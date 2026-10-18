@@ -209,6 +209,366 @@ Text to check: ${JSON.stringify(combinedText)}`,
   };
 }
 
+const VALID_DEMERIT_CATEGORIES = [
+  'Attendance / No-Show',
+  'Insubordination / Defiance',
+  'Bar Etiquette / Seating',
+  'Drink Crime / Order Foul',
+  'Attire / Headgear Foul',
+  'Sports / Fantasy Foul',
+  'Party Foul / Conduct',
+];
+
+function inferDemeritCategory(desc, suggestedType) {
+  if (suggestedType && VALID_DEMERIT_CATEGORIES.includes(suggestedType)) {
+    return suggestedType;
+  }
+  const lower = String(desc || '').toLowerCase();
+  if (lower.includes('no call') || lower.includes('no show') || lower.includes('red wings') || lower.includes('late') || lower.includes('absent')) {
+    return 'Attendance / No-Show';
+  }
+  if (
+    lower.includes('not caring') ||
+    lower.includes('first demerit') ||
+    lower.includes('defian') ||
+    lower.includes('back talk') ||
+    lower.includes('insubordinat') ||
+    lower.includes('disrespect') ||
+    lower.includes('attitude') ||
+    lower.includes('mouth')
+  ) {
+    return 'Insubordination / Defiance';
+  }
+  if (lower.includes('seat') || lower.includes('chair') || lower.includes('stool') || lower.includes('booth') || lower.includes('table')) {
+    return 'Bar Etiquette / Seating';
+  }
+  if (lower.includes('gin') || lower.includes('diet coke') || lower.includes('order') || lower.includes('drink') || lower.includes('beer') || lower.includes('shot') || lower.includes('tab')) {
+    return 'Drink Crime / Order Foul';
+  }
+  if (lower.includes('headband') || lower.includes('hat') || lower.includes('shirt') || lower.includes('attire') || lower.includes('jersey') || lower.includes('outfit')) {
+    return 'Attire / Headgear Foul';
+  }
+  if (lower.includes('lions') || lower.includes('tigers') || lower.includes('pistons') || lower.includes('michigan') || lower.includes('spartan') || lower.includes('buckeye') || lower.includes('packager') || lower.includes('packer') || lower.includes('sports') || lower.includes('fantasy')) {
+    return 'Sports / Fantasy Foul';
+  }
+  return 'Party Foul / Conduct';
+}
+
+function normalizeExtractedDate(rawDate, fallbackDate) {
+  const fb = fallbackDate || new Date().toISOString().slice(0, 10);
+  const currentYear = fb.slice(0, 4);
+  if (!rawDate) return fb;
+  const str = String(rawDate).trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(str)) {
+    const yr = parseInt(str.slice(0, 4), 10);
+    if (yr < 2025) {
+      return `${currentYear}${str.slice(4)}`;
+    }
+    return str;
+  }
+  const mdy = str.match(/^(\d{1,2})[\/\-](\d{1,2})(?:[\/\-](\d{2,4}))?$/);
+  if (mdy) {
+    const mm = mdy[1].padStart(2, '0');
+    const dd = mdy[2].padStart(2, '0');
+    let yyyy = mdy[3] ? mdy[3] : currentYear;
+    if (yyyy.length === 2) yyyy = `20${yyyy}`;
+    if (parseInt(yyyy, 10) < 2025) yyyy = currentYear;
+    return `${yyyy}-${mm}-${dd}`;
+  }
+  return fb;
+}
+
+function normalizeExtractedTime(rawTime) {
+  if (!rawTime) return '21:00';
+  const str = String(rawTime).trim().toUpperCase();
+  const match = str.match(/(\d{1,2}):(\d{2})\s*(AM|PM)?/);
+  if (!match) return '21:00';
+  let hours = parseInt(match[1], 10);
+  const mins = match[2];
+  const ampm = match[3];
+  if (ampm === 'PM' && hours < 12) {
+    hours += 12;
+  } else if (ampm === 'AM' && hours === 12) {
+    hours = 0;
+  } else if (!ampm && hours >= 1 && hours <= 11) {
+    // Bar demerit slips written between 1:00 and 11:59 without AM/PM are evening PM hours
+    hours += 12;
+  }
+  return `${String(hours).padStart(2, '0')}:${mins}`;
+}
+
+function base64ToUint8Array(base64DataUrl) {
+  const rawB64 = base64DataUrl.includes('base64,')
+    ? base64DataUrl.split('base64,')[1]
+    : base64DataUrl;
+  const binaryString = atob(rawB64);
+  const bytes = new Uint8Array(binaryString.length);
+  for (let i = 0; i < binaryString.length; i++) {
+    bytes[i] = binaryString.charCodeAt(i);
+  }
+  return bytes;
+}
+
+function sanitizeExtractedSlips(rawSlips, fallbackDate) {
+  if (!Array.isArray(rawSlips) || rawSlips.length === 0) return [];
+  return rawSlips.map((s) => {
+    const rawStudent = String(s.raw_student || s.student || s.patron || 'Patron').trim();
+    const rawSignature = String(
+      s.raw_signature || s.signature || s.teacher || s.issuer || 'The Boss - AKA Sarah'
+    ).trim();
+    const incidentDate = normalizeExtractedDate(s.incident_date || s.date, fallbackDate);
+    const incidentTime = normalizeExtractedTime(s.incident_time || s.time);
+    const locationArea = String(s.location_area || s.room || 'Copper A.C.').trim() || 'Copper A.C.';
+
+    let rawItems = Array.isArray(s.demerit_items || s.items) ? (s.demerit_items || s.items) : [];
+    const rawInfractions = Array.isArray(s.infractions)
+      ? s.infractions.map((x) => String(x || '').trim()).filter(Boolean)
+      : [];
+
+    if (rawItems.length === 0 && rawInfractions.length > 0) {
+      rawItems = rawInfractions.map((desc) => ({
+        type: inferDemeritCategory(desc, null),
+        description: desc,
+        points: 1,
+      }));
+    }
+
+    if (rawItems.length === 0 && s.reason) {
+      const desc = String(s.reason).trim();
+      rawItems = [
+        {
+          type: inferDemeritCategory(desc, null),
+          description: desc,
+          points: Math.max(1, Number(s.demerit_count || s.points) || 1),
+        },
+      ];
+    }
+
+    if (rawItems.length === 0) {
+      rawItems = [
+        {
+          type: 'Party Foul / Conduct',
+          description: 'Bar Demerit Citation',
+          points: Math.max(1, Number(s.demerit_count || s.points) || 1),
+        },
+      ];
+    }
+
+    const cleanedItems = rawItems.map((it) => {
+      const desc = String(it.description || it.reason || 'Bar Citation').trim();
+      return {
+        type: inferDemeritCategory(desc, it.type),
+        description: desc,
+        points: Math.max(1, Number(it.points) || 1),
+      };
+    });
+
+    const explicitCount = Number(s.demerit_count || s.points);
+    const sumPoints = cleanedItems.reduce((acc, it) => acc + it.points, 0);
+    if (explicitCount > sumPoints && cleanedItems.length === 1) {
+      cleanedItems[0].points = explicitCount;
+    }
+    const finalCount = cleanedItems.reduce((acc, it) => acc + it.points, 0);
+
+    return {
+      raw_student: rawStudent,
+      raw_signature: rawSignature,
+      incident_date: incidentDate,
+      incident_time: incidentTime,
+      location_area: locationArea,
+      demerit_count: finalCount,
+      infractions: cleanedItems.map((it) => it.description),
+      demerit_items: cleanedItems,
+    };
+  });
+}
+
+/**
+ * Extracts 1 or more physical Demerit Slips from an uploaded photo using Vision AI:
+ * - Uses Gemini 2.5 Flash if `env.GEMINI_API_KEY` is configured
+ * - Uses Cloudflare Workers AI Vision (`@cf/meta/llama-3.2-11b-vision-instruct` / `@cf/google/gemma-3-12b-it` / `@cf/llava-hf/llava-1.5-7b-hf`)
+ */
+async function extractSlipsFromImageWithAI(env, { imageBase64, defaultDate, knownMembers = [], knownAliases = [] }) {
+  const fallbackDate = defaultDate || new Date().toISOString().slice(0, 10);
+  if (!imageBase64) {
+    return { ok: false, error: 'Missing imageBase64 for slip extraction.' };
+  }
+
+  const rosterHint = knownMembers.length > 0
+    ? `Known Copper Athletic Club patrons & staff names: ${knownMembers.join(', ')}. Known nicknames/signatures: ${knownAliases.join(', ')}.`
+    : `Known Copper Athletic Club regulars: Rick, Burtis, Sarah (The Boss / The Boss Lady), David Lee.`;
+
+  const extractionPrompt = `You are an expert OCR reader for Copper Athletic Club's handwritten "DEMERIT SLIP" citations.
+Examine this photo carefully. A photo may contain 1 single Demerit Slip OR multiple physical Demerit Slips (e.g., 2, 3, or 4 slips laying next to each other).
+${rosterHint}
+
+For EVERY physical Demerit Slip visible in the image, read all handwritten fields:
+- "raw_student": Handwritten name on the "Student:" line (e.g. "Rick", "Burtis", "David Lee", etc.)
+- "incident_date": Handwritten date on the "Date(s):" line formatted as YYYY-MM-DD (if year is 26 or missing, use 2026; if blank use "${fallbackDate}")
+- "incident_time": Handwritten time on the "Time:" line in 24-hour HH:MM format (note: bar slips are evening PM times unless AM is written, so "9:09" or "9:09 PM" -> "21:09", "6:27" -> "18:27", "8:50" -> "20:50")
+- "location_area": Handwritten room on the "Room:" line (e.g. "Copper A.C.", "Copper Bar", "Copper")
+- "demerit_count": Total integer number of demerits written on the "Demerits:" line (e.g. "1", "2", "3", "1 - so far" -> 1)
+- "raw_signature": Handwritten signature on the "Teacher:" / bottom signature line (e.g. "The Boss - AKA Sarah", "The Boss Lady", "YOUR BOSS!", or if it's Sarah's cursive signature write "Sarah (Cursive Signature)")
+- "demerit_items": Array of each handwritten offense/reason listed on the slip. Each item must have:
+  - "description": Exact handwritten offense text (e.g. "Too many seat moves", "Tried to order Gin and Diet Coke", "The headband", "Back talk, insubordinate", "No call / no show to see the Red Wings")
+  - "type": One of ["Attendance / No-Show", "Insubordination / Defiance", "Bar Etiquette / Seating", "Drink Crime / Order Foul", "Attire / Headgear Foul", "Sports / Fantasy Foul", "Party Foul / Conduct"]
+  - "points": Integer points for this offense so the items sum to "demerit_count"
+
+Respond ONLY with valid JSON in this exact structure (no markdown fences, no extra commentary):
+{"slips": [{"raw_student": "...", "incident_date": "YYYY-MM-DD", "incident_time": "HH:MM", "location_area": "...", "demerit_count": 1, "raw_signature": "...", "demerit_items": [{"type": "...", "description": "...", "points": 1}]}]}`;
+
+  const dataUrl = imageBase64.startsWith('data:')
+    ? imageBase64
+    : `data:image/jpeg;base64,${imageBase64}`;
+
+  // 1. Optional Gemini 2.5 Flash Vision if GEMINI_API_KEY is set
+  if (env.GEMINI_API_KEY) {
+    try {
+      const rawB64 = dataUrl.split('base64,')[1];
+      const geminiRes = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${env.GEMINI_API_KEY}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [
+              {
+                parts: [
+                  { text: extractionPrompt },
+                  { inlineData: { mimeType: 'image/jpeg', data: rawB64 } },
+                ],
+              },
+            ],
+            generationConfig: { responseMimeType: 'application/json' },
+          }),
+        }
+      );
+      if (geminiRes.ok) {
+        const geminiJson = await geminiRes.json();
+        const rawOut = geminiJson?.candidates?.[0]?.content?.parts?.[0]?.text;
+        const parsed = parseJsonSafe(rawOut, null);
+        const slips = sanitizeExtractedSlips(parsed?.slips || (Array.isArray(parsed) ? parsed : []), fallbackDate);
+        if (slips.length > 0) {
+          return { ok: true, model: 'gemini-2.5-flash', slips };
+        }
+      }
+    } catch {
+      // Fall through to Cloudflare Workers AI Vision
+    }
+  }
+
+  // 2. Cloudflare Workers AI Vision Models (`env.AI`)
+  if (env.AI) {
+    const visionModels = [
+      '@cf/mistralai/mistral-small-3.1-24b-instruct',
+      '@cf/google/gemma-3-12b-it',
+      '@cf/meta/llama-3.2-11b-vision-instruct',
+    ];
+
+    for (const modelName of visionModels) {
+      try {
+        let aiRes;
+        if (modelName === '@cf/meta/llama-3.2-11b-vision-instruct') {
+          const imgBytes = Array.from(base64ToUint8Array(dataUrl));
+          try {
+            aiRes = await env.AI.run(modelName, {
+              messages: [
+                {
+                  role: 'user',
+                  content: extractionPrompt,
+                },
+              ],
+              image: imgBytes,
+              max_tokens: 900,
+              temperature: 0.1,
+            });
+          } catch (innerErr) {
+            const msg = String(innerErr?.message || innerErr || '');
+            if (msg.toLowerCase().includes('agree')) {
+              await env.AI.run(modelName, { prompt: 'agree' });
+              aiRes = await env.AI.run(modelName, {
+                messages: [
+                  {
+                    role: 'user',
+                    content: extractionPrompt,
+                  },
+                ],
+                image: imgBytes,
+                max_tokens: 900,
+                temperature: 0.1,
+              });
+            } else {
+              throw innerErr;
+            }
+          }
+        } else {
+          aiRes = await env.AI.run(modelName, {
+            messages: [
+              {
+                role: 'user',
+                content: [
+                  { type: 'text', text: extractionPrompt },
+                  { type: 'image_url', image_url: { url: dataUrl } },
+                ],
+              },
+            ],
+            max_tokens: 900,
+            temperature: 0.1,
+          });
+        }
+
+        const rawResponse =
+          typeof aiRes?.response === 'string'
+            ? aiRes.response
+            : aiRes?.choices?.[0]?.message?.content || JSON.stringify(aiRes || '');
+
+        const jsonMatch = String(rawResponse).match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+          const parsed = parseJsonSafe(jsonMatch[0], null);
+          const slips = sanitizeExtractedSlips(
+            parsed?.slips || (Array.isArray(parsed) ? parsed : []),
+            fallbackDate
+          );
+          if (slips.length > 0) {
+            return { ok: true, model: modelName, slips };
+          }
+        }
+      } catch {
+        // Try next vision model
+      }
+    }
+
+    // Fallback Vision model: `@cf/llava-hf/llava-1.5-7b-hf`
+    try {
+      const imgBytes = Array.from(base64ToUint8Array(dataUrl));
+      const llavaRes = await env.AI.run('@cf/llava-hf/llava-1.5-7b-hf', {
+        image: imgBytes,
+        prompt: extractionPrompt,
+        max_tokens: 512,
+      });
+      const rawText = llavaRes?.description || llavaRes?.response || '';
+      const jsonMatch = String(rawText).match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        const parsed = parseJsonSafe(jsonMatch[0], null);
+        const slips = sanitizeExtractedSlips(
+          parsed?.slips || (Array.isArray(parsed) ? parsed : []),
+          fallbackDate
+        );
+        if (slips.length > 0) {
+          return { ok: true, model: '@cf/llava-hf/llava-1.5-7b-hf', slips };
+        }
+      }
+    } catch {
+      // Fall through
+    }
+  }
+
+  return {
+    ok: false,
+    error: 'Could not automatically read slip handwriting from photo.',
+  };
+}
+
 function normalizeEmail(raw) {
   return String(raw || '').trim().toLowerCase();
 }
@@ -683,6 +1043,26 @@ export default {
           ok: true,
           ...mod,
         });
+      }
+
+      // 3B. Zero-Touch AI Vision Slip OCR & Extraction (`POST /api/extract-slip`)
+      if (path === '/api/extract-slip' && request.method === 'POST') {
+        const body = await request.json();
+        const [membersRes, aliasesRes] = await Promise.all([
+          env.DB.prepare('SELECT display_name FROM members').all(),
+          env.DB.prepare('SELECT alias FROM staff_aliases').all(),
+        ]);
+        const knownMembers = (membersRes.results || []).map((m) => m.display_name);
+        const knownAliases = (aliasesRes.results || []).map((a) => a.alias);
+
+        const extraction = await extractSlipsFromImageWithAI(env, {
+          imageBase64: body.imageBase64 || null,
+          defaultDate: body.defaultDate || new Date().toISOString().slice(0, 10),
+          knownMembers,
+          knownAliases,
+        });
+
+        return jsonResponse(extraction, extraction.ok ? 200 : 422);
       }
 
       // 4. Bootstrap All Public Data (`GET /api/bootstrap`) — Zero PII Exposed
@@ -1358,11 +1738,31 @@ export default {
         const allMembers = membersRes.results || [];
         const allAliases = aliasesRes.results || [];
 
-        const resolvedPatronId =
+        let resolvedPatronId =
           body.patron_id ||
           matchMemberFromAliases(sanitizedStudent, allMembers, allAliases, 'patron') ||
           matchMemberFromAliases(sanitizedStudent, allMembers, allAliases, null) ||
           null;
+
+        if (
+          !resolvedPatronId &&
+          !isFlaggedOrBlurred &&
+          sanitizedStudent &&
+          sanitizedStudent.toLowerCase() !== 'anonymous patron'
+        ) {
+          const newPatronId = crypto.randomUUID();
+          await env.DB.prepare(
+            'INSERT INTO members (id, display_name, is_staff, is_patron, is_claimed, favorite_team, tagline) VALUES (?, ?, 0, 1, 0, ?, ?)'
+          )
+            .bind(newPatronId, sanitizedStudent.trim(), 'lions', 'Ring of Honor Contender')
+            .run();
+          await env.DB.prepare(
+            'INSERT OR IGNORE INTO staff_aliases (id, alias, member_id) VALUES (?, ?, ?)'
+          )
+            .bind(crypto.randomUUID(), sanitizedStudent.trim().toLowerCase(), newPatronId)
+            .run();
+          resolvedPatronId = newPatronId;
+        }
 
         const resolvedIssuerId =
           body.issuer_id ||

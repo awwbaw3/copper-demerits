@@ -2,6 +2,16 @@
 
 All notable changes to the **Copper Athletic Club — Ring of Honor** web application are documented in this file.
 
+## [1.6.4] - 2026-10-18
+
+### Added
+- **Zero-Touch AI Vision Slip OCR & Automatic Logging on Image Capture (`POST /api/extract-slip`, `cloudflare/worker.js`, `src/lib/moderation.ts`, `src/pages/SubmitSlipPage.tsx`)**:
+  - Added `POST /api/extract-slip` powered by **Cloudflare Workers AI Vision (`@cf/mistralai/mistral-small-3.1-24b-instruct`)** (with automatic fallback to `@cf/google/gemma-3-12b-it` / `@cf/meta/llama-3.2-11b-vision-instruct` and optional Gemini 2.5 Flash Vision).
+  - When a user captures a camera photo or selects a slip image on `/submit`, the app automatically:
+    1. Verifies the image is unique (SHA-256 + 64-bit Perceptual dHash) and uploads it to Cloudflare R2 (`copper-demerits-slips`).
+    2. Detects how many physical slips are in the photo (1 to 4 slips) and extracts all handwritten fields (**Student / Patron Name**, **Date**, **Time**, **Room**, **Total Demerits**, **Itemized Offenses & Categories**, and **Teacher / Staff Signature**).
+    3. Automatically runs the AI Referee profanity/auto-blur monitor, merges stats into matching Patron/Staff profiles (or creates an unclaimed Patron profile if new), and saves all extracted slips directly to **Cloudflare D1** — so the user **only has to snap/choose the photo and does not have to type or click anything else**.
+
 ## [1.6.3] - 2026-10-18
 
 ### Added & Hardened

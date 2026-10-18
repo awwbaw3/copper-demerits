@@ -4,6 +4,16 @@ Chronological log of architectural decisions, database migrations, and infrastru
 
 ---
 
+## 2026-10-18 — v1.6.4 Zero-Touch AI Vision Slip Extraction & Automatic Logging on Image Capture
+- **Cloudflare Workers AI Vision OCR Endpoint (`POST /api/extract-slip` in `cloudflare/worker.js`)**:
+  - Added `extractSlipsFromImageWithAI` using Cloudflare Workers AI Vision (`@cf/mistralai/mistral-small-3.1-24b-instruct`, `@cf/google/gemma-3-12b-it`, `@cf/meta/llama-3.2-11b-vision-instruct`) seeded with the live `members` and `staff_aliases` roster hints.
+  - Verified live against both single-slip photos (`28318_david_lee_1827.jpg`, `Scan_20261017_212309.jpg`) and the 3-slip bar photo (`20261017_211324.jpg`), accurately extracting all 3 slips, patron names, timestamps, rooms, offense descriptions, categories, points, and signatures in a single pass.
+  - Updated `POST /api/demerits` to automatically create an unclaimed Patron profile in D1 whenever a clean slip cites a brand-new patron name.
+- **Zero-Touch Image Capture Workflow (`src/pages/SubmitSlipPage.tsx`, `src/lib/moderation.ts`)**:
+  - Updated `handleFileChange` on `/submit` so snapping or selecting a photo automatically verifies uniqueness, uploads to R2, extracts all slip fields via `/api/extract-slip`, runs AI Referee moderation, saves all extracted slips to Cloudflare D1, and renders a **Zero-Touch AI Slip Receipt** without requiring any manual typing or second button press.
+
+---
+
 ## 2026-10-18 — v1.6.3 Email or Phone Required to Claim/Sign Up, Returning Email/Phone + PIN Login & Unclaimed-Only Claim List
 - **Cloudflare D1 Schema & Worker Auth Upgrade (`cloudflare/worker.js` Version `3a8003ff-8410-4378-b402-dbdc2e6059ab`)**:
   - Added `is_claimed INTEGER NOT NULL DEFAULT 0` to `members` on remote D1 (`copper-demerits-db`) and updated `formatPublicMember` so `is_claimed` is `true` whenever `row.is_claimed` or `row.claimed_pin` is set.

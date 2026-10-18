@@ -10,6 +10,7 @@ import {
   moderateTextInstant,
   scanWithRefereeMonitor,
   applyRefereeBlurStampToImage,
+  extractSlipsFromPhotoAI,
 } from '../lib/moderation';
 import {
   Camera,
@@ -28,6 +29,8 @@ import {
   KeyRound,
   UserCheck,
   EyeOff,
+  Wand2,
+  SlidersHorizontal,
 } from 'lucide-react';
 
 interface SlipDraftItem {
@@ -80,6 +83,8 @@ export const SubmitSlipPage: React.FC = () => {
   const [uploadStatusMsg, setUploadStatusMsg] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [showManualEditor, setShowManualEditor] = useState(false);
+  const [autoLoggedSlips, setAutoLoggedSlips] = useState<SlipDraftItem[] | null>(null);
   const [submittedSummary, setSubmittedSummary] = useState<{
     newCount: number;
     mergedCount: number;
@@ -164,6 +169,106 @@ export const SubmitSlipPage: React.FC = () => {
     );
   };
 
+  /**
+   * Saves an array of slip drafts to Cloudflare D1 (with AI Referee auto-blur moderation & stat merging).
+   */
+  const persistSlipDrafts = async (
+    draftsToSave: SlipDraftItem[],
+    targetImageUrl: string,
+    targetRawDataUrl: string | null,
+    targetSha256: string | null,
+    targetDhash: string | null
+  ) => {
+    if (!currentMember) return;
+    setSubmitting(true);
+    setErrorMsg(null);
+    try {
+      let newCount = 0;
+      let mergedCount = 0;
+      let blurredQueueCount = 0;
+      const isMultiSlip = draftsToSave.length > 1;
+
+      for (let i = 0; i < draftsToSave.length; i++) {
+        const d = draftsToSave[i];
+        const validItems = d.items
+          .map((item) => ({
+            type: item.type,
+            description: item.description.trim() || item.type,
+            points: Math.max(1, Number(item.points) || 1),
+          }))
+          .filter(Boolean);
+
+        const totalDemeritCount = validItems.reduce((sum, item) => sum + item.points, 0);
+        const cleanedInfractions = validItems.map((item) => item.description);
+
+        // Scan text + image with AI Referee Monitor
+        const modScan = await scanWithRefereeMonitor(
+          [d.rawStudent, d.rawSignature, ...cleanedInfractions],
+          targetRawDataUrl
+        );
+
+        let finalSlipImageUrl = targetImageUrl;
+        if (modScan.flagged && (targetRawDataUrl || targetImageUrl)) {
+          finalSlipImageUrl = await applyRefereeBlurStampToImage(
+            targetRawDataUrl || targetImageUrl,
+            modScan.blurRegions
+          );
+        }
+
+        const res = await submitDemeritSlip({
+          raw_student: d.rawStudent,
+          raw_signature: d.rawSignature,
+          submitted_by_member_id: currentMember.id,
+          demerit_count: totalDemeritCount,
+          incident_date: d.incidentDate,
+          incident_time: d.incidentTime || null,
+          location_area: d.locationArea,
+          infractions: cleanedInfractions,
+          demerit_items: validItems,
+          image_url: finalSlipImageUrl,
+          source_image_url: isMultiSlip ? targetImageUrl : null,
+          image_sha256: i === 0 ? targetSha256 : null,
+          image_dhash: i === 0 ? targetDhash : null,
+          is_blurred: modScan.flagged,
+          moderation_flag_reason: modScan.reason,
+          capture_note: isMultiSlip
+            ? `Slip ${i + 1} of ${draftsToSave.length} auto-extracted from multi-slip photo (${
+                d.incidentTime || d.incidentDate
+              })`
+            : 'Auto-extracted & logged via AI Vision Capture',
+          createPatronIfNew: true,
+          allowMultiSlipBatch: i > 0,
+          mergeIfCitationDuplicate: true,
+        });
+
+        if (res.wasMergedDuplicate) {
+          mergedCount += 1;
+        } else if (res.wasBlurredAndQueued) {
+          blurredQueueCount += 1;
+        } else {
+          newCount += 1;
+        }
+      }
+
+      setAutoLoggedSlips(draftsToSave);
+      setSubmittedSummary({ newCount, mergedCount, blurredQueueCount });
+      setTimeout(() => {
+        navigate(blurredQueueCount > 0 ? '/admin' : '/docket');
+      }, 2400);
+    } catch (err) {
+      setErrorMsg(err instanceof Error ? err.message : 'Could not save slip.');
+      setShowManualEditor(true);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  /**
+   * Zero-Touch Image Capture:
+   * 1. Computes SHA-256 & 64-bit Perceptual dHash and uploads photo to Cloudflare R2.
+   * 2. Runs Vision AI OCR (`/api/extract-slip`) to automatically read all handwritten fields.
+   * 3. Automatically logs all extracted slip(s) to Cloudflare D1 so the user doesn't have to do anything else!
+   */
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -177,7 +282,9 @@ export const SubmitSlipPage: React.FC = () => {
     setUploadingPhoto(true);
     setErrorMsg(null);
     setDuplicateAlert(null);
-    setUploadStatusMsg('Computing SHA-256, 64-bit Perceptual dHash & AI Referee Scan...');
+    setSubmittedSummary(null);
+    setAutoLoggedSlips(null);
+    setUploadStatusMsg('Step 1/3 · Verifying Unique Photo (SHA-256 & 64-bit Perceptual dHash)...');
 
     try {
       const asset = await processAndUploadSlipImage(file);
@@ -190,15 +297,69 @@ export const SubmitSlipPage: React.FC = () => {
         setImageSha256(null);
         setImageDhash(null);
         setUploadStatusMsg(null);
-      } else {
-        setImageUrl(asset.url);
-        setRawDataUrl(asset.fingerprint.dataUrl);
-        setImageSha256(asset.fingerprint.sha256);
-        setImageDhash(asset.fingerprint.dhash);
+        return;
+      }
+
+      setImageUrl(asset.url);
+      setRawDataUrl(asset.fingerprint.dataUrl);
+      setImageSha256(asset.fingerprint.sha256);
+      setImageDhash(asset.fingerprint.dhash);
+      setUploadStatusMsg(
+        'Step 2/3 · AI Vision Referee Reading Handwritten Slip(s) (Patron, Offenses, Time & Signature)...'
+      );
+
+      const todayStr = new Date().toISOString().slice(0, 10);
+      const aiResult = await extractSlipsFromPhotoAI(asset.fingerprint.dataUrl, todayStr);
+
+      if (aiResult.ok && aiResult.slips && aiResult.slips.length > 0) {
+        const extractedDrafts: SlipDraftItem[] = aiResult.slips.map((s) => ({
+          rawStudent: s.raw_student || 'Patron',
+          rawSignature: s.raw_signature || 'The Boss - AKA Sarah',
+          incidentDate: s.incident_date || todayStr,
+          incidentTime: s.incident_time || '21:00',
+          locationArea: s.location_area || 'Copper A.C.',
+          items:
+            Array.isArray(s.demerit_items) && s.demerit_items.length > 0
+              ? s.demerit_items.map((it) => ({
+                  type: it.type || DEMERIT_CATEGORIES[6],
+                  description: it.description || 'Bar Citation',
+                  points: Math.max(1, Number(it.points) || 1),
+                }))
+              : [
+                  {
+                    type: DEMERIT_CATEGORIES[6],
+                    description: (s.infractions && s.infractions[0]) || 'Bar Demerit Citation',
+                    points: Math.max(1, Number(s.demerit_count) || 1),
+                  },
+                ],
+        }));
+
+        setSlipDrafts(extractedDrafts);
         setUploadStatusMsg(
-          asset.storageMode === 'cloudflare-r2'
-            ? `Verified Unique Image · Uploaded to Cloudflare R2 "${SLIPS_BUCKET}"`
-            : `Verified Unique Image · Ready for submission`
+          `Step 3/3 · Grabbed ${extractedDrafts.length} ${
+            extractedDrafts.length === 1 ? 'Slip' : 'Slips'
+          } Automatically! Logging to Ring of Honor...`
+        );
+
+        // Automatically log and save the extracted slip(s) so the user doesn't have to do anything else!
+        await persistSlipDrafts(
+          extractedDrafts,
+          asset.url,
+          asset.fingerprint.dataUrl,
+          asset.fingerprint.sha256,
+          asset.fingerprint.dhash
+        );
+
+        setUploadStatusMsg(
+          `Zero-Touch Complete · ${extractedDrafts.length} ${
+            extractedDrafts.length === 1 ? 'Slip' : 'Slips'
+          } Read & Logged Automatically to Cloudflare R2 "${SLIPS_BUCKET}" & D1`
+        );
+      } else {
+        // Only open manual editor if photo was too blurry for AI OCR
+        setShowManualEditor(true);
+        setUploadStatusMsg(
+          'Photo uploaded to Cloudflare R2 · Review or enter slip details below to finish logging.'
         );
       }
     } catch {
@@ -224,84 +385,7 @@ export const SubmitSlipPage: React.FC = () => {
       return;
     }
 
-    setSubmitting(true);
-    try {
-      let newCount = 0;
-      let mergedCount = 0;
-      let blurredQueueCount = 0;
-      const isMultiSlip = slipDrafts.length > 1;
-
-      for (let i = 0; i < slipDrafts.length; i++) {
-        const d = slipDrafts[i];
-        const validItems = d.items
-          .map((item) => ({
-            type: item.type,
-            description: item.description.trim() || item.type,
-            points: Math.max(1, Number(item.points) || 1),
-          }))
-          .filter(Boolean);
-
-        const totalDemeritCount = validItems.reduce((sum, item) => sum + item.points, 0);
-        const cleanedInfractions = validItems.map((item) => item.description);
-
-        // Scan text + image with AI Referee Monitor
-        const modScan = await scanWithRefereeMonitor(
-          [d.rawStudent, d.rawSignature, ...cleanedInfractions],
-          rawDataUrl
-        );
-
-        let finalSlipImageUrl = imageUrl;
-        if (modScan.flagged && (rawDataUrl || imageUrl)) {
-          finalSlipImageUrl = await applyRefereeBlurStampToImage(
-            rawDataUrl || imageUrl,
-            modScan.blurRegions
-          );
-        }
-
-        const res = await submitDemeritSlip({
-          raw_student: d.rawStudent,
-          raw_signature: d.rawSignature,
-          submitted_by_member_id: currentMember.id,
-          demerit_count: totalDemeritCount,
-          incident_date: d.incidentDate,
-          incident_time: d.incidentTime || null,
-          location_area: d.locationArea,
-          infractions: cleanedInfractions,
-          demerit_items: validItems,
-          image_url: finalSlipImageUrl,
-          source_image_url: isMultiSlip ? imageUrl : null,
-          image_sha256: i === 0 ? imageSha256 : null,
-          image_dhash: i === 0 ? imageDhash : null,
-          is_blurred: modScan.flagged,
-          moderation_flag_reason: modScan.reason,
-          capture_note: isMultiSlip
-            ? `Slip ${i + 1} of ${slipDrafts.length} extracted from multi-slip photo (${
-                d.incidentTime || d.incidentDate
-              })`
-            : null,
-          createPatronIfNew: true,
-          allowMultiSlipBatch: i > 0,
-          mergeIfCitationDuplicate: true,
-        });
-
-        if (res.wasMergedDuplicate) {
-          mergedCount += 1;
-        } else if (res.wasBlurredAndQueued) {
-          blurredQueueCount += 1;
-        } else {
-          newCount += 1;
-        }
-      }
-
-      setSubmittedSummary({ newCount, mergedCount, blurredQueueCount });
-      setTimeout(() => {
-        navigate(blurredQueueCount > 0 ? '/admin' : '/docket');
-      }, 1600);
-    } catch (err) {
-      setErrorMsg(err instanceof Error ? err.message : 'Could not save slip.');
-    } finally {
-      setSubmitting(false);
-    }
+    await persistSlipDrafts(slipDrafts, imageUrl, rawDataUrl, imageSha256, imageDhash);
   };
 
   return (
@@ -309,15 +393,16 @@ export const SubmitSlipPage: React.FC = () => {
       {/* Header */}
       <div className="border-b border-[#B87333]/30 pb-5">
         <div className="inline-flex items-center gap-2 rounded-full border border-[#B87333]/40 bg-[#B87333]/10 px-3 py-1 text-[11px] font-mono-docket uppercase tracking-widest text-[#E8B888]">
-          <Camera className="h-3.5 w-3.5 text-[#B87333]" />
-          <span>CLOUDFLARE D1 + R2 · PROFILE-VERIFIED SLIP LOGGER</span>
+          <Wand2 className="h-3.5 w-3.5 text-[#DFC15E]" />
+          <span>ZERO-TOUCH AI VISION CAPTURE · SNAP &amp; DONE</span>
         </div>
         <h1 className="mt-2 font-athletic text-3xl sm:text-5xl font-extrabold uppercase tracking-wide text-[#F5F2EB]">
-          DROP A <span className="text-[#B87333]">SLIP PHOTO</span>
+          SNAP A <span className="text-[#B87333]">SLIP PHOTO</span>
         </h1>
         <p className="mt-1 text-xs sm:text-sm text-[#B5A99D]">
-          Claim or sign in to your Staff or Patron Bar Profile to log single-slip scans or
-          multi-slip bar photos directly to Cloudflare R2 &amp; D1.
+          Just snap or choose a photo of the physical demerit slip(s). Our AI Referee automatically
+          reads the handwriting (Student, Offenses, Points, Time, Room &amp; Signature) and logs it
+          to the Ring of Honor — <strong className="text-[#DFC15E]">nothing else to type!</strong>
         </p>
       </div>
 
@@ -331,14 +416,11 @@ export const SubmitSlipPage: React.FC = () => {
                 BAR LOCKER LOGIN REQUIRED TO UPLOAD
               </span>
               <h2 className="font-athletic text-2xl sm:text-3xl font-black uppercase text-[#F5F2EB]">
-                CLAIM YOUR STAFF OR PATRON PROFILE FIRST
+                SIGN IN OR CLAIM YOUR PROFILE FIRST
               </h2>
               <p className="text-xs sm:text-sm text-[#D6C7B8]">
-                Pick your card (<strong className="text-white">Sarah</strong>,{' '}
-                <strong className="text-white">Rick</strong>,{' '}
-                <strong className="text-white">Burtis</strong>,{' '}
-                <strong className="text-white">David Lee</strong>, or create a new Patron pass) with
-                a 4 to 8-digit Bar PIN so every uploaded slip is tied to a verified bar member.
+                Sign in with your email or 10-digit phone number + Bar PIN (or claim an unclaimed
+                name on the board) so every uploaded slip is tied to a verified bar member.
               </p>
             </div>
 
@@ -348,7 +430,7 @@ export const SubmitSlipPage: React.FC = () => {
               className="inline-flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-[#DFC15E] to-[#B87333] px-5 py-3.5 font-athletic text-base font-black uppercase tracking-wider text-[#121212] shadow-[0_0_25px_rgba(223,193,94,0.4)] hover:brightness-110 shrink-0 cursor-pointer"
             >
               <KeyRound className="h-4 w-4" />
-              <span>Claim / Sign In</span>
+              <span>Sign In / Claim</span>
             </button>
           </div>
         </div>
@@ -461,35 +543,109 @@ export const SubmitSlipPage: React.FC = () => {
         </div>
       )}
 
-      {submittedSummary && (
-        <div className="flex items-center gap-3 rounded-2xl border border-emerald-500/50 bg-emerald-950/60 p-4 text-emerald-200">
-          <CheckCircle2 className="h-6 w-6 text-emerald-400 shrink-0" />
-          <div>
-            <h3 className="font-athletic text-xl uppercase font-bold">
-              Slip Photo Processed!
-            </h3>
-            <p className="text-xs font-mono-docket">
-              {submittedSummary.newCount} new citation(s) logged ·{' '}
-              {submittedSummary.mergedCount} duplicate citation(s) merged as secondary photo evidence
-              {submittedSummary.blurredQueueCount > 0
-                ? ` · ${submittedSummary.blurredQueueCount} slip(s) auto-blurred by Referee & queued for Admin override.`
-                : '.'}
-            </p>
+      {/* Zero-Touch Auto-Logged Receipt Card */}
+      {submittedSummary && autoLoggedSlips && (
+        <div className="rounded-3xl border-2 border-emerald-500/60 bg-gradient-to-b from-emerald-950/70 to-[#14110F] p-5 sm:p-6 text-emerald-100 space-y-4 shadow-[0_15px_50px_rgba(16,185,129,0.2)]">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <CheckCircle2 className="h-7 w-7 text-emerald-400 shrink-0" />
+              <div>
+                <span className="font-mono-docket text-[10px] font-bold uppercase tracking-widest text-emerald-300">
+                  ZERO-TOUCH AI VISION OCR • LOGGED AUTOMATICALLY
+                </span>
+                <h3 className="font-athletic text-2xl sm:text-3xl uppercase font-black text-white">
+                  Slip Grabbed &amp; Logged to Ring of Honor!
+                </h3>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => navigate('/docket')}
+              className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-400 px-4 py-2 font-athletic text-sm font-black uppercase tracking-wider text-[#121212] hover:bg-emerald-300 cursor-pointer"
+            >
+              <span>View on Wall of Slips</span>
+              <ArrowRight className="h-4 w-4" />
+            </button>
+          </div>
+
+          <p className="text-xs font-mono-docket text-emerald-200">
+            {submittedSummary.newCount} new citation(s) logged automatically ·{' '}
+            {submittedSummary.mergedCount} duplicate citation(s) merged as secondary photo evidence
+            {submittedSummary.blurredQueueCount > 0
+              ? ` · ${submittedSummary.blurredQueueCount} slip(s) auto-blurred by Referee & queued for Admin override.`
+              : '.'}
+          </p>
+
+          <div className="grid grid-cols-1 gap-3">
+            {autoLoggedSlips.map((s, idx) => {
+              const resolvedPatron = resolvePatronNickname(s.rawStudent);
+              const resolvedStaff = resolveStaffSignature(s.rawSignature);
+              const totalPts = s.items.reduce((sum, it) => sum + (Number(it.points) || 1), 0);
+              return (
+                <div
+                  key={idx}
+                  className="rounded-2xl border border-emerald-500/35 bg-black/45 p-3.5 space-y-2"
+                >
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="font-athletic text-xl font-black uppercase text-white">
+                      {s.rawStudent}{' '}
+                      {resolvedPatron.member && (
+                        <span className="font-mono-docket text-xs font-normal text-emerald-300">
+                          (&rarr; {resolvedPatron.member.display_name})
+                        </span>
+                      )}
+                    </div>
+                    <span className="rounded-lg bg-[#C86D51]/25 border border-[#C86D51]/50 px-2.5 py-0.5 font-mono-docket text-xs font-bold text-[#E08A4E]">
+                      +{totalPts} {totalPts === 1 ? 'DEMERIT' : 'DEMERITS'}
+                    </span>
+                  </div>
+
+                  <div className="space-y-1">
+                    {s.items.map((it, j) => (
+                      <div
+                        key={j}
+                        className="flex flex-wrap items-center justify-between gap-2 font-mono-docket text-xs text-[#F5F2EB]"
+                      >
+                        <span>&bull; &ldquo;{it.description}&rdquo;</span>
+                        <span className="text-[10px] text-[#DFC15E]">
+                          {it.type} (+{it.points})
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="flex flex-wrap items-center justify-between gap-2 border-t border-white/10 pt-2 font-mono-docket text-[11px] text-[#B5A99D]">
+                    <span>
+                      📅 {s.incidentDate} · 🕒 {s.incidentTime} · 📍 {s.locationArea}
+                    </span>
+                    <span>
+                      ✍️ Signed: &ldquo;{s.rawSignature}&rdquo;
+                      {resolvedStaff.member ? ` (${resolvedStaff.member.display_name})` : ''}
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
       )}
 
       <form onSubmit={handleSubmit} className="space-y-5">
-        {/* Step 1: Slip Photo Upload + Number of Slips in Image */}
-        <div className="rounded-2xl border border-[#B87333]/35 bg-[#1A1715] p-4 sm:p-6 space-y-4">
+        {/* Step 1: Zero-Touch Slip Photo Capture */}
+        <div className="rounded-3xl border-2 border-[#B87333]/50 bg-[#1A1715] p-5 sm:p-7 space-y-4 shadow-[0_15px_45px_rgba(0,0,0,0.5)]">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
-              <span className="font-mono-docket text-[10px] font-bold uppercase tracking-widest text-[#B87333]">
-                STEP 1 · UPLOAD PHOTO &amp; SELECT SLIP COUNT IN IMAGE
+              <span className="font-mono-docket text-[10px] font-bold uppercase tracking-widest text-[#DFC15E]">
+                ONE-TAP CAMERA OR PHOTO UPLOAD · AUTO-EXTRACTS ALL FIELDS
               </span>
-              <h2 className="font-athletic text-xl sm:text-2xl font-bold uppercase text-[#F5F2EB]">
-                SLIP PHOTO &amp; MULTI-SLIP COUNT
+              <h2 className="font-athletic text-2xl sm:text-3xl font-bold uppercase text-[#F5F2EB]">
+                SNAP OR UPLOAD SLIP PHOTO
               </h2>
+              <p className="mt-0.5 font-mono-docket text-xs text-[#B5A99D]">
+                Works with 1 single slip or up to 4 slips in the same photo. Everything is read and
+                saved automatically!
+              </p>
             </div>
 
             {imageUrl && (
@@ -497,38 +653,18 @@ export const SubmitSlipPage: React.FC = () => {
                 type="button"
                 onClick={() => {
                   setImageUrl(null);
+                  setRawDataUrl(null);
                   setImageSha256(null);
                   setImageDhash(null);
                   setUploadStatusMsg(null);
+                  setSubmittedSummary(null);
+                  setAutoLoggedSlips(null);
                 }}
-                className="text-xs font-mono-docket text-rose-400 hover:underline self-start sm:self-auto"
+                className="rounded-xl border border-rose-500/40 bg-rose-500/15 px-3 py-1.5 text-xs font-mono-docket font-bold text-rose-300 hover:bg-rose-500/25 self-start sm:self-auto cursor-pointer"
               >
-                Change Photo
+                Snap Another Slip Photo
               </button>
             )}
-          </div>
-
-          <div className="rounded-xl border border-white/10 bg-[#121212] p-3.5 space-y-2">
-            <span className="flex items-center gap-1.5 font-mono-docket text-xs font-bold uppercase text-[#E8B888]">
-              <Layers className="h-3.5 w-3.5 text-[#B87333]" />
-              <span>HOW MANY PHYSICAL SLIPS ARE IN THIS IMAGE?</span>
-            </span>
-            <div className="grid grid-cols-4 gap-2">
-              {[1, 2, 3, 4].map((cnt) => (
-                <button
-                  key={cnt}
-                  type="button"
-                  onClick={() => setSlipCountInPhoto(cnt)}
-                  className={`rounded-xl border py-2 font-athletic text-base font-bold uppercase transition ${
-                    slipDrafts.length === cnt
-                      ? 'border-[#B87333] bg-[#B87333] text-[#121212]'
-                      : 'border-white/15 bg-[#1A1715] text-[#D6C7B8] hover:border-[#B87333]/50'
-                  }`}
-                >
-                  {cnt} {cnt === 1 ? 'Slip' : 'Slips'}
-                </button>
-              ))}
-            </div>
           </div>
 
           <input
@@ -556,9 +692,13 @@ export const SubmitSlipPage: React.FC = () => {
                   className="mx-auto max-h-80 w-auto rounded object-contain"
                 />
               </div>
-              <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-emerald-500/30 bg-emerald-950/30 px-3.5 py-2 text-xs font-mono-docket text-emerald-300">
+              <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-emerald-500/30 bg-emerald-950/30 px-3.5 py-2.5 text-xs font-mono-docket text-emerald-300">
                 <span className="flex items-center gap-1.5">
-                  <Fingerprint className="h-4 w-4 text-emerald-400 shrink-0" />
+                  {uploadingPhoto || submitting ? (
+                    <Wand2 className="h-4 w-4 text-[#DFC15E] animate-spin shrink-0" />
+                  ) : (
+                    <Fingerprint className="h-4 w-4 text-emerald-400 shrink-0" />
+                  )}
                   {uploadStatusMsg}
                 </span>
                 {imageDhash && (
@@ -567,339 +707,389 @@ export const SubmitSlipPage: React.FC = () => {
               </div>
             </div>
           ) : (
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
               <button
                 type="button"
-                onClick={() => fileInputRef.current?.click()}
-                disabled={uploadingPhoto}
-                className="flex flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-[#B87333]/60 bg-[#121212] p-6 text-center transition hover:border-[#B87333] hover:bg-[#B87333]/10"
+                onClick={() => cameraInputRef.current?.click()}
+                disabled={uploadingPhoto || submitting}
+                className="flex flex-col items-center justify-center gap-2.5 rounded-2xl border-2 border-dashed border-[#DFC15E]/70 bg-gradient-to-b from-[#241C14] to-[#121212] p-7 text-center transition hover:border-[#DFC15E] hover:brightness-110 cursor-pointer"
               >
-                <Upload className="h-7 w-7 text-[#B87333]" />
-                <span className="font-athletic text-base font-bold uppercase tracking-wider text-[#F5F2EB]">
-                  {uploadingPhoto ? 'Checking Duplicate Hash...' : 'Choose Slip Photo'}
+                <Camera className="h-9 w-9 text-[#DFC15E]" />
+                <span className="font-athletic text-xl font-black uppercase tracking-wider text-[#F5F2EB]">
+                  {uploadingPhoto
+                    ? 'AI Reading & Logging Slip...'
+                    : 'Take Camera Photo'}
                 </span>
-                <span className="font-mono-docket text-[11px] text-[#9E8F82]">
-                  Single scan or multi-slip bar photo
+                <span className="font-mono-docket text-[11px] text-[#D6C7B8]">
+                  Snap slip(s) — grabs all info &amp; saves automatically
                 </span>
               </button>
 
               <button
                 type="button"
-                onClick={() => cameraInputRef.current?.click()}
-                disabled={uploadingPhoto}
-                className="flex flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-white/15 bg-[#121212] p-6 text-center transition hover:border-[#B87333] hover:bg-white/5"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={uploadingPhoto || submitting}
+                className="flex flex-col items-center justify-center gap-2.5 rounded-2xl border-2 border-dashed border-[#B87333]/60 bg-[#121212] p-7 text-center transition hover:border-[#B87333] hover:bg-[#B87333]/10 cursor-pointer"
               >
-                <Camera className="h-7 w-7 text-[#C86D51]" />
-                <span className="font-athletic text-base font-bold uppercase tracking-wider text-[#F5F2EB]">
-                  Take Camera Photo
+                <Upload className="h-9 w-9 text-[#B87333]" />
+                <span className="font-athletic text-xl font-black uppercase tracking-wider text-[#F5F2EB]">
+                  {uploadingPhoto
+                    ? 'AI Reading & Logging Slip...'
+                    : 'Choose Slip Photo'}
                 </span>
                 <span className="font-mono-docket text-[11px] text-[#9E8F82]">
-                  Snap physical slip(s) directly
+                  Upload single scan or multi-slip bar photo
                 </span>
               </button>
             </div>
           )}
+
+          {/* Optional Manual Override Toggle */}
+          <div className="flex items-center justify-between border-t border-white/10 pt-3">
+            <span className="font-mono-docket text-[11px] text-[#9E8F82]">
+              ✨ AI Vision automatically grabs Student, Date, Time, Room, Offenses, Points &amp;
+              Signature.
+            </span>
+            <button
+              type="button"
+              onClick={() => setShowManualEditor((prev) => !prev)}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-white/10 bg-[#121212] px-2.5 py-1 font-mono-docket text-[11px] text-[#E8B888] hover:border-[#B87333] cursor-pointer"
+            >
+              <SlidersHorizontal className="h-3 w-3" />
+              <span>{showManualEditor ? 'Hide Manual Editor' : 'Manual Override / Edit'}</span>
+            </button>
+          </div>
         </div>
 
-        {/* Step 2: Individual Slip Details for Each Slip in the Image */}
-        {slipDrafts.map((draft, draftIdx) => {
-          const resolvedStaff = resolveStaffSignature(draft.rawSignature);
-          const resolvedPatron = resolvePatronNickname(draft.rawStudent);
-          const totalSlipPoints = draft.items.reduce(
-            (sum, item) => sum + (Number(item.points) || 1),
-            0
-          );
-          const citationDup = checkCitationDuplicate({
-            raw_student: draft.rawStudent,
-            incident_date: draft.incidentDate,
-            incident_time: draft.incidentTime || null,
-            demerit_count: totalSlipPoints,
-            infractions: draft.items.map((i) => i.description),
-          });
-
-          return (
-            <div
-              key={draftIdx}
-              className="rounded-2xl border border-white/15 bg-[#1A1715] p-4 sm:p-6 space-y-4"
-            >
-              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/10 pb-3">
-                <div className="flex items-center gap-2.5">
-                  <span className="font-athletic text-xl font-bold uppercase text-[#E8B888]">
-                    {slipDrafts.length > 1
-                      ? `SLIP #${draftIdx + 1} OF ${slipDrafts.length} IN PHOTO`
-                      : 'SLIP DATA, TIMESTAMP & DEMERIT TYPES'}
-                  </span>
-                  <span className="rounded-lg bg-[#C86D51]/20 border border-[#C86D51]/40 px-2.5 py-0.5 font-mono-docket text-xs font-bold text-[#E08A4E]">
-                    TOTAL: +{totalSlipPoints} {totalSlipPoints === 1 ? 'DEMERIT' : 'DEMERITS'}
-                  </span>
-                </div>
-
-                {citationDup.isDuplicate && (
-                  <span className="inline-flex items-center gap-1 rounded-lg border border-amber-500/40 bg-amber-500/15 px-2.5 py-1 font-mono-docket text-[11px] text-amber-300">
-                    <Fingerprint className="h-3.5 w-3.5" />
-                    Matches existing {draft.rawStudent} ({draft.incidentTime}) slip — will merge photo
-                  </span>
-                )}
-              </div>
-
-              {/* Patron */}
-              <div>
-                <label className="block font-mono-docket text-xs font-bold uppercase text-[#D6C7B8]">
-                  STUDENT (PATRON OR NICKNAME WRITTEN ON SLIP) *
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={draft.rawStudent}
-                  onChange={(e) => updateDraft(draftIdx, { rawStudent: e.target.value })}
-                  placeholder="Rick, Burtis, Dave, or any linked Patron Nickname"
-                  className="mt-1.5 w-full rounded-xl border border-white/15 bg-[#121212] px-3.5 py-2.5 text-sm text-[#F5F2EB] focus:border-[#B87333] focus:outline-none"
-                />
-
-                <div className="mt-2.5 rounded-xl border border-[#B87333]/30 bg-[#121212] p-3">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <span className="flex items-center gap-1.5 font-mono-docket text-xs text-[#D6C7B8]">
-                      <Sparkles className="h-3.5 w-3.5 text-[#B87333]" />
-                      Stats Merge Into Profile:
-                    </span>
-                    {resolvedPatron.member ? (
-                      <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/20 border border-emerald-500/40 px-2.5 py-0.5 font-mono-docket text-xs font-bold text-emerald-300">
-                        <CheckCircle2 className="h-3.5 w-3.5" />
-                        {resolvedPatron.member.display_name}
-                        {resolvedPatron.matchedAlias &&
-                          resolvedPatron.matchedAlias.toLowerCase() !==
-                            resolvedPatron.member.display_name.toLowerCase() && (
-                            <span className="text-[10px] font-normal text-emerald-200/80">
-                              (via nickname &ldquo;{resolvedPatron.matchedAlias}&rdquo;)
-                            </span>
-                          )}
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/20 border border-amber-500/40 px-2.5 py-0.5 font-mono-docket text-[11px] text-amber-300">
-                        <AlertCircle className="h-3.5 w-3.5" />
-                        New Patron Profile (&ldquo;{draft.rawStudent.trim() || 'Unknown'}&rdquo;)
-                      </span>
-                    )}
-                  </div>
-
-                  <div className="mt-2 flex flex-wrap items-center gap-1.5">
-                    {members
-                      .filter((m) => m.is_patron)
-                      .map((m) => (
-                        <button
-                          key={m.id}
-                          type="button"
-                          onClick={() => updateDraft(draftIdx, { rawStudent: m.display_name })}
-                          className={`rounded-lg border px-2.5 py-1 font-mono-docket text-xs transition ${
-                            resolvedPatron.member?.id === m.id
-                              ? 'border-[#B87333] bg-[#B87333]/20 text-[#E8B888] font-bold'
-                              : 'border-white/10 bg-[#1A1715] text-[#B5A99D] hover:border-[#B87333]/50'
-                          }`}
-                        >
-                          {m.display_name}
-                        </button>
-                      ))}
-                  </div>
-                </div>
-              </div>
-
-              {/* Date, Time, Room */}
-              <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-3">
-                <div>
-                  <label className="block font-mono-docket text-xs font-bold uppercase text-[#D6C7B8]">
-                    DATE(S) *
-                  </label>
-                  <input
-                    type="date"
-                    required
-                    value={draft.incidentDate}
-                    onChange={(e) => updateDraft(draftIdx, { incidentDate: e.target.value })}
-                    className="mt-1.5 w-full rounded-xl border border-white/15 bg-[#121212] px-3 py-2.5 font-mono-docket text-xs text-[#F5F2EB]"
-                  />
-                </div>
-
-                <div>
-                  <label className="flex items-center gap-1 font-mono-docket text-xs font-bold uppercase text-[#D6C7B8]">
-                    <Clock className="h-3.5 w-3.5 text-[#C86D51]" />
-                    <span>TIME ON SLIP *</span>
-                  </label>
-                  <input
-                    type="time"
-                    value={draft.incidentTime}
-                    onChange={(e) => updateDraft(draftIdx, { incidentTime: e.target.value })}
-                    className="mt-1.5 w-full rounded-xl border border-white/15 bg-[#121212] px-3 py-2.5 font-mono-docket text-xs text-[#F5F2EB]"
-                  />
-                </div>
-
-                <div>
-                  <label className="block font-mono-docket text-xs font-bold uppercase text-[#D6C7B8]">
-                    ROOM (AS WRITTEN ON SLIP)
-                  </label>
-                  <input
-                    type="text"
-                    value={draft.locationArea}
-                    onChange={(e) => updateDraft(draftIdx, { locationArea: e.target.value })}
-                    placeholder="Copper Bar, Copper, Copper A.C."
-                    className="mt-1.5 w-full rounded-xl border border-white/15 bg-[#121212] px-3.5 py-2 text-sm text-[#F5F2EB]"
-                  />
-                </div>
-              </div>
-
-              {/* Itemized Demerit Types & Points */}
-              <div className="space-y-2.5">
-                <div className="flex items-center justify-between">
-                  <label className="flex items-center gap-1.5 font-mono-docket text-xs font-bold uppercase text-[#D6C7B8]">
-                    <Tag className="h-3.5 w-3.5 text-[#B87333]" />
-                    <span>ITEMIZED DEMERIT TYPES &amp; POINTS ON SLIP *</span>
-                  </label>
+        {/* Optional Manual Slip Editor (Collapsed by default since AI Vision auto-extracts & logs!) */}
+        {showManualEditor && (
+          <div className="space-y-4">
+            <div className="rounded-xl border border-white/10 bg-[#121212] p-3.5 space-y-2">
+              <span className="flex items-center gap-1.5 font-mono-docket text-xs font-bold uppercase text-[#E8B888]">
+                <Layers className="h-3.5 w-3.5 text-[#B87333]" />
+                <span>HOW MANY PHYSICAL SLIPS ARE IN THIS IMAGE?</span>
+              </span>
+              <div className="grid grid-cols-4 gap-2">
+                {[1, 2, 3, 4].map((cnt) => (
                   <button
+                    key={cnt}
                     type="button"
-                    onClick={() => addDraftLineItem(draftIdx)}
-                    className="inline-flex items-center gap-1 font-mono-docket text-xs font-bold text-[#E08A4E]"
+                    onClick={() => setSlipCountInPhoto(cnt)}
+                    className={`rounded-xl border py-2 font-athletic text-base font-bold uppercase transition ${
+                      slipDrafts.length === cnt
+                        ? 'border-[#B87333] bg-[#B87333] text-[#121212]'
+                        : 'border-white/15 bg-[#1A1715] text-[#D6C7B8] hover:border-[#B87333]/50'
+                    }`}
                   >
-                    <Plus className="h-3.5 w-3.5" />
-                    <span>Add Demerit Offense</span>
+                    {cnt} {cnt === 1 ? 'Slip' : 'Slips'}
                   </button>
-                </div>
-
-                <div className="space-y-2.5">
-                  {draft.items.map((item, itemIdx) => (
-                    <div
-                      key={itemIdx}
-                      className="rounded-xl border border-white/10 bg-[#121212] p-3 space-y-2.5"
-                    >
-                      <div className="flex flex-wrap items-center justify-between gap-2">
-                        <div className="flex items-center gap-2 flex-1 min-w-[200px]">
-                          <span className="font-mono-docket text-xs font-bold text-[#B87333]">
-                            #{itemIdx + 1}
-                          </span>
-                          <select
-                            value={item.type}
-                            onChange={(e) =>
-                              updateDraftLineItem(draftIdx, itemIdx, { type: e.target.value })
-                            }
-                            aria-label="Demerit Type"
-                            className="flex-1 rounded-lg border border-white/15 bg-[#1A1715] px-2.5 py-1.5 font-mono-docket text-xs text-[#E8B888]"
-                          >
-                            {DEMERIT_CATEGORIES.map((cat) => (
-                              <option key={cat} value={cat}>
-                                Type: {cat}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-
-                        <div className="flex items-center gap-1.5">
-                          <span className="font-mono-docket text-[10px] text-[#9E8F82]">
-                            POINTS:
-                          </span>
-                          {[1, 2, 3].map((pts) => (
-                            <button
-                              key={pts}
-                              type="button"
-                              onClick={() =>
-                                updateDraftLineItem(draftIdx, itemIdx, { points: pts })
-                              }
-                              className={`rounded-lg border px-2.5 py-1 font-mono-docket text-xs font-bold transition ${
-                                item.points === pts
-                                  ? 'border-[#B87333] bg-[#B87333] text-[#121212]'
-                                  : 'border-white/15 bg-[#1A1715] text-[#D6C7B8]'
-                              }`}
-                            >
-                              +{pts}
-                            </button>
-                          ))}
-                          {draft.items.length > 1 && (
-                            <button
-                              type="button"
-                              onClick={() => removeDraftLineItem(draftIdx, itemIdx)}
-                              aria-label="Remove offense"
-                              className="rounded-lg border border-white/10 p-1.5 text-[#9E8F82] hover:text-rose-400"
-                            >
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </button>
-                          )}
-                        </div>
-                      </div>
-
-                      <input
-                        type="text"
-                        value={item.description}
-                        onChange={(e) =>
-                          updateDraftLineItem(draftIdx, itemIdx, { description: e.target.value })
-                        }
-                        placeholder="Reason written on slip (e.g. Too many seat moves)..."
-                        className="w-full rounded-lg border border-white/15 bg-[#1A1715] px-3 py-2 text-sm text-[#F5F2EB]"
-                      />
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Signature */}
-              <div>
-                <label className="block font-mono-docket text-xs font-bold uppercase text-[#D6C7B8]">
-                  SIGNATURE WRITTEN ON SLIP *
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={draft.rawSignature}
-                  onChange={(e) => updateDraft(draftIdx, { rawSignature: e.target.value })}
-                  placeholder='e.g. "YOUR BOSS!", "The Boss - AKA Sarah", "Sarah (Cursive Signature)"'
-                  className="mt-1.5 w-full rounded-xl border border-white/15 bg-[#121212] px-3.5 py-2.5 text-sm text-[#F5F2EB] focus:border-[#B87333] focus:outline-none"
-                />
-
-                <div className="mt-2.5 rounded-xl border border-[#B87333]/30 bg-[#121212] p-3">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <span className="flex items-center gap-1.5 font-mono-docket text-xs text-[#D6C7B8]">
-                      <Sparkles className="h-3.5 w-3.5 text-[#B87333]" />
-                      Normalized Issuer:
-                    </span>
-                    {resolvedStaff.member ? (
-                      <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/20 border border-emerald-500/40 px-2.5 py-0.5 font-mono-docket text-xs font-bold text-emerald-300">
-                        <CheckCircle2 className="h-3.5 w-3.5" />
-                        {resolvedStaff.member.display_name}
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/20 border border-amber-500/40 px-2.5 py-0.5 font-mono-docket text-[11px] text-amber-300">
-                        <AlertCircle className="h-3.5 w-3.5" />
-                        Unmapped Signature
-                      </span>
-                    )}
-                  </div>
-                  <div className="mt-2 flex flex-wrap gap-1.5">
-                    {aliases.map((a) => (
-                      <button
-                        key={a.id}
-                        type="button"
-                        onClick={() => updateDraft(draftIdx, { rawSignature: a.alias })}
-                        className="rounded border border-white/10 bg-[#1A1715] px-2 py-1 font-mono-docket text-[10px] text-[#B5A99D] hover:border-[#B87333] hover:text-white"
-                      >
-                        &ldquo;{a.alias}&rdquo;
-                      </button>
-                    ))}
-                  </div>
-                </div>
+                ))}
               </div>
             </div>
-          );
-        })}
 
-        <button
-          type="submit"
-          disabled={submitting || !imageUrl}
-          className="flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-[#B87333] to-[#C86D51] px-6 py-4 font-athletic text-xl font-bold uppercase tracking-wider text-[#121212] shadow-[0_0_25px_rgba(184,115,51,0.4)] transition hover:brightness-110 disabled:opacity-40"
-        >
-          <span>
-            {submitting
-              ? 'Referee Scanning & Saving...'
-              : slipDrafts.length > 1
-              ? `Save ${slipDrafts.length} Slips from Photo to Docket`
-              : 'Save Slip Photo to Docket'}
-          </span>
-          <ArrowRight className="h-5 w-5" />
-        </button>
+            {slipDrafts.map((draft, draftIdx) => {
+              const resolvedStaff = resolveStaffSignature(draft.rawSignature);
+              const resolvedPatron = resolvePatronNickname(draft.rawStudent);
+              const totalSlipPoints = draft.items.reduce(
+                (sum, item) => sum + (Number(item.points) || 1),
+                0
+              );
+              const citationDup = checkCitationDuplicate({
+                raw_student: draft.rawStudent,
+                incident_date: draft.incidentDate,
+                incident_time: draft.incidentTime || null,
+                demerit_count: totalSlipPoints,
+                infractions: draft.items.map((i) => i.description),
+              });
+
+              return (
+                <div
+                  key={draftIdx}
+                  className="rounded-2xl border border-white/15 bg-[#1A1715] p-4 sm:p-6 space-y-4"
+                >
+                  <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/10 pb-3">
+                    <div className="flex items-center gap-2.5">
+                      <span className="font-athletic text-xl font-bold uppercase text-[#E8B888]">
+                        {slipDrafts.length > 1
+                          ? `SLIP #${draftIdx + 1} OF ${slipDrafts.length} IN PHOTO`
+                          : 'SLIP DATA, TIMESTAMP & DEMERIT TYPES'}
+                      </span>
+                      <span className="rounded-lg bg-[#C86D51]/20 border border-[#C86D51]/40 px-2.5 py-0.5 font-mono-docket text-xs font-bold text-[#E08A4E]">
+                        TOTAL: +{totalSlipPoints} {totalSlipPoints === 1 ? 'DEMERIT' : 'DEMERITS'}
+                      </span>
+                    </div>
+
+                    {citationDup.isDuplicate && (
+                      <span className="inline-flex items-center gap-1 rounded-lg border border-amber-500/40 bg-amber-500/15 px-2.5 py-1 font-mono-docket text-[11px] text-amber-300">
+                        <Fingerprint className="h-3.5 w-3.5" />
+                        Matches existing {draft.rawStudent} ({draft.incidentTime}) slip — will merge
+                        photo
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Patron */}
+                  <div>
+                    <label className="block font-mono-docket text-xs font-bold uppercase text-[#D6C7B8]">
+                      STUDENT (PATRON OR NICKNAME WRITTEN ON SLIP) *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={draft.rawStudent}
+                      onChange={(e) => updateDraft(draftIdx, { rawStudent: e.target.value })}
+                      placeholder="Rick, Burtis, Dave, or any linked Patron Nickname"
+                      className="mt-1.5 w-full rounded-xl border border-white/15 bg-[#121212] px-3.5 py-2.5 text-sm text-[#F5F2EB] focus:border-[#B87333] focus:outline-none"
+                    />
+
+                    <div className="mt-2.5 rounded-xl border border-[#B87333]/30 bg-[#121212] p-3">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <span className="flex items-center gap-1.5 font-mono-docket text-xs text-[#D6C7B8]">
+                          <Sparkles className="h-3.5 w-3.5 text-[#B87333]" />
+                          Stats Merge Into Profile:
+                        </span>
+                        {resolvedPatron.member ? (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/20 border border-emerald-500/40 px-2.5 py-0.5 font-mono-docket text-xs font-bold text-emerald-300">
+                            <CheckCircle2 className="h-3.5 w-3.5" />
+                            {resolvedPatron.member.display_name}
+                            {resolvedPatron.matchedAlias &&
+                              resolvedPatron.matchedAlias.toLowerCase() !==
+                                resolvedPatron.member.display_name.toLowerCase() && (
+                                <span className="text-[10px] font-normal text-emerald-200/80">
+                                  (via nickname &ldquo;{resolvedPatron.matchedAlias}&rdquo;)
+                                </span>
+                              )}
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/20 border border-amber-500/40 px-2.5 py-0.5 font-mono-docket text-[11px] text-amber-300">
+                            <AlertCircle className="h-3.5 w-3.5" />
+                            New Patron Profile (&ldquo;{draft.rawStudent.trim() || 'Unknown'}&rdquo;)
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                        {members
+                          .filter((m) => m.is_patron)
+                          .map((m) => (
+                            <button
+                              key={m.id}
+                              type="button"
+                              onClick={() => updateDraft(draftIdx, { rawStudent: m.display_name })}
+                              className={`rounded-lg border px-2.5 py-1 font-mono-docket text-xs transition ${
+                                resolvedPatron.member?.id === m.id
+                                  ? 'border-[#B87333] bg-[#B87333]/20 text-[#E8B888] font-bold'
+                                  : 'border-white/10 bg-[#1A1715] text-[#B5A99D] hover:border-[#B87333]/50'
+                              }`}
+                            >
+                              {m.display_name}
+                            </button>
+                          ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Date, Time, Room */}
+                  <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-3">
+                    <div>
+                      <label className="block font-mono-docket text-xs font-bold uppercase text-[#D6C7B8]">
+                        DATE(S) *
+                      </label>
+                      <input
+                        type="date"
+                        required
+                        value={draft.incidentDate}
+                        onChange={(e) => updateDraft(draftIdx, { incidentDate: e.target.value })}
+                        className="mt-1.5 w-full rounded-xl border border-white/15 bg-[#121212] px-3 py-2.5 font-mono-docket text-xs text-[#F5F2EB]"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="flex items-center gap-1 font-mono-docket text-xs font-bold uppercase text-[#D6C7B8]">
+                        <Clock className="h-3.5 w-3.5 text-[#C86D51]" />
+                        <span>TIME ON SLIP *</span>
+                      </label>
+                      <input
+                        type="time"
+                        value={draft.incidentTime}
+                        onChange={(e) => updateDraft(draftIdx, { incidentTime: e.target.value })}
+                        className="mt-1.5 w-full rounded-xl border border-white/15 bg-[#121212] px-3 py-2.5 font-mono-docket text-xs text-[#F5F2EB]"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block font-mono-docket text-xs font-bold uppercase text-[#D6C7B8]">
+                        ROOM (AS WRITTEN ON SLIP)
+                      </label>
+                      <input
+                        type="text"
+                        value={draft.locationArea}
+                        onChange={(e) => updateDraft(draftIdx, { locationArea: e.target.value })}
+                        placeholder="Copper Bar, Copper, Copper A.C."
+                        className="mt-1.5 w-full rounded-xl border border-white/15 bg-[#121212] px-3.5 py-2 text-sm text-[#F5F2EB]"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Itemized Demerit Types & Points */}
+                  <div className="space-y-2.5">
+                    <div className="flex items-center justify-between">
+                      <label className="flex items-center gap-1.5 font-mono-docket text-xs font-bold uppercase text-[#D6C7B8]">
+                        <Tag className="h-3.5 w-3.5 text-[#B87333]" />
+                        <span>ITEMIZED DEMERIT TYPES &amp; POINTS ON SLIP *</span>
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => addDraftLineItem(draftIdx)}
+                        className="inline-flex items-center gap-1 font-mono-docket text-xs font-bold text-[#E08A4E]"
+                      >
+                        <Plus className="h-3.5 w-3.5" />
+                        <span>Add Demerit Offense</span>
+                      </button>
+                    </div>
+
+                    <div className="space-y-2.5">
+                      {draft.items.map((item, itemIdx) => (
+                        <div
+                          key={itemIdx}
+                          className="rounded-xl border border-white/10 bg-[#121212] p-3 space-y-2.5"
+                        >
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <div className="flex items-center gap-2 flex-1 min-w-[200px]">
+                              <span className="font-mono-docket text-xs font-bold text-[#B87333]">
+                                #{itemIdx + 1}
+                              </span>
+                              <select
+                                value={item.type}
+                                onChange={(e) =>
+                                  updateDraftLineItem(draftIdx, itemIdx, { type: e.target.value })
+                                }
+                                aria-label="Demerit Type"
+                                className="flex-1 rounded-lg border border-white/15 bg-[#1A1715] px-2.5 py-1.5 font-mono-docket text-xs text-[#E8B888]"
+                              >
+                                {DEMERIT_CATEGORIES.map((cat) => (
+                                  <option key={cat} value={cat}>
+                                    Type: {cat}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+
+                            <div className="flex items-center gap-1.5">
+                              <span className="font-mono-docket text-[10px] text-[#9E8F82]">
+                                POINTS:
+                              </span>
+                              {[1, 2, 3].map((pts) => (
+                                <button
+                                  key={pts}
+                                  type="button"
+                                  onClick={() =>
+                                    updateDraftLineItem(draftIdx, itemIdx, { points: pts })
+                                  }
+                                  className={`rounded-lg border px-2.5 py-1 font-mono-docket text-xs font-bold transition ${
+                                    item.points === pts
+                                      ? 'border-[#B87333] bg-[#B87333] text-[#121212]'
+                                      : 'border-white/15 bg-[#1A1715] text-[#D6C7B8]'
+                                  }`}
+                                >
+                                  +{pts}
+                                </button>
+                              ))}
+                              {draft.items.length > 1 && (
+                                <button
+                                  type="button"
+                                  onClick={() => removeDraftLineItem(draftIdx, itemIdx)}
+                                  aria-label="Remove offense"
+                                  className="rounded-lg border border-white/10 p-1.5 text-[#9E8F82] hover:text-rose-400"
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </button>
+                              )}
+                            </div>
+                          </div>
+
+                          <input
+                            type="text"
+                            value={item.description}
+                            onChange={(e) =>
+                              updateDraftLineItem(draftIdx, itemIdx, {
+                                description: e.target.value,
+                              })
+                            }
+                            placeholder="Reason written on slip (e.g. Too many seat moves)..."
+                            className="w-full rounded-lg border border-white/15 bg-[#1A1715] px-3 py-2 text-sm text-[#F5F2EB]"
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Signature */}
+                  <div>
+                    <label className="block font-mono-docket text-xs font-bold uppercase text-[#D6C7B8]">
+                      SIGNATURE WRITTEN ON SLIP *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={draft.rawSignature}
+                      onChange={(e) => updateDraft(draftIdx, { rawSignature: e.target.value })}
+                      placeholder='e.g. "YOUR BOSS!", "The Boss - AKA Sarah", "Sarah (Cursive Signature)"'
+                      className="mt-1.5 w-full rounded-xl border border-white/15 bg-[#121212] px-3.5 py-2.5 text-sm text-[#F5F2EB] focus:border-[#B87333] focus:outline-none"
+                    />
+
+                    <div className="mt-2.5 rounded-xl border border-[#B87333]/30 bg-[#121212] p-3">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <span className="flex items-center gap-1.5 font-mono-docket text-xs text-[#D6C7B8]">
+                          <Sparkles className="h-3.5 w-3.5 text-[#B87333]" />
+                          Normalized Issuer:
+                        </span>
+                        {resolvedStaff.member ? (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/20 border border-emerald-500/40 px-2.5 py-0.5 font-mono-docket text-xs font-bold text-emerald-300">
+                            <CheckCircle2 className="h-3.5 w-3.5" />
+                            {resolvedStaff.member.display_name}
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/20 border border-amber-500/40 px-2.5 py-0.5 font-mono-docket text-[11px] text-amber-300">
+                            <AlertCircle className="h-3.5 w-3.5" />
+                            Unmapped Signature
+                          </span>
+                        )}
+                      </div>
+                      <div className="mt-2 flex flex-wrap gap-1.5">
+                        {aliases.map((a) => (
+                          <button
+                            key={a.id}
+                            type="button"
+                            onClick={() => updateDraft(draftIdx, { rawSignature: a.alias })}
+                            className="rounded border border-white/10 bg-[#1A1715] px-2 py-1 font-mono-docket text-[10px] text-[#B5A99D] hover:border-[#B87333] hover:text-white"
+                          >
+                            &ldquo;{a.alias}&rdquo;
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+
+            <button
+              type="submit"
+              disabled={submitting || !imageUrl}
+              className="flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-[#B87333] to-[#C86D51] px-6 py-4 font-athletic text-xl font-bold uppercase tracking-wider text-[#121212] shadow-[0_0_25px_rgba(184,115,51,0.4)] transition hover:brightness-110 disabled:opacity-40 cursor-pointer"
+            >
+              <span>
+                {submitting
+                  ? 'Referee Scanning & Saving...'
+                  : slipDrafts.length > 1
+                  ? `Save ${slipDrafts.length} Slips from Photo to Docket`
+                  : 'Save Slip Photo to Docket'}
+              </span>
+              <ArrowRight className="h-5 w-5" />
+            </button>
+          </div>
+        )}
 
         {/* Unofficial Fan Site Disclaimer */}
         <div className="rounded-xl border border-white/10 bg-[#141210] px-4 py-3 text-center">

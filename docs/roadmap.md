@@ -36,8 +36,9 @@
 - [x] Removed `copper_demerits` schema from `Supabase5` (`iqbpnkttwtugxkospdqt`).
 - [x] Added **Staff & Patron Profile Claiming** (`src/components/ClaimProfileModal.tsx` + `POST /api/claim-profile`) with 4-digit Bar PINs and Detroit/Michigan team badges, and required profile sign-in before uploading slips on `/submit`.
 
-## Phase 9: AI Referee Auto-Blur & Override Queue, Profile Editor, Claimed Nickname Stat Merging, Email/Phone Login & Complementary Local SEO (Completed — v1.6.3)
+## Phase 9: AI Referee Auto-Blur, Zero-Touch Vision OCR Slip Capture, Profile Editor, Claimed Nickname Stat Merging, Email/Phone Login & Complementary Local SEO (Completed — v1.6.4)
 - [x] Purged `Matt Barnes` and all non-authentic / negative aliases from Cloudflare D1, Worker seed data, and UI placeholders.
+- [x] Added **Zero-Touch AI Vision Slip OCR (`POST /api/extract-slip` via `@cf/mistralai/mistral-small-3.1-24b-instruct`)** so snapping or choosing a slip photo automatically extracts all fields (single or multi-slip) and logs them to Cloudflare R2 & D1 with zero manual typing required.
 - [x] Added **Real-Time AI Referee Monitor** (Cloudflare Workers AI `env.AI` + deterministic profanity/slur filter) that blocks offensive names/aliases and **auto-blurs + queues** flagged slip uploads for Site Admin (**Rick**) to review and override in the **Ref Booth (`/admin`)**.
 - [x] Added **Self-Service Profile Editing ("My Locker")** with **4–8 digit Bar PINs**, frictionless post-claim editing of display name, email, phone, notification settings, tagline, and team badge, locked `/admin` behind `isAdminOrStaff`, and stripped all PII from public API responses.
 - [x] Added **Email or 10-Digit Phone Requirement on Claim/Sign-Up**, **Returning User Email/Phone + PIN Sign-In**, and **Unclaimed-Only Claim List** (hiding already-claimed profiles from the claimable list).

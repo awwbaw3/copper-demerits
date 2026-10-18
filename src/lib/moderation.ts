@@ -209,3 +209,54 @@ export async function applyRefereeBlurStampToImage(
     img.src = imageSrc;
   });
 }
+
+export interface ExtractedSlipAI {
+  raw_student: string;
+  raw_signature: string;
+  incident_date: string;
+  incident_time: string;
+  location_area: string;
+  demerit_count: number;
+  infractions: string[];
+  demerit_items: {
+    type: string;
+    description: string;
+    points: number;
+  }[];
+}
+
+/**
+ * Calls the Cloudflare Worker Vision AI (`/api/extract-slip`) to automatically read
+ * 1 or more physical Demerit Slips from an uploaded photo or camera capture.
+ */
+export async function extractSlipsFromPhotoAI(
+  imageBase64: string,
+  defaultDate?: string
+): Promise<{
+  ok: boolean;
+  model?: string;
+  slips?: ExtractedSlipAI[];
+  error?: string;
+}> {
+  try {
+    const res = await cloudflareFetch<{
+      ok: boolean;
+      model?: string;
+      slips?: ExtractedSlipAI[];
+      error?: string;
+    }>('/api/extract-slip', {
+      method: 'POST',
+      body: JSON.stringify({
+        imageBase64,
+        defaultDate: defaultDate || new Date().toISOString().slice(0, 10),
+      }),
+    });
+    return res;
+  } catch (err) {
+    return {
+      ok: false,
+      error: err instanceof Error ? err.message : 'Could not automatically read slip photo.',
+    };
+  }
+}
+
