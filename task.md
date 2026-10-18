@@ -1,6 +1,18 @@
 # Task Tracker — Copper Demerits (`copperdemerits.com`)
 
-## Active Sprint — v1.6.9 (Granular Notification Channels, PIN Rate-Limiting & Security Audit)
+## Active Sprint — v1.6.10 (Individual Leaderboard Showcase, Clean Header & "Add Your Demerit" Action)
+- [x] Showcase Individual Leaderboard (`RING OF HONOR STANDINGS`) immediately beneath the Penalty Box header
+- [x] Move 5-team foul category banners below player cards so standings are front and center
+- [x] Rename upload CTA button from `"DROP SLIP"` to **`"ADD YOUR DEMERIT"`**
+- [x] Remove `"A SPORTS BAR. NOT A GYM. • MARSHALL, MI"` badge
+- [x] Remove `"Official Bar Demerit Jumbotron · Lions · Red Wings · Pistons · Tigers · UM · MSU"` subtitle
+- [x] Remove `"🦁 ACTUAL COPPER AC BACKBAR • MARSHALL, MI"` badge from Sarah's section
+- [x] Modernize period filters: replaced `"Oct 17 Game Night"` with production options (`All-Time`, `This Month`, `This Week`, `Today`, `Custom Dates`)
+- [x] Replace hardcoded `'OCT 17'` fallback timestamps with dynamic dates on physical slip thumbnail cards
+- [x] Honor user directive: Do NOT publish to Netlify production
+
+## Completed Sprints
+### v1.6.9 (Granular Notification Channels, PIN Rate-Limiting & Security Audit)
 - [x] Security Audit: Verified 0 API keys/secrets in git history; all secrets encrypted in Cloudflare Worker
 - [x] Backend Security: Added PIN brute-force lockout (5 failed attempts in 15 min via D1 `pin_failures` table)
 - [x] Backend Security: Added strict HTTP security headers (`nosniff`, `DENY`, `strict-origin-when-cross-origin`)

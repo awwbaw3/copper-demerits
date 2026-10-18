@@ -4,7 +4,6 @@ import {
   Trophy,
   Flame,
   Camera,
-  Sparkles,
   Calendar,
   Award,
   Eye,
@@ -61,9 +60,9 @@ export const LeaderboardPage: React.FC = () => {
 
   const periodOptions: { key: PeriodMode; label: string }[] = [
     { key: 'all-time', label: 'All-Time' },
-    { key: 'oct-17-session', label: 'Oct 17 Game Night' },
     { key: 'this-month', label: 'This Month' },
     { key: 'this-week', label: 'This Week' },
+    { key: 'today', label: 'Today' },
     { key: 'custom', label: 'Custom Dates' },
   ];
 
@@ -136,16 +135,9 @@ export const LeaderboardPage: React.FC = () => {
                 />
               </div>
               <div>
-                <div className="inline-flex items-center gap-2 rounded-full border border-[#DFC15E]/50 bg-[#B87333]/20 px-3 py-1 text-[11px] font-mono-docket font-bold uppercase tracking-widest text-[#DFC15E]">
-                  <Sparkles className="h-3.5 w-3.5 text-[#E8B888]" />
-                  A SPORTS BAR. NOT A GYM. • MARSHALL, MI
-                </div>
-                <h1 className="mt-2 font-display-tall text-4xl sm:text-6xl font-black uppercase tracking-wider text-[#F5F2EB] leading-none drop-shadow-[0_4px_12px_rgba(0,0,0,0.9)]">
+                <h1 className="font-display-tall text-4xl sm:text-6xl font-black uppercase tracking-wider text-[#F5F2EB] leading-none drop-shadow-[0_4px_12px_rgba(0,0,0,0.9)]">
                   THE PENALTY <span className="text-[#B87333]">BOX</span>
                 </h1>
-                <p className="mt-1 font-athletic text-sm sm:text-base uppercase tracking-widest text-[#D6C7B8]">
-                  Official Bar Demerit Jumbotron · Lions · Red Wings · Pistons · Tigers · UM · MSU
-                </p>
               </div>
             </div>
 
@@ -174,7 +166,7 @@ export const LeaderboardPage: React.FC = () => {
                 className="group flex flex-col items-center justify-center rounded-xl bg-gradient-to-b from-[#E08A4E] to-[#B87333] px-4 py-2 text-[#121212] font-athletic font-black uppercase tracking-wider shadow-[0_0_20px_rgba(184,115,51,0.5)] hover:scale-105 transition"
               >
                 <Camera className="h-5 w-5 mb-0.5" />
-                <span className="text-xs leading-none">DROP SLIP</span>
+                <span className="text-xs leading-none">ADD YOUR DEMERIT</span>
               </Link>
             </div>
           </div>
@@ -236,26 +228,20 @@ export const LeaderboardPage: React.FC = () => {
               </label>
             </div>
           )}
-
-          {/* Graphical Team Foul Category Strip (Pistons / Red Wings / Lions / Tigers / UM-MSU) */}
-          <div className="mt-5">
-            <DetroitSportsBannerStrip
-              activeFilter={selectedDemeritType}
-              onSelectType={setSelectedDemeritType}
-              typeCounts={typeCounts}
-            />
-          </div>
         </div>
       </section>
 
-      {/* 2. GRAPHICAL PLAYER TRADING CARDS LEADERBOARD */}
+      {/* 2. INDIVIDUAL LEADERBOARD — SHOWCASED AT THE TOP */}
       <section className="space-y-4">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-2.5">
             <Trophy className="h-6 w-6 text-[#DFC15E]" />
             <h2 className="font-display-tall text-3xl sm:text-4xl uppercase tracking-wider text-[#F5F2EB]">
-              RING OF HONOR <span className="text-[#B87333]">STANDINGS</span>
+              INDIVIDUAL <span className="text-[#B87333]">LEADERBOARD</span>
             </h2>
+            <span className="hidden sm:inline-block rounded-full bg-[#B87333]/20 border border-[#B87333]/40 px-2.5 py-0.5 font-mono-docket text-[10px] font-bold uppercase text-[#DFC15E]">
+              RING OF HONOR
+            </span>
           </div>
           <span className="text-xs font-mono-docket uppercase text-[#9E8F82]">
             Tap any slip or badge to inspect photo
@@ -420,7 +406,24 @@ export const LeaderboardPage: React.FC = () => {
         )}
       </section>
 
-      {/* 3. HEAD REFEREE SPOTLIGHT — SARAH ("THE BOSS / BOSS LADY") + DETROIT LIONS HELMET BACKBAR */}
+      {/* 3. DEMERIT CATEGORIES & MICHIGAN SPORTS TEAMS */}
+      <section className="space-y-3">
+        <div className="flex items-center justify-between">
+          <span className="font-athletic text-base sm:text-lg font-bold uppercase tracking-wider text-[#F5F2EB]">
+            DEMERIT CATEGORIES &amp; TEAM FOULS
+          </span>
+          <span className="text-xs font-mono-docket text-[#9E8F82]">
+            Tap any category to filter standings
+          </span>
+        </div>
+        <DetroitSportsBannerStrip
+          activeFilter={selectedDemeritType}
+          onSelectType={setSelectedDemeritType}
+          typeCounts={typeCounts}
+        />
+      </section>
+
+      {/* 4. HEAD REFEREE SPOTLIGHT — SARAH ("THE BOSS / BOSS LADY") + DETROIT LIONS HELMET BACKBAR */}
       <section className="relative overflow-hidden rounded-3xl border-2 border-[#DFC15E]/50 bg-[#14110F] shadow-2xl">
         <div className="grid grid-cols-1 lg:grid-cols-12 items-center">
           {/* Actual Copper Athletic Club Backbar Photo (Detroit Lions Helmet + Copper Mugs) */}
@@ -431,9 +434,6 @@ export const LeaderboardPage: React.FC = () => {
               className="h-full w-full object-cover object-center transition-transform duration-700 hover:scale-105"
             />
             <div className="absolute inset-0 bg-gradient-to-t lg:bg-gradient-to-r from-transparent via-[#14110F]/40 to-[#14110F]" />
-            <div className="absolute bottom-3 left-3 rounded-xl border border-[#0076B6] bg-[#0076B6]/85 backdrop-blur-md px-3 py-1 text-[10px] font-mono-docket font-bold uppercase tracking-wider text-white shadow">
-              🦁 ACTUAL COPPER AC BACKBAR • MARSHALL, MI
-            </div>
           </div>
 
           {/* Referee Stats & Signature Stamps */}
@@ -555,7 +555,7 @@ export const LeaderboardPage: React.FC = () => {
 
                     {/* Top Left Time Badge */}
                     <span className="absolute top-2.5 left-2.5 rounded-lg bg-black/80 border border-white/15 px-2 py-0.5 font-mono-docket text-[10px] font-bold text-[#DFC15E]">
-                      {slip.incident_time ? slip.incident_time.slice(0, 5) : 'OCT 17'}
+                      {slip.incident_time ? slip.incident_time.slice(0, 5) : 'SLIP'}
                     </span>
 
                     {/* Top Right Points Stamp */}

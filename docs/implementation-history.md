@@ -2,6 +2,17 @@
 
 Chronological log of architectural decisions, database migrations, and infrastructure deployments.
 
+## 2026-10-18 — v1.6.10 Individual Leaderboard Showcase, Clean Header & "Add Your Demerit" Action
+- **Showcase Individual Leaderboard at the Top (`src/pages/LeaderboardPage.tsx`)**:
+  - Reordered home page layout to present the **Individual Leaderboard (`RING OF HONOR STANDINGS`)** immediately below the Penalty Box header, moving the 5-team foul categories below the player cards.
+- **Header Clean-Up & CTA Redesign (`src/pages/LeaderboardPage.tsx`)**:
+  - Changed upload button from `"DROP SLIP"` to **`"ADD YOUR DEMERIT"`** with prominent athletic styling.
+  - Removed `"A SPORTS BAR. NOT A GYM. • MARSHALL, MI"` badge and `"Official Bar Demerit Jumbotron · Lions · Red Wings · Pistons · Tigers · UM · MSU"` subtitle to eliminate visual clutter.
+  - Removed `"🦁 ACTUAL COPPER AC BACKBAR • MARSHALL, MI"` overlay tag from Sarah's spotlight section.
+- **Season / Period Selectors Modernization (`src/pages/LeaderboardPage.tsx`, `src/types/demerits.ts`, `src/context/DemeritsContext.tsx`)**:
+  - Removed the development session pill `"Oct 17 Game Night"`, adding `'today'` support alongside `'all-time'`, `'this-month'`, `'this-week'`, and `'custom'`.
+  - Replaced fallback `'OCT 17'` with dynamic dates on physical slip thumbnail cards.
+
 ---
 
 ## 2026-10-18 — v1.6.9 Granular Opt-In Notification Channels, PIN Brute-Force Rate Limiting & Happy Hour Docket

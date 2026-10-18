@@ -778,6 +778,9 @@ export const DemeritsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         if (filter.mode === 'this-month') {
           return s.incident_date.startsWith(monthPrefix);
         }
+        if (filter.mode === 'today') {
+          return s.incident_date === nowIso;
+        }
         if (filter.mode === 'oct-17-session') {
           return s.incident_date === '2026-10-17';
         }

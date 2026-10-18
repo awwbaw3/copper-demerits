@@ -120,7 +120,7 @@ export interface DemeritTypeSummary {
   leaderPoints: number;
 }
 
-export type PeriodMode = 'all-time' | 'this-month' | 'this-week' | 'oct-17-session' | 'custom';
+export type PeriodMode = 'all-time' | 'this-month' | 'this-week' | 'today' | 'oct-17-session' | 'custom';
 
 export interface LeaderboardPeriodFilter {
   mode: PeriodMode;

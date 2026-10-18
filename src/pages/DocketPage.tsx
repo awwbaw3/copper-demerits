@@ -129,7 +129,7 @@ export const DocketPage: React.FC = () => {
                 {/* Top Badges */}
                 <div className="absolute top-3 left-3 right-3 flex items-center justify-between">
                   <span className="rounded-xl bg-black/80 border border-white/15 px-3 py-1 font-mono-docket text-xs font-bold text-[#DFC15E]">
-                    {slip.incident_date} · {slip.incident_time?.slice(0, 5) || 'OCT 17'} · {slip.location_area}
+                    {slip.incident_date} · {slip.incident_time ? `${slip.incident_time.slice(0, 5)} · ` : ''}{slip.location_area}
                   </span>
                   <span className="rounded-2xl bg-[#C86D51] px-3.5 py-1 font-display-tall text-3xl font-black text-[#121212] shadow-lg">
                     +{slip.demerit_count} PTS

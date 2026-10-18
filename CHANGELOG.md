@@ -2,6 +2,20 @@
 
 All notable changes to the **Copper Athletic Club — Ring of Honor** web application are documented in this file.
 
+## [1.6.10] - 2026-10-18
+
+### Changed & Streamlined
+- **Individual Leaderboard Front-and-Center (`src/pages/LeaderboardPage.tsx`)**:
+  - Showcased the **Individual Leaderboard (`RING OF HONOR STANDINGS`)** directly beneath the Penalty Box header, moving the 5-team foul categories below the player cards so player standings (Rick, Burtis, David Lee) are instantly visible at the top of the fold.
+- **Header Streamlining & Clutter Removal (`src/pages/LeaderboardPage.tsx`)**:
+  - Renamed the upload CTA button from `"DROP SLIP"` to **`"ADD YOUR DEMERIT"`** with camera icon.
+  - Removed clutter tagline `"A SPORTS BAR. NOT A GYM. • MARSHALL, MI"` above the header.
+  - Removed verbose subtitle `"Official Bar Demerit Jumbotron · Lions · Red Wings · Pistons · Tigers · UM · MSU"` below The Penalty Box.
+  - Removed backbar badge `"Actual Copper AC backbar - marshall, mi"` from the Head Referee (Sarah) section.
+- **Modernized Season / Period Selectors (`src/pages/LeaderboardPage.tsx`, `src/types/demerits.ts`, `src/context/DemeritsContext.tsx`)**:
+  - Replaced the testing session button `"Oct 17 Game Night"` with production options: **`All-Time`**, **`This Month`**, **`This Week`**, **`Today`**, and **`Custom Dates`**.
+  - Replaced hardcoded `'OCT 17'` fallback timestamps with dynamic dates on thumbnail slips.
+
 ## [1.6.9] - 2026-10-18
 
 ### Added & Hardened

@@ -53,3 +53,10 @@
 - [x] Strict Security Headers: Enforced `nosniff`, `DENY`, and `strict-origin-when-cross-origin` on all API responses.
 - [x] Granular Opt-In Notification Triggers (Off by default): Independent 4-way selectors (`[Off] [Email] [Text] [Both]`) for 👑 Crown, 📉 Dethroned, 📋 New Citation, 📢 Ref Whistle, and 🍺 Friday Night Docket.
 - [x] Automated Friday 5:00 PM EST Cron: Cloudflare Workers Cron trigger (`0 21 * * 5`) with Ref Booth preview trigger and safety caps.
+
+## Phase 11: Front-Page Leaderboard Showcase & Clean Header UX (Completed — v1.6.10)
+- [x] Showcased the Individual Leaderboard directly beneath the Penalty Box header, moving foul categories below player cards.
+- [x] Renamed the slip upload button to "Add Your Demerit" with camera icon.
+- [x] Streamlined header layout: purged "A sports bar. Not a gym." and "Official bar demerit jumbotron" taglines.
+- [x] Removed "Actual Copper AC backbar" tag from Sarah's section.
+- [x] Replaced "Oct 17 Game Night" with production period options: All-Time, This Month, This Week, Today, and Custom Dates.
