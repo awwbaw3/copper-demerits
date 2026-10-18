@@ -41,18 +41,18 @@ export async function cloudflareFetch<T = unknown>(
 }
 
 /**
- * Fingerprints a File (computing SHA-256 and 64-bit perceptual dHash) and uploads it to
- * the Cloudflare R2 bucket `copper-demerits-slips` via `PUT https://api.copperdemerits.com/api/slips/:filename`.
+ * Uploads an already-compressed JPEG Data URL (`< 82 KB`) to Cloudflare R2
+ * (`copper-demerits-slips`) via `PUT https://api.copperdemerits.com/api/slips/:filename`.
  */
-export async function processAndUploadSlipImage(file: File): Promise<UploadedSlipAsset> {
-  const fingerprint = await fingerprintImageFile(file, 1280, 0.85);
-
+export async function uploadCompressedSlipToR2(
+  dataUrl: string,
+  filename: string
+): Promise<{ url: string; storageMode: 'cloudflare-r2' | 'local' }> {
   try {
-    const res = await fetch(fingerprint.dataUrl);
+    const res = await fetch(dataUrl);
     const blob = await res.blob();
-    const filename = `${fingerprint.sha256.slice(0, 24)}.jpg`;
 
-    const uploadRes = await fetch(`${CLOUDFLARE_API_BASE}/api/slips/${filename}`, {
+    const uploadRes = await fetch(`${CLOUDFLARE_API_BASE}/api/slips/${encodeURIComponent(filename)}`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'image/jpeg',
@@ -63,9 +63,8 @@ export async function processAndUploadSlipImage(file: File): Promise<UploadedSli
     if (uploadRes.ok) {
       const payload = (await uploadRes.json()) as { ok?: boolean; url?: string };
       return {
-        url: payload.url || `${CLOUDFLARE_API_BASE}/api/slips/${filename}`,
+        url: payload.url || `${CLOUDFLARE_API_BASE}/api/slips/${encodeURIComponent(filename)}`,
         storageMode: 'cloudflare-r2',
-        fingerprint,
       };
     }
   } catch {
@@ -73,8 +72,23 @@ export async function processAndUploadSlipImage(file: File): Promise<UploadedSli
   }
 
   return {
-    url: fingerprint.dataUrl,
+    url: dataUrl,
     storageMode: 'local',
+  };
+}
+
+/**
+ * Fingerprints & compresses a File (computing SHA-256, 64-bit perceptual dHash, and shrinking
+ * 4MB-12MB smartphone photos down to ~45KB-82KB) and uploads it to Cloudflare R2.
+ */
+export async function processAndUploadSlipImage(file: File): Promise<UploadedSlipAsset> {
+  const fingerprint = await fingerprintImageFile(file, 960, 0.74, 82 * 1024);
+  const filename = `${fingerprint.sha256.slice(0, 24)}.jpg`;
+  const uploaded = await uploadCompressedSlipToR2(fingerprint.dataUrl, filename);
+
+  return {
+    url: uploaded.url,
+    storageMode: uploaded.storageMode,
     fingerprint,
   };
 }

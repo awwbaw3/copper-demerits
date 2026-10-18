@@ -36,15 +36,17 @@
 - [x] Removed `copper_demerits` schema from `Supabase5` (`iqbpnkttwtugxkospdqt`).
 - [x] Added **Staff & Patron Profile Claiming** (`src/components/ClaimProfileModal.tsx` + `POST /api/claim-profile`) with 4-digit Bar PINs and Detroit/Michigan team badges, and required profile sign-in before uploading slips on `/submit`.
 
-## Phase 9: AI Referee Auto-Blur, Zero-Touch Vision OCR Slip Capture, Profile Editor, Claimed Nickname Stat Merging, Email/Phone Login & Complementary Local SEO (Completed — v1.6.4)
+## Phase 9: AI Referee Auto-Blur, Zero-Touch Vision OCR Slip Capture, Adaptive Smartphone Image Compression, Profile Editor, Claimed Nickname Stat Merging, Email/Phone Login & Complementary Local SEO (Completed — v1.6.5)
 - [x] Purged `Matt Barnes` and all non-authentic / negative aliases from Cloudflare D1, Worker seed data, and UI placeholders.
 - [x] Added **Zero-Touch AI Vision Slip OCR (`POST /api/extract-slip` via `@cf/mistralai/mistral-small-3.1-24b-instruct`)** so snapping or choosing a slip photo automatically extracts all fields (single or multi-slip) and logs them to Cloudflare R2 & D1 with zero manual typing required.
+- [x] Added **Adaptive Smartphone Slip Image Compression (`<82 KB` target, 95%–99% size reduction)** with EXIF/GPS stripping, pre-upload deduplication (0 R2 bytes for blocked duplicates), `350 KB` Worker upload cap, and compressed all 7 existing R2 slip photos from `3.26 MB` down to `387.6 KB` (enabling **150,000+ slip photos** inside Cloudflare R2's $0/month 10 GB free tier).
 - [x] Added **Real-Time AI Referee Monitor** (Cloudflare Workers AI `env.AI` + deterministic profanity/slur filter) that blocks offensive names/aliases and **auto-blurs + queues** flagged slip uploads for Site Admin (**Rick**) to review and override in the **Ref Booth (`/admin`)**.
 - [x] Added **Self-Service Profile Editing ("My Locker")** with **4–8 digit Bar PINs**, frictionless post-claim editing of display name, email, phone, notification settings, tagline, and team badge, locked `/admin` behind `isAdminOrStaff`, and stripped all PII from public API responses.
 - [x] Added **Email or 10-Digit Phone Requirement on Claim/Sign-Up**, **Returning User Email/Phone + PIN Sign-In**, and **Unclaimed-Only Claim List** (hiding already-claimed profiles from the claimable list).
 - [x] Added **Claimed Profile & Admin-Only Nicknames (`My Bar Nicknames & Slip Aliases`)** with automatic slip stat merging so slips written with any linked nickname automatically merge their points and offenses into the correct profile.
 - [x] Configured DNS-verified **`copperdemerits.com`** on Resend Free Tier (`referee@copperdemerits.com`) with **Opt-In 6-Digit Verified Email & Free Carrier SMS Gateway Notifications** capped at 25/day ($0 cost).
 - [x] Added **Preset Jovial Bar Reactions**, **Unofficial Patron-Run Fan Site Disclaimer**, and **Complementary Local SEO (`index.html` JSON-LD `BarOrPub` attribution + dofollow backlink to `copperac.com`)**.
+
 
 
 

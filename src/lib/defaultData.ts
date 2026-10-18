@@ -202,13 +202,25 @@ export const KNOWN_UPLOADED_FILE_HASHES: Record<
     slipId: 'a4444444-4444-4444-8444-444444444444',
     description: '28318.jpg (Single-Slip Photo: David Lee 6:27 PM — "Back talk, insubordinate")',
   },
+  b9af52b9645dbb1d1e29f2fe497fb91117bce6481b2d26f9b9705d93ec11ff8f: {
+    slipId: 'a4444444-4444-4444-8444-444444444444',
+    description: '28318.jpg (Optimized 43KB Single-Slip Photo: David Lee 6:27 PM)',
+  },
   '6738d10aaaf8d8044454d9b17279ac1fa2f02733c0eba99cd5065714e2c57e04': {
     slipId: 'a4444444-4444-4444-8444-444444444444',
     description: '28318_david_lee_1827.jpg (David Lee 6:27 PM Slip Crop)',
   },
+  '6147393f1b0dc3adc36286e055f7ffb4050c0fbcf5364986d4d4ddc861ecbf80': {
+    slipId: 'a4444444-4444-4444-8444-444444444444',
+    description: '28318_david_lee_1827.jpg (Optimized 71KB David Lee 6:27 PM Slip Crop)',
+  },
   ecc1ca1e8a95d0cf62f82a5949e40a6044ea7bb335a2f5991cc500c4557feb36: {
     slipId: 'a3333333-3333-4333-8333-333333333333',
     description: '20261017_211324.jpg (Multi-Slip Bar Photo: Burtis 8:50 PM, Burtis 8:56 PM, Rick 9:09 PM)',
+  },
+  bcefcb8a999bbd35554a47e494d8a56945d88f7417c0e381cbf9196021a153e3: {
+    slipId: 'a3333333-3333-4333-8333-333333333333',
+    description: '20261017_211324.jpg (Optimized 48KB Multi-Slip Bar Photo)',
   },
   c03f872eb440b12c9835d1b84407278c39eb106df64c446c35eb06eb382def9e: {
     slipId: 'a3333333-3333-4333-8333-333333333333',
@@ -218,17 +230,33 @@ export const KNOWN_UPLOADED_FILE_HASHES: Record<
     slipId: 'a3333333-3333-4333-8333-333333333333',
     description: 'Scan_20261017_212309.jpg (Upright Scan: Rick 9:09 PM)',
   },
+  b34395923555cafba3f6b8b803741e6dde93afc12ba7942279ccc2eb93c5394a: {
+    slipId: 'a3333333-3333-4333-8333-333333333333',
+    description: 'Scan_20261017_212309.jpg (Optimized 79KB Upright Scan: Rick 9:09 PM)',
+  },
   a88e9b61232ff9d47abda74d8db70de8aa80ffa4037115d25ea5beacd8f3347d: {
     slipId: 'a1111111-1111-4111-8111-111111111111',
     description: '20261017_211324_burtis_2050.jpg (Burtis 8:50 PM Slip)',
+  },
+  bd26b5f39b778ee74fd684937883b8a42af6179c4cc1c4b166038798189cf5ff: {
+    slipId: 'a1111111-1111-4111-8111-111111111111',
+    description: '20261017_211324_burtis_2050.jpg (Optimized 35KB Burtis 8:50 PM Slip)',
   },
   de5d75f906950591314f38f2ad6fe4fde09545759ee5fba74c42905150c96ef8: {
     slipId: 'a2222222-2222-4222-8222-222222222222',
     description: '20261017_211324_burtis_2056.jpg (Burtis 8:56 PM Slip)',
   },
+  '9609c7842e853e30a0c8ca83c7f76b5e12dfc1c49918dd70506a5e8f99d344dc': {
+    slipId: 'a2222222-2222-4222-8222-222222222222',
+    description: '20261017_211324_burtis_2056.jpg (Optimized 55KB Burtis 8:56 PM Slip)',
+  },
   d0e27033e69d8c789fdec035769ad37eca920a2ccb2a9d1208bfeb01f35c4ae8: {
     slipId: 'a3333333-3333-4333-8333-333333333333',
     description: '20261017_211324_rick_2109.jpg (Rick 9:09 PM Slip)',
+  },
+  '20f8bc508d75f981d9567c57c15b8bda2c8219c79f40ecb704a1c21d70fe3e3e': {
+    slipId: 'a3333333-3333-4333-8333-333333333333',
+    description: '20261017_211324_rick_2109.jpg (Optimized 58KB Rick 9:09 PM Slip)',
   },
 };
 

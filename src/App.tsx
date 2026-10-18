@@ -50,7 +50,7 @@ export const App: React.FC = () => {
                     Official Menus, Tap List &amp; Hours: Copper Athletic Club (copperac.com) — Marshall, MI ↗
                   </a>
                   <span>·</span>
-                  <span>Cloudflare D1 + R2 + AI Referee · PWA v1.6.4</span>
+                  <span>Cloudflare D1 + R2 + AI Referee · PWA v1.6.5</span>
                 </div>
               </div>
             </div>

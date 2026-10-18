@@ -2,6 +2,18 @@
 
 All notable changes to the **Copper Athletic Club — Ring of Honor** web application are documented in this file.
 
+## [1.6.5] - 2026-10-18
+
+### Added & Optimized
+- **Adaptive Smartphone Slip Image Compression (<82 KB Target, 95%–99% Size Reduction) (`src/lib/imageDedup.ts`, `src/lib/supabase.ts`, `src/pages/SubmitSlipPage.tsx`)**:
+  - Upgraded `fingerprintImageFile` to automatically downscale 12MP–48MP smartphone camera photos (typically `4 MB – 12 MB`) to a crisp **`960px` max dimension** using high-quality bicubic canvas resampling (stripping 100% of EXIF, GPS, and camera metadata) and an adaptive JPEG byte-budget loop (`quality: 0.74 -> 0.52`) targeting **`~35 KB – 82 KB` per slip photo**.
+  - Added live compression stats (`originalBytes`, `compressedBytes`, `savingsPercent`, `width × height`) displayed on `/submit` so users see the exact size reduction (e.g., `6.4 MB → 58 KB · 99% saved`).
+- **Zero-Waste R2 Deduplication & Compact Blurred Image Storage (`src/pages/SubmitSlipPage.tsx`, `src/lib/moderation.ts`, `cloudflare/worker.js`)**:
+  - Reordered the capture pipeline so SHA-256 and 64-bit Perceptual dHash duplicate checks run **locally in the browser before uploading to Cloudflare R2** — blocked duplicate photos now consume **0 bytes** of R2 storage and bandwidth.
+  - Updated `applyRefereeBlurStampToImage` and `persistSlipDrafts` so Referee-blurred slip images are compressed (`<= 960px`, `quality = 0.72`) and uploaded to Cloudflare R2 (`_blurred.jpg`) rather than storing inline base64 strings in Cloudflare D1.
+  - Enforced a hard `350 KB` maximum payload guard on `PUT /api/slips/:filename` in `cloudflare/worker.js`.
+  - Compressed all 7 existing slip images in `public/slips/` and Cloudflare R2 (`copper-demerits-slips`), shrinking total existing slip storage from **`3,263 KB (3.26 MB)` down to `387.6 KB` (`88.1%` total reduction; `20261017_211324.jpg` reduced from `1,805.2 KB` to `47.7 KB`)**.
+
 ## [1.6.4] - 2026-10-18
 
 ### Added

@@ -8,6 +8,29 @@ export interface ImageFingerprint {
   dataUrl: string;
   width: number;
   height: number;
+  originalBytes: number;
+  compressedBytes: number;
+  savingsPercent: number;
+}
+
+/**
+ * Estimates the binary byte length of a base64 Data URL (`data:image/jpeg;base64,...`).
+ */
+export function estimateDataUrlBytes(dataUrl: string): number {
+  const commaIdx = dataUrl.indexOf(',');
+  const base64Len = commaIdx >= 0 ? dataUrl.length - (commaIdx + 1) : dataUrl.length;
+  return Math.max(1, Math.round((base64Len * 3) / 4));
+}
+
+/**
+ * Formats a byte count into a clean human-readable label (e.g. `6.4 MB` or `64 KB`).
+ */
+export function formatByteSize(bytes: number): string {
+  if (!Number.isFinite(bytes) || bytes <= 0) return '0 KB';
+  if (bytes >= 1024 * 1024) {
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  }
+  return `${Math.max(1, Math.round(bytes / 1024))} KB`;
 }
 
 export interface DuplicateCheckResult {
@@ -105,13 +128,17 @@ export function calculateHammingDistance(
 }
 
 /**
- * Extracts both the exact SHA-256 file digest and rotation-aware 64-bit perceptual dHashes from a File.
+ * Extracts the exact SHA-256 raw file digest and rotation-aware 64-bit perceptual dHashes,
+ * while aggressively compressing modern 12MP-48MP smartphone photos (typically 4MB-12MB)
+ * down to a crisp ~45KB-82KB image (stripping all EXIF/GPS metadata and keeping handwriting sharp).
  */
 export async function fingerprintImageFile(
   file: File,
-  maxDimension = 1280,
-  quality = 0.85
+  maxDimension = 960,
+  initialQuality = 0.74,
+  targetMaxBytes = 82 * 1024
 ): Promise<ImageFingerprint> {
+  const originalBytes = file.size || 0;
   const buffer = await file.arrayBuffer();
   const sha256 = await computeSha256FromBuffer(buffer);
 
@@ -141,13 +168,44 @@ export async function fingerprintImageFile(
           }
         }
 
-        const canvas = document.createElement('canvas');
-        canvas.width = width;
-        canvas.height = height;
-        const ctx = canvas.getContext('2d');
-        const dataUrl = ctx
-          ? (ctx.drawImage(img, 0, 0, width, height), canvas.toDataURL('image/jpeg', quality))
-          : (reader.result as string);
+        const renderCompressed = (targetW: number, targetH: number, q: number): string => {
+          const canvas = document.createElement('canvas');
+          canvas.width = targetW;
+          canvas.height = targetH;
+          const ctx = canvas.getContext('2d');
+          if (!ctx) return reader.result as string;
+          ctx.imageSmoothingEnabled = true;
+          ctx.imageSmoothingQuality = 'high';
+          // Fill white background in case of transparent PNGs before JPEG encoding
+          ctx.fillStyle = '#FFFFFF';
+          ctx.fillRect(0, 0, targetW, targetH);
+          ctx.drawImage(img, 0, 0, targetW, targetH);
+          return canvas.toDataURL('image/jpeg', q);
+        };
+
+        let dataUrl = renderCompressed(width, height, initialQuality);
+        let compressedBytes = estimateDataUrlBytes(dataUrl);
+
+        // Adaptive byte-budget loop: step down quality if needed so smartphone photos stay under ~82KB
+        const qualitySteps = [0.66, 0.58, 0.52];
+        for (const qStep of qualitySteps) {
+          if (compressedBytes <= targetMaxBytes) break;
+          dataUrl = renderCompressed(width, height, qStep);
+          compressedBytes = estimateDataUrlBytes(dataUrl);
+        }
+
+        // Final dimension step-down if an unusually dense texture still exceeds targetMaxBytes
+        if (compressedBytes > targetMaxBytes && (width > 720 || height > 720)) {
+          width = Math.round(width * 0.82);
+          height = Math.round(height * 0.82);
+          dataUrl = renderCompressed(width, height, 0.62);
+          compressedBytes = estimateDataUrlBytes(dataUrl);
+        }
+
+        const savingsPercent =
+          originalBytes > compressedBytes
+            ? Math.min(99, Math.max(1, Math.round(((originalBytes - compressedBytes) / originalBytes) * 100)))
+            : 0;
 
         resolve({
           sha256,
@@ -156,6 +214,9 @@ export async function fingerprintImageFile(
           dataUrl,
           width,
           height,
+          originalBytes: originalBytes || compressedBytes,
+          compressedBytes,
+          savingsPercent,
         });
       };
       img.src = reader.result as string;

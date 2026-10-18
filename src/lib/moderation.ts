@@ -147,9 +147,22 @@ export async function applyRefereeBlurStampToImage(
     img.crossOrigin = 'anonymous';
     img.onload = () => {
       try {
+        let targetW = img.width || 800;
+        let targetH = img.height || 600;
+        const maxDim = 960;
+        if (targetW > maxDim || targetH > maxDim) {
+          if (targetW > targetH) {
+            targetH = Math.round((targetH * maxDim) / targetW);
+            targetW = maxDim;
+          } else {
+            targetW = Math.round((targetW * maxDim) / targetH);
+            targetH = maxDim;
+          }
+        }
+
         const canvas = document.createElement('canvas');
-        canvas.width = img.width || 800;
-        canvas.height = img.height || 600;
+        canvas.width = targetW;
+        canvas.height = targetH;
         const ctx = canvas.getContext('2d');
         if (!ctx) {
           resolve(imageSrc);
@@ -200,7 +213,7 @@ export async function applyRefereeBlurStampToImage(
           ctx.restore();
         }
 
-        resolve(canvas.toDataURL('image/jpeg', 0.86));
+        resolve(canvas.toDataURL('image/jpeg', 0.72));
       } catch {
         resolve(imageSrc);
       }

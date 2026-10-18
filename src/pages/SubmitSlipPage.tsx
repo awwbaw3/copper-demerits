@@ -1,10 +1,14 @@
 import React, { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useDemerits } from '../context/DemeritsContext';
-import { processAndUploadSlipImage, SLIPS_BUCKET } from '../lib/supabase';
+import { uploadCompressedSlipToR2 } from '../lib/supabase';
 import { DEMERIT_CATEGORIES } from '../lib/defaultData';
 import { DemeritLineItem } from '../types/demerits';
-import { DuplicateCheckResult } from '../lib/imageDedup';
+import {
+  DuplicateCheckResult,
+  fingerprintImageFile,
+  formatByteSize,
+} from '../lib/imageDedup';
 import { MichiganTeamBadge, TeamBadgeMeta } from '../components/MichiganSportsGraphics';
 import {
   moderateTextInstant,
@@ -78,6 +82,13 @@ export const SubmitSlipPage: React.FC = () => {
   const [rawDataUrl, setRawDataUrl] = useState<string | null>(null);
   const [imageSha256, setImageSha256] = useState<string | null>(null);
   const [imageDhash, setImageDhash] = useState<string | null>(null);
+  const [compressionStats, setCompressionStats] = useState<{
+    originalBytes: number;
+    compressedBytes: number;
+    savingsPercent: number;
+    width: number;
+    height: number;
+  } | null>(null);
   const [duplicateAlert, setDuplicateAlert] = useState<DuplicateCheckResult | null>(null);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [uploadStatusMsg, setUploadStatusMsg] = useState<string | null>(null);
@@ -209,10 +220,13 @@ export const SubmitSlipPage: React.FC = () => {
 
         let finalSlipImageUrl = targetImageUrl;
         if (modScan.flagged && (targetRawDataUrl || targetImageUrl)) {
-          finalSlipImageUrl = await applyRefereeBlurStampToImage(
+          const blurredDataUrl = await applyRefereeBlurStampToImage(
             targetRawDataUrl || targetImageUrl,
             modScan.blurRegions
           );
+          const blurKey = `${(targetSha256 || Date.now().toString()).slice(0, 24)}_blurred_${i + 1}.jpg`;
+          const blurredUpload = await uploadCompressedSlipToR2(blurredDataUrl, blurKey);
+          finalSlipImageUrl = blurredUpload.url;
         }
 
         const res = await submitDemeritSlip({
@@ -264,10 +278,10 @@ export const SubmitSlipPage: React.FC = () => {
   };
 
   /**
-   * Zero-Touch Image Capture:
-   * 1. Computes SHA-256 & 64-bit Perceptual dHash and uploads photo to Cloudflare R2.
-   * 2. Runs Vision AI OCR (`/api/extract-slip`) to automatically read all handwritten fields.
-   * 3. Automatically logs all extracted slip(s) to Cloudflare D1 so the user doesn't have to do anything else!
+   * Zero-Touch Image Capture + Smart Smartphone Compression:
+   * 1. Compresses 4MB-12MB smartphone photos down to ~45KB-82KB locally in the browser & verifies uniqueness BEFORE uploading any bytes to R2.
+   * 2. Uploads the compact optimized image to Cloudflare R2 (`copper-demerits-slips`).
+   * 3. Runs Vision AI OCR (`/api/extract-slip`) to automatically read all handwritten fields and logs to Cloudflare D1.
    */
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -284,11 +298,15 @@ export const SubmitSlipPage: React.FC = () => {
     setDuplicateAlert(null);
     setSubmittedSummary(null);
     setAutoLoggedSlips(null);
-    setUploadStatusMsg('Step 1/3 · Verifying Unique Photo (SHA-256 & 64-bit Perceptual dHash)...');
+    setCompressionStats(null);
+    setUploadStatusMsg(
+      'Step 1/3 · Compressing Smartphone Photo (<80KB) & Verifying Uniqueness (SHA-256 + dHash)...'
+    );
 
     try {
-      const asset = await processAndUploadSlipImage(file);
-      const dupCheck = checkImageDuplicate(asset.fingerprint);
+      // 1. Compress & fingerprint locally FIRST so duplicate photos take 0 bytes in Cloudflare R2
+      const fingerprint = await fingerprintImageFile(file, 960, 0.74, 82 * 1024);
+      const dupCheck = checkImageDuplicate(fingerprint);
 
       if (dupCheck.isDuplicate) {
         setDuplicateAlert(dupCheck);
@@ -296,20 +314,35 @@ export const SubmitSlipPage: React.FC = () => {
         setRawDataUrl(null);
         setImageSha256(null);
         setImageDhash(null);
+        setCompressionStats(null);
         setUploadStatusMsg(null);
         return;
       }
 
-      setImageUrl(asset.url);
-      setRawDataUrl(asset.fingerprint.dataUrl);
-      setImageSha256(asset.fingerprint.sha256);
-      setImageDhash(asset.fingerprint.dhash);
+      setCompressionStats({
+        originalBytes: fingerprint.originalBytes,
+        compressedBytes: fingerprint.compressedBytes,
+        savingsPercent: fingerprint.savingsPercent,
+        width: fingerprint.width,
+        height: fingerprint.height,
+      });
+
+      // 2. Upload the tiny compressed (<82KB) image to Cloudflare R2
+      const filename = `${fingerprint.sha256.slice(0, 24)}.jpg`;
+      const uploaded = await uploadCompressedSlipToR2(fingerprint.dataUrl, filename);
+
+      setImageUrl(uploaded.url);
+      setRawDataUrl(fingerprint.dataUrl);
+      setImageSha256(fingerprint.sha256);
+      setImageDhash(fingerprint.dhash);
       setUploadStatusMsg(
-        'Step 2/3 · AI Vision Referee Reading Handwritten Slip(s) (Patron, Offenses, Time & Signature)...'
+        `Step 2/3 · Optimized (${formatByteSize(fingerprint.originalBytes)} → ${formatByteSize(
+          fingerprint.compressedBytes
+        )}) · AI Vision Reading Handwritten Slip(s)...`
       );
 
       const todayStr = new Date().toISOString().slice(0, 10);
-      const aiResult = await extractSlipsFromPhotoAI(asset.fingerprint.dataUrl, todayStr);
+      const aiResult = await extractSlipsFromPhotoAI(fingerprint.dataUrl, todayStr);
 
       if (aiResult.ok && aiResult.slips && aiResult.slips.length > 0) {
         const extractedDrafts: SlipDraftItem[] = aiResult.slips.map((s) => ({
@@ -344,22 +377,28 @@ export const SubmitSlipPage: React.FC = () => {
         // Automatically log and save the extracted slip(s) so the user doesn't have to do anything else!
         await persistSlipDrafts(
           extractedDrafts,
-          asset.url,
-          asset.fingerprint.dataUrl,
-          asset.fingerprint.sha256,
-          asset.fingerprint.dhash
+          uploaded.url,
+          fingerprint.dataUrl,
+          fingerprint.sha256,
+          fingerprint.dhash
         );
 
         setUploadStatusMsg(
           `Zero-Touch Complete · ${extractedDrafts.length} ${
             extractedDrafts.length === 1 ? 'Slip' : 'Slips'
-          } Read & Logged Automatically to Cloudflare R2 "${SLIPS_BUCKET}" & D1`
+          } Read & Logged Automatically (${formatByteSize(
+            fingerprint.originalBytes
+          )} → ${formatByteSize(fingerprint.compressedBytes)}${
+            fingerprint.savingsPercent > 0 ? `, ${fingerprint.savingsPercent}% saved` : ''
+          })`
         );
       } else {
         // Only open manual editor if photo was too blurry for AI OCR
         setShowManualEditor(true);
         setUploadStatusMsg(
-          'Photo uploaded to Cloudflare R2 · Review or enter slip details below to finish logging.'
+          `Photo optimized (${formatByteSize(fingerprint.originalBytes)} → ${formatByteSize(
+            fingerprint.compressedBytes
+          )}) & uploaded to R2 · Review or enter slip details below.`
         );
       }
     } catch {
@@ -656,6 +695,7 @@ export const SubmitSlipPage: React.FC = () => {
                   setRawDataUrl(null);
                   setImageSha256(null);
                   setImageDhash(null);
+                  setCompressionStats(null);
                   setUploadStatusMsg(null);
                   setSubmittedSummary(null);
                   setAutoLoggedSlips(null);
@@ -701,9 +741,22 @@ export const SubmitSlipPage: React.FC = () => {
                   )}
                   {uploadStatusMsg}
                 </span>
-                {imageDhash && (
-                  <span className="text-[10px] text-emerald-400/80">dHash: {imageDhash}</span>
-                )}
+                <div className="flex flex-wrap items-center gap-2">
+                  {compressionStats && (
+                    <span className="rounded-md border border-[#DFC15E]/40 bg-[#DFC15E]/15 px-2 py-0.5 text-[10px] font-bold text-[#DFC15E]">
+                      ⚡ {formatByteSize(compressionStats.originalBytes)} &rarr;{' '}
+                      {formatByteSize(compressionStats.compressedBytes)} (
+                      {compressionStats.width}&times;{compressionStats.height}px
+                      {compressionStats.savingsPercent > 0
+                        ? ` · ${compressionStats.savingsPercent}% saved`
+                        : ''}
+                      )
+                    </span>
+                  )}
+                  {imageDhash && (
+                    <span className="text-[10px] text-emerald-400/80">dHash: {imageDhash}</span>
+                  )}
+                </div>
               </div>
             </div>
           ) : (

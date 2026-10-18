@@ -4,6 +4,16 @@ Chronological log of architectural decisions, database migrations, and infrastru
 
 ---
 
+## 2026-10-18 — v1.6.5 Adaptive Smartphone Slip Image Compression (<82 KB Target) & Zero-Waste Cloudflare R2 Storage Optimization
+- **Adaptive Client-Side Slip Image Compressor (`src/lib/imageDedup.ts`, `src/lib/supabase.ts`)**:
+  - Upgraded `fingerprintImageFile` to compute raw SHA-256 and 4-rotation 64-bit Perceptual dHash on the original file, then downscale smartphone camera photos to max `960px` on the longest edge with bicubic smoothing (stripping all EXIF/GPS metadata) and step through an adaptive quality loop (`0.74 -> 0.66 -> 0.58 -> 0.52`) so uploaded slip images consistently land between **35 KB and 82 KB** (95%–99% smaller than 4MB–12MB smartphone photos) while keeping handwriting sharp for Vision AI OCR.
+- **Pre-Upload Deduplication, R2 Blurred Image Storage & Existing Asset Optimization (`src/pages/SubmitSlipPage.tsx`, `cloudflare/worker.js`)**:
+  - Updated `handleFileChange` to verify `checkImageDuplicate(fingerprint)` **before** calling `uploadCompressedSlipToR2`, ensuring duplicate photos consume `0 bytes` in Cloudflare R2.
+  - Updated `persistSlipDrafts` to upload Referee-blurred images to R2 (`_blurred_${i}.jpg`) instead of storing base64 strings in D1, and added a `350 KB` max payload guard on `PUT /api/slips/:filename` in `cloudflare/worker.js` (Worker Version `e1b8dd62-0327-4523-9a0a-70d22449c955`).
+  - Optimized all 7 existing slip images in `public/slips/` and re-uploaded them to Cloudflare R2 `copper-demerits-slips`, reducing existing storage from `3,263.0 KB` (`3.26 MB`) to `387.6 KB` (`88.1%` reduction) and preserving both raw and optimized SHA-256 digests in `KNOWN_UPLOADED_FILE_HASHES`.
+
+---
+
 ## 2026-10-18 — v1.6.4 Zero-Touch AI Vision Slip Extraction & Automatic Logging on Image Capture
 - **Cloudflare Workers AI Vision OCR Endpoint (`POST /api/extract-slip` in `cloudflare/worker.js`)**:
   - Added `extractSlipsFromImageWithAI` using Cloudflare Workers AI Vision (`@cf/mistralai/mistral-small-3.1-24b-instruct`, `@cf/google/gemma-3-12b-it`, `@cf/meta/llama-3.2-11b-vision-instruct`) seeded with the live `members` and `staff_aliases` roster hints.

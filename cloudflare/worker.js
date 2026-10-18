@@ -986,7 +986,7 @@ export default {
         return jsonResponse({
           ok: true,
           service: 'copper-demerits-api',
-          version: '1.6.0',
+          version: '1.6.5',
           backend: 'cloudflare-d1-r2-ai',
           database: 'copper-demerits-db',
           bucket: 'copper-demerits-slips',
@@ -1018,6 +1018,18 @@ export default {
         if (request.method === 'PUT' || request.method === 'POST') {
           const contentType = request.headers.get('Content-Type') || 'image/jpeg';
           const body = await request.arrayBuffer();
+          const maxBytes = 350 * 1024; // 350 KB hard cap (client compresses smartphone photos to ~45KB-82KB)
+          if (body.byteLength > maxBytes) {
+            return jsonResponse(
+              {
+                ok: false,
+                error: `Slip image exceeds 350 KB optimized storage limit (${Math.round(
+                  body.byteLength / 1024
+                )} KB). Please upload via the Copper Demerits app so automatic compression runs first.`,
+              },
+              413
+            );
+          }
           await env.SLIPS_BUCKET.put(key, body, {
             httpMetadata: {
               contentType,
@@ -1025,7 +1037,12 @@ export default {
             },
           });
           const publicUrl = `${url.origin}/api/slips/${encodeURIComponent(key)}`;
-          return jsonResponse({ ok: true, key, url: publicUrl });
+          return jsonResponse({
+            ok: true,
+            key,
+            url: publicUrl,
+            bytes: body.byteLength,
+          });
         }
       }
 
