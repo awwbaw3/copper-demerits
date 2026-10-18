@@ -4,6 +4,15 @@ Chronological log of architectural decisions, database migrations, and infrastru
 
 ---
 
+## 2026-10-18 — v1.6.3 Email or Phone Required to Claim/Sign Up, Returning Email/Phone + PIN Login & Unclaimed-Only Claim List
+- **Cloudflare D1 Schema & Worker Auth Upgrade (`cloudflare/worker.js` Version `3a8003ff-8410-4378-b402-dbdc2e6059ab`)**:
+  - Added `is_claimed INTEGER NOT NULL DEFAULT 0` to `members` on remote D1 (`copper-demerits-db`) and updated `formatPublicMember` so `is_claimed` is `true` whenever `row.is_claimed` or `row.claimed_pin` is set.
+  - Updated `POST /api/claim-profile` (and `POST /api/login`) to support `action === 'login'` (looking up claimed profiles by normalized email or 10-digit phone + verifying 4–8 digit PIN) and `action === 'claim' | 'new'` (requiring at least one valid email or 10-digit phone + 4–8 digit PIN, blocking re-claiming of already-claimed profiles, and preventing duplicate email/phone claims).
+- **Frontend Sign-In & Unclaimed-Only Claim Modal (`src/components/ClaimProfileModal.tsx`)**:
+  - Split signed-out tabs into **`Sign In`** (Email or 10-Digit Phone + PIN), **`Claim Name (${unclaimedMembers.length})`** (showing only `!m.is_claimed` profiles with a search filter), and **`New Profile`**.
+
+---
+
 ## 2026-10-18 — v1.6.2 Complementary Fan-Site Local SEO & Authority Passing to `copperac.com`
 - Updated `index.html` `<title>`, `<meta name="description">`, Marshall MI `geo.*` tags, and Schema.org JSON-LD `@graph` so `https://copperdemerits.com` ranks for companion fan queries (`Copper Demerits`, `Ring of Honor leaderboard`) while attributing the canonical `@type: "BarOrPub"` LocalBusiness entity to `https://copperac.com/`.
 - Updated `src/App.tsx` footer link to a clean dofollow backlink (`rel="noopener"`) passing local anchor text authority to `https://copperac.com`, and added `public/robots.txt` and `public/sitemap.xml` (indexing `/` and `/docket` while disallowing `/admin` and `/submit`).

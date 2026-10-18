@@ -51,7 +51,11 @@ export const ClaimProfileModal: React.FC = () => {
     logoutProfile,
   } = useDemerits();
 
-  const [mode, setMode] = useState<'my-locker' | 'existing' | 'new'>('existing');
+  const [mode, setMode] = useState<'my-locker' | 'login' | 'claim' | 'new'>('login');
+  const [loginIdentifier, setLoginIdentifier] = useState('');
+  const [claimEmail, setClaimEmail] = useState('');
+  const [claimPhone, setClaimPhone] = useState('');
+  const [unclaimedSearch, setUnclaimedSearch] = useState('');
   const [selectedMemberId, setSelectedMemberId] = useState<string>('');
   const [newDisplayName, setNewDisplayName] = useState('');
   const [newRole, setNewRole] = useState<'patron' | 'staff' | 'both'>('patron');
@@ -78,6 +82,12 @@ export const ClaimProfileModal: React.FC = () => {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
+  // Only show UNCLAIMED profiles in the claimable list — once claimed, they never appear here
+  const unclaimedMembers = members.filter((m) => !m.is_claimed);
+  const filteredUnclaimedMembers = unclaimedMembers.filter((m) =>
+    m.display_name.toLowerCase().includes(unclaimedSearch.trim().toLowerCase())
+  );
+
   useEffect(() => {
     if (isProfileModalOpen) {
       setErrorMsg(null);
@@ -98,15 +108,16 @@ export const ClaimProfileModal: React.FC = () => {
           setPin(activePin);
         }
       } else {
-        setMode('existing');
-        const defaultTarget =
-          members.find((m) => m.display_name === 'Rick') || members[0];
-        if (defaultTarget) {
-          setSelectedMemberId(defaultTarget.id);
+        setMode('login');
+        const firstUnclaimed = members.find((m) => !m.is_claimed);
+        if (firstUnclaimed) {
+          setSelectedMemberId(firstUnclaimed.id);
           setFavoriteTeam(
-            (defaultTarget.favorite_team as TeamBadgeMeta['iconType']) || 'lions'
+            (firstUnclaimed.favorite_team as TeamBadgeMeta['iconType']) || 'lions'
           );
-          setTagline(defaultTarget.tagline || '');
+          setTagline(firstUnclaimed.tagline || '');
+        } else {
+          setSelectedMemberId('');
         }
       }
     }
@@ -114,14 +125,13 @@ export const ClaimProfileModal: React.FC = () => {
 
   if (!isProfileModalOpen) return null;
 
-  const selectedMember = members.find((m) => m.id === selectedMemberId) || null;
-  const isAlreadyClaimed = Boolean(selectedMember?.is_claimed);
+  const selectedMember = unclaimedMembers.find((m) => m.id === selectedMemberId) || null;
 
   const handleSelectMember = (id: string) => {
     setSelectedMemberId(id);
     setErrorMsg(null);
     setSuccessMsg(null);
-    const m = members.find((mem) => mem.id === id);
+    const m = unclaimedMembers.find((mem) => mem.id === id);
     if (m) {
       setFavoriteTeam((m.favorite_team as TeamBadgeMeta['iconType']) || 'lions');
       setTagline(m.tagline || '');
@@ -135,7 +145,62 @@ export const ClaimProfileModal: React.FC = () => {
 
     const cleanPin = pin.trim();
     if (cleanPin.length < 4 || cleanPin.length > 8) {
-      setErrorMsg('Enter a 4 to 8 digit Bar PIN to claim or unlock your profile.');
+      setErrorMsg('Enter a 4 to 8 digit Bar PIN.');
+      return;
+    }
+
+    // 1. Returning User Sign-In via Email or 10-Digit Phone + PIN
+    if (mode === 'login') {
+      if (!loginIdentifier.trim()) {
+        setErrorMsg('Enter your Email Address or 10-Digit Phone Number to sign in.');
+        return;
+      }
+
+      setSubmitting(true);
+      try {
+        const res = await claimOrLoginProfile({
+          action: 'login',
+          loginIdentifier: loginIdentifier.trim(),
+          pin: cleanPin,
+        });
+
+        if (!res.ok) {
+          setErrorMsg(res.error || 'Could not sign in with that email/phone and PIN.');
+        } else {
+          setSuccessMsg(`Welcome back, ${res.member?.display_name}!`);
+          setMode('my-locker');
+        }
+      } finally {
+        setSubmitting(false);
+      }
+      return;
+    }
+
+    // 2. Claiming an Unclaimed Profile or Creating a New Profile — Require Email OR Phone
+    const cleanEmail = claimEmail.trim().toLowerCase();
+    const rawDigits = claimPhone.replace(/\D/g, '');
+    const cleanPhone =
+      rawDigits.length === 11 && rawDigits.startsWith('1') ? rawDigits.slice(1) : rawDigits;
+
+    if (!cleanEmail && !cleanPhone) {
+      setErrorMsg(
+        'Please enter either your Email Address or your 10-Digit Phone Number to claim your profile (you will use it with your PIN to sign in next time).'
+      );
+      return;
+    }
+
+    if (cleanEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
+      setErrorMsg('Please enter a valid email address.');
+      return;
+    }
+
+    if (cleanPhone && cleanPhone.length !== 10) {
+      setErrorMsg('Please enter a valid 10-digit phone number (e.g. 269-274-9665).');
+      return;
+    }
+
+    if (mode === 'claim' && !selectedMember) {
+      setErrorMsg('Select your unclaimed name from the list above (or switch to New Profile).');
       return;
     }
 
@@ -155,8 +220,11 @@ export const ClaimProfileModal: React.FC = () => {
     setSubmitting(true);
     try {
       const res = await claimOrLoginProfile({
-        memberId: mode === 'existing' ? selectedMemberId : undefined,
+        action: mode === 'new' ? 'new' : 'claim',
+        memberId: mode === 'claim' ? selectedMemberId : undefined,
         displayName: mode === 'new' ? newDisplayName.trim() : selectedMember?.display_name,
+        email: cleanEmail || undefined,
+        phone: cleanPhone || undefined,
         pin: cleanPin,
         favoriteTeam,
         tagline: tagline.trim() || undefined,
@@ -164,13 +232,9 @@ export const ClaimProfileModal: React.FC = () => {
       });
 
       if (!res.ok) {
-        setErrorMsg(res.error || 'Could not verify profile.');
+        setErrorMsg(res.error || 'Could not claim profile.');
       } else {
-        setSuccessMsg(
-          res.mode === 'logged-in'
-            ? `Welcome back, ${res.member?.display_name}!`
-            : `Profile claimed for ${res.member?.display_name}!`
-        );
+        setSuccessMsg(`Profile claimed for ${res.member?.display_name}!`);
         setMode('my-locker');
       }
     } finally {
@@ -191,6 +255,18 @@ export const ClaimProfileModal: React.FC = () => {
 
     if (newPin.trim() && (newPin.trim().length < 4 || newPin.trim().length > 8)) {
       setErrorMsg('New Bar PIN must be between 4 and 8 digits.');
+      return;
+    }
+
+    const cleanEmail = notifEmail.trim().toLowerCase();
+    const rawDigits = notifPhone.replace(/\D/g, '');
+    const cleanPhone =
+      rawDigits.length === 11 && rawDigits.startsWith('1') ? rawDigits.slice(1) : rawDigits;
+
+    if (!cleanEmail && cleanPhone.length !== 10) {
+      setErrorMsg(
+        'Please keep at least a valid Email Address or 10-Digit Phone Number on your profile so you can sign in with your PIN.'
+      );
       return;
     }
 
@@ -432,7 +508,7 @@ export const ClaimProfileModal: React.FC = () => {
               type="button"
               onClick={() => {
                 logoutProfile();
-                setMode('existing');
+                setMode('login');
                 setPin('');
                 setSuccessMsg(null);
               }}
@@ -447,7 +523,7 @@ export const ClaimProfileModal: React.FC = () => {
         {/* Mode Toggle Tabs */}
         <div
           className={`grid ${
-            currentMember ? 'grid-cols-3' : 'grid-cols-2'
+            currentMember ? 'grid-cols-2 sm:grid-cols-4' : 'grid-cols-3'
           } gap-2 rounded-2xl border border-white/10 bg-[#0D0B0A] p-1.5`}
         >
           {currentMember && (
@@ -471,17 +547,35 @@ export const ClaimProfileModal: React.FC = () => {
           <button
             type="button"
             onClick={() => {
-              setMode('existing');
+              setMode('login');
               setErrorMsg(null);
+              setSuccessMsg(null);
             }}
             className={`flex items-center justify-center gap-1.5 rounded-xl py-2.5 font-athletic text-xs sm:text-sm font-bold uppercase tracking-wider transition cursor-pointer ${
-              mode === 'existing'
+              mode === 'login'
+                ? 'bg-[#B87333] text-[#121212] shadow-md'
+                : 'text-[#B5A99D] hover:text-white'
+            }`}
+          >
+            <KeyRound className="h-4 w-4" />
+            <span>{currentMember ? 'Switch Account' : 'Sign In'}</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              setMode('claim');
+              setErrorMsg(null);
+              setSuccessMsg(null);
+            }}
+            className={`flex items-center justify-center gap-1.5 rounded-xl py-2.5 font-athletic text-xs sm:text-sm font-bold uppercase tracking-wider transition cursor-pointer ${
+              mode === 'claim'
                 ? 'bg-[#B87333] text-[#121212] shadow-md'
                 : 'text-[#B5A99D] hover:text-white'
             }`}
           >
             <UserCheck className="h-4 w-4" />
-            <span>{currentMember ? 'Switch Profile' : 'Claim / Sign In'}</span>
+            <span>Claim Name ({unclaimedMembers.length})</span>
           </button>
 
           <button
@@ -491,6 +585,7 @@ export const ClaimProfileModal: React.FC = () => {
               setNewDisplayName('');
               setTagline('');
               setErrorMsg(null);
+              setSuccessMsg(null);
             }}
             className={`flex items-center justify-center gap-1.5 rounded-xl py-2.5 font-athletic text-xs sm:text-sm font-bold uppercase tracking-wider transition cursor-pointer ${
               mode === 'new'
@@ -499,7 +594,7 @@ export const ClaimProfileModal: React.FC = () => {
             }`}
           >
             <Plus className="h-4 w-4" />
-            <span>New Patron</span>
+            <span>New Profile</span>
           </button>
         </div>
 
@@ -675,13 +770,13 @@ export const ClaimProfileModal: React.FC = () => {
               </div>
             </div>
 
-            {/* Controlled Opt-In Email & Text Notification Box */}
+            {/* Login & Opt-In Email / Phone Box */}
             <div className="rounded-2xl border border-[#B87333]/35 bg-[#0E0C0B] p-4 space-y-3">
               <div className="flex items-center justify-between gap-2">
                 <div className="flex items-center gap-2">
                   <Bell className="h-4 w-4 text-[#DFC15E]" />
                   <span className="font-athletic text-base font-bold uppercase tracking-wider text-[#F5F2EB]">
-                    OPT-IN ALERTS (EMAIL &amp; CARRIER SMS)
+                    SIGN-IN CONTACT &amp; OPT-IN ALERTS (EMAIL / PHONE)
                   </span>
                 </div>
                 {currentMember.notification_verified ? (
@@ -691,24 +786,22 @@ export const ClaimProfileModal: React.FC = () => {
                   </span>
                 ) : (
                   <span className="inline-flex items-center gap-1 rounded-full bg-white/10 px-2.5 py-0.5 font-mono-docket text-[10px] uppercase text-[#B5A99D]">
-                    Not Verified Yet
+                    Private Login Contact
                   </span>
                 )}
               </div>
 
               <p className="font-mono-docket text-[11px] text-[#9E8F82]">
                 100% private — your email and phone number are <strong>never</strong> shown to
-                other users. Get notified when a slip is logged on your card
-                {currentMember.is_admin
-                  ? ' or when a blurred slip lands in your Admin Override Queue.'
-                  : '.'}
+                other users. Keep at least one on file so you can sign in from any device with your
+                PIN!
               </p>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                 <div>
                   <label className="flex items-center gap-1 font-mono-docket text-[10px] uppercase text-[#D6C7B8]">
                     <Mail className="h-3 w-3 text-[#B87333]" />
-                    <span>Email Address (Free via Resend)</span>
+                    <span>Email Address (Sign-In &amp; Alerts)</span>
                   </label>
                   <input
                     type="email"
@@ -722,7 +815,7 @@ export const ClaimProfileModal: React.FC = () => {
                 <div>
                   <label className="flex items-center gap-1 font-mono-docket text-[10px] uppercase text-[#D6C7B8]">
                     <Smartphone className="h-3 w-3 text-[#B87333]" />
-                    <span>10-Digit Mobile + Carrier Gateway (Free)</span>
+                    <span>10-Digit Mobile + Carrier Gateway</span>
                   </label>
                   <div className="mt-1 flex gap-1.5">
                     <input
@@ -825,74 +918,195 @@ export const ClaimProfileModal: React.FC = () => {
               <span>{submitting ? 'Saving Changes...' : 'Save My Profile & Preferences'}</span>
             </button>
           </form>
-        ) : (
-          /* CLAIM OR SIGN IN / NEW PATRON FORM */
+        ) : mode === 'login' ? (
+          /* RETURNING USER SIGN IN: EMAIL OR 10-DIGIT PHONE + PIN */
           <form onSubmit={handleClaimOrSignIn} className="space-y-4">
-            {mode === 'existing' ? (
+            <div className="rounded-2xl border border-[#B87333]/35 bg-[#0E0C0B] p-4 space-y-3">
+              <div className="flex items-center gap-2">
+                <Lock className="h-4 w-4 text-[#DFC15E]" />
+                <span className="font-athletic text-lg font-bold uppercase tracking-wider text-[#F5F2EB]">
+                  RETURNING PATRON &amp; STAFF SIGN IN
+                </span>
+              </div>
+              <p className="font-mono-docket text-xs text-[#B5A99D]">
+                Already claimed your profile? Enter the <strong>Email Address</strong> or{' '}
+                <strong>10-Digit Phone Number</strong> you used when claiming along with your{' '}
+                <strong>4–8 Digit Bar PIN</strong>.
+              </p>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                <div>
+                  <label className="block font-mono-docket text-xs font-bold uppercase text-[#E8B888]">
+                    EMAIL ADDRESS OR 10-DIGIT PHONE *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={loginIdentifier}
+                    onChange={(e) => setLoginIdentifier(e.target.value)}
+                    placeholder="you@example.com or 269-274-9665"
+                    className="mt-1.5 w-full rounded-xl border border-white/15 bg-[#151210] px-3.5 py-2.5 font-mono-docket text-sm text-[#F5F2EB] focus:border-[#B87333] focus:outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-mono-docket text-xs font-bold uppercase text-[#DFC15E]">
+                    YOUR 4–8 DIGIT BAR PIN *
+                  </label>
+                  <input
+                    type="password"
+                    inputMode="numeric"
+                    minLength={4}
+                    maxLength={8}
+                    required
+                    value={pin}
+                    onChange={(e) => setPin(e.target.value)}
+                    placeholder="4 to 8 digit PIN"
+                    className="mt-1.5 w-full rounded-xl border border-[#B87333]/50 bg-[#151210] px-3.5 py-2.5 font-mono-docket text-sm tracking-widest text-[#F5F2EB] focus:border-[#B87333] focus:outline-none"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {errorMsg && (
+              <div className="flex items-center gap-2 rounded-xl border border-rose-500/50 bg-rose-950/40 p-3 text-xs font-mono-docket text-rose-200">
+                <AlertCircle className="h-4 w-4 text-rose-400 shrink-0" />
+                <span>{errorMsg}</span>
+              </div>
+            )}
+
+            {successMsg && (
+              <div className="flex items-center gap-2 rounded-xl border border-emerald-500/50 bg-emerald-950/40 p-3 text-xs font-mono-docket text-emerald-200">
+                <CheckCircle2 className="h-4 w-4 text-emerald-400 shrink-0" />
+                <span>{successMsg}</span>
+              </div>
+            )}
+
+            <button
+              type="submit"
+              disabled={submitting}
+              className="flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-[#B87333] to-[#C86D51] px-5 py-3.5 font-athletic text-lg font-black uppercase tracking-wider text-[#121212] shadow-[0_0_25px_rgba(184,115,51,0.45)] transition hover:brightness-110 disabled:opacity-50 cursor-pointer"
+            >
+              <ShieldCheck className="h-5 w-5" />
+              <span>{submitting ? 'Signing In...' : 'Sign In to My Locker'}</span>
+            </button>
+
+            <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-white/10 bg-[#0D0B0A] px-3.5 py-2.5 font-mono-docket text-xs text-[#B5A99D]">
+              <span>Haven&apos;t claimed your name on the board yet?</span>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMode('claim');
+                    setErrorMsg(null);
+                  }}
+                  className="font-bold text-[#DFC15E] underline hover:text-white cursor-pointer"
+                >
+                  Claim Unclaimed Name ({unclaimedMembers.length})
+                </button>
+                <span>•</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMode('new');
+                    setErrorMsg(null);
+                  }}
+                  className="font-bold text-[#E8B888] underline hover:text-white cursor-pointer"
+                >
+                  Create New Profile
+                </button>
+              </div>
+            </div>
+          </form>
+        ) : (
+          /* CLAIM AN UNCLAIMED ROSTER CARD OR CREATE A NEW PROFILE */
+          <form onSubmit={handleClaimOrSignIn} className="space-y-4">
+            {mode === 'claim' ? (
               <div className="space-y-2.5">
-                <label className="block font-mono-docket text-xs font-bold uppercase tracking-wider text-[#E8B888]">
-                  1. SELECT YOUR STAFF OR PATRON ROSTER CARD
-                </label>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                  {members.map((m) => {
-                    const isSelected = m.id === selectedMemberId;
-                    const teamIcon =
-                      (m.favorite_team as TeamBadgeMeta['iconType']) ||
-                      (m.display_name === 'Sarah'
-                        ? 'pistons-bad-boys'
-                        : m.display_name === 'Burtis'
-                        ? 'red-wings'
-                        : 'lions');
-                    return (
-                      <button
-                        key={m.id}
-                        type="button"
-                        onClick={() => handleSelectMember(m.id)}
-                        className={`flex items-center justify-between gap-2.5 rounded-2xl border p-3 text-left transition cursor-pointer ${
-                          isSelected
-                            ? 'border-[#B87333] bg-[#B87333]/20 shadow-[0_0_20px_rgba(184,115,51,0.25)]'
-                            : 'border-white/10 bg-[#1B1714] hover:border-[#B87333]/40'
-                        }`}
-                      >
-                        <div className="flex items-center gap-2.5 min-w-0">
-                          <MichiganTeamBadge iconType={teamIcon} size="sm" />
-                          <div className="min-w-0">
-                            <div className="font-athletic text-lg font-black uppercase text-[#F5F2EB] truncate">
-                              {m.display_name}
-                            </div>
-                            <div className="font-mono-docket text-[10px] uppercase text-[#B5A99D]">
-                              {m.is_admin
-                                ? 'Patron • Site Admin'
-                                : m.is_staff && m.is_patron
-                                ? 'Staff & Patron'
-                                : m.is_staff
-                                ? 'Head Ref / Staff'
-                                : 'Patron'}
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <label className="block font-mono-docket text-xs font-bold uppercase tracking-wider text-[#E8B888]">
+                    1. CHOOSE YOUR UNCLAIMED NAME ({unclaimedMembers.length} AVAILABLE)
+                  </label>
+                  <span className="font-mono-docket text-[10px] text-[#9E8F82]">
+                    Already-claimed profiles are hidden &amp; protected
+                  </span>
+                </div>
+
+                {unclaimedMembers.length > 4 && (
+                  <input
+                    type="text"
+                    value={unclaimedSearch}
+                    onChange={(e) => setUnclaimedSearch(e.target.value)}
+                    placeholder="Filter unclaimed names..."
+                    className="w-full rounded-xl border border-white/15 bg-[#0D0B0A] px-3 py-2 font-mono-docket text-xs text-[#F5F2EB] focus:border-[#B87333] focus:outline-none"
+                  />
+                )}
+
+                {filteredUnclaimedMembers.length === 0 ? (
+                  <div className="rounded-2xl border border-white/10 bg-[#0D0B0A] p-4 text-center font-mono-docket text-xs text-[#B5A99D]">
+                    No unclaimed names match your search.{' '}
+                    <button
+                      type="button"
+                      onClick={() => setMode('new')}
+                      className="font-bold text-[#DFC15E] underline cursor-pointer"
+                    >
+                      Create a New Profile instead
+                    </button>
+                    .
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 max-h-56 overflow-y-auto pr-1">
+                    {filteredUnclaimedMembers.map((m) => {
+                      const isSelected = m.id === selectedMemberId;
+                      const teamIcon =
+                        (m.favorite_team as TeamBadgeMeta['iconType']) ||
+                        (m.display_name === 'Sarah'
+                          ? 'pistons-bad-boys'
+                          : m.display_name === 'Burtis'
+                          ? 'red-wings'
+                          : 'lions');
+                      return (
+                        <button
+                          key={m.id}
+                          type="button"
+                          onClick={() => handleSelectMember(m.id)}
+                          className={`flex items-center justify-between gap-2.5 rounded-2xl border p-3 text-left transition cursor-pointer ${
+                            isSelected
+                              ? 'border-[#B87333] bg-[#B87333]/20 shadow-[0_0_20px_rgba(184,115,51,0.25)]'
+                              : 'border-white/10 bg-[#1B1714] hover:border-[#B87333]/40'
+                          }`}
+                        >
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <MichiganTeamBadge iconType={teamIcon} size="sm" />
+                            <div className="min-w-0">
+                              <div className="font-athletic text-lg font-black uppercase text-[#F5F2EB] truncate">
+                                {m.display_name}
+                              </div>
+                              <div className="font-mono-docket text-[10px] uppercase text-[#B5A99D]">
+                                {m.is_staff && m.is_patron
+                                  ? 'Staff & Patron'
+                                  : m.is_staff
+                                  ? 'Head Ref / Staff'
+                                  : 'Patron'}
+                              </div>
                             </div>
                           </div>
-                        </div>
 
-                        {m.is_claimed ? (
-                          <span className="inline-flex items-center gap-1 rounded-full border border-emerald-500/40 bg-emerald-500/15 px-2 py-0.5 font-mono-docket text-[9px] font-bold uppercase text-emerald-300 shrink-0">
-                            <Lock className="h-2.5 w-2.5" />
-                            Claimed
-                          </span>
-                        ) : (
                           <span className="inline-flex items-center gap-1 rounded-full border border-[#DFC15E]/40 bg-[#DFC15E]/15 px-2 py-0.5 font-mono-docket text-[9px] font-bold uppercase text-[#DFC15E] shrink-0">
                             <Sparkles className="h-2.5 w-2.5" />
                             Unclaimed
                           </span>
-                        )}
-                      </button>
-                    );
-                  })}
-                </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block font-mono-docket text-xs font-bold uppercase text-[#D6C7B8]">
-                    YOUR NAME / BAR NICKNAME *
+                    1. YOUR NAME / BAR NICKNAME *
                   </label>
                   <input
                     type="text"
@@ -922,10 +1136,52 @@ export const ClaimProfileModal: React.FC = () => {
               </div>
             )}
 
+            {/* Required Email OR Phone to Claim & Sign In Later */}
+            <div className="rounded-2xl border border-[#B87333]/35 bg-[#0E0C0B] p-3.5 space-y-2.5">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <label className="block font-mono-docket text-xs font-bold uppercase tracking-wider text-[#DFC15E]">
+                  2. YOUR SIGN-IN EMAIL OR 10-DIGIT PHONE (ENTER AT LEAST ONE) *
+                </label>
+                <span className="font-mono-docket text-[10px] text-[#9E8F82]">
+                  100% Private • Used to sign in with your PIN
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="flex items-center gap-1 font-mono-docket text-[10px] uppercase text-[#D6C7B8]">
+                    <Mail className="h-3 w-3 text-[#B87333]" />
+                    <span>Email Address</span>
+                  </label>
+                  <input
+                    type="email"
+                    value={claimEmail}
+                    onChange={(e) => setClaimEmail(e.target.value)}
+                    placeholder="you@example.com"
+                    className="mt-1 w-full rounded-xl border border-white/15 bg-[#151210] px-3 py-2 font-mono-docket text-xs text-[#F5F2EB] focus:border-[#B87333] focus:outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="flex items-center gap-1 font-mono-docket text-[10px] uppercase text-[#D6C7B8]">
+                    <Smartphone className="h-3 w-3 text-[#B87333]" />
+                    <span>10-Digit Mobile Phone</span>
+                  </label>
+                  <input
+                    type="tel"
+                    value={claimPhone}
+                    onChange={(e) => setClaimPhone(e.target.value)}
+                    placeholder="269-274-9665"
+                    className="mt-1 w-full rounded-xl border border-white/15 bg-[#151210] px-3 py-2 font-mono-docket text-xs text-[#F5F2EB] focus:border-[#B87333] focus:outline-none"
+                  />
+                </div>
+              </div>
+            </div>
+
             {/* Team Allegiance Picker */}
             <div>
               <label className="block font-mono-docket text-xs font-bold uppercase tracking-wider text-[#E8B888]">
-                2. PICK YOUR DETROIT / MICHIGAN TEAM EMBLEM
+                3. PICK YOUR DETROIT / MICHIGAN TEAM EMBLEM
               </label>
               <div className="mt-2 grid grid-cols-2 sm:grid-cols-3 gap-2">
                 {TEAM_CHOICES.map((team) => (
@@ -952,9 +1208,7 @@ export const ClaimProfileModal: React.FC = () => {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className="block font-mono-docket text-xs font-bold uppercase text-[#DFC15E]">
-                  {mode === 'existing' && isAlreadyClaimed
-                    ? 'ENTER YOUR 4–8 DIGIT BAR PIN *'
-                    : 'SET YOUR 4–8 DIGIT BAR PIN *'}
+                  4. CREATE YOUR 4–8 DIGIT BAR PIN *
                 </label>
                 <input
                   type="password"
@@ -968,9 +1222,8 @@ export const ClaimProfileModal: React.FC = () => {
                   className="mt-1.5 w-full rounded-xl border border-[#B87333]/50 bg-[#0D0B0A] px-3.5 py-2.5 font-mono-docket text-base tracking-widest text-[#F5F2EB] focus:border-[#B87333] focus:outline-none"
                 />
                 <span className="mt-1 block font-mono-docket text-[10px] text-[#8E8074]">
-                  {mode === 'existing' && isAlreadyClaimed
-                    ? 'This profile is claimed. Enter your 4–8 digit PIN to sign in.'
-                    : 'Choose a 4 to 8 digit PIN to unlock your card & edit profile settings.'}
+                  Once claimed, your name is removed from the unclaimed list and locked to your
+                  email/phone + PIN.
                 </span>
               </div>
 
@@ -1004,18 +1257,16 @@ export const ClaimProfileModal: React.FC = () => {
 
             <button
               type="submit"
-              disabled={submitting}
+              disabled={submitting || (mode === 'claim' && !selectedMember)}
               className="flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-[#B87333] to-[#C86D51] px-5 py-3.5 font-athletic text-lg font-black uppercase tracking-wider text-[#121212] shadow-[0_0_25px_rgba(184,115,51,0.45)] transition hover:brightness-110 disabled:opacity-50 cursor-pointer"
             >
               <ShieldCheck className="h-5 w-5" />
               <span>
                 {submitting
-                  ? 'Verifying with Cloudflare D1...'
+                  ? 'Locking Profile in Cloudflare D1...'
                   : mode === 'new'
                   ? 'Create & Claim Bar Profile'
-                  : isAlreadyClaimed
-                  ? `Sign In as ${selectedMember?.display_name || 'Member'}`
-                  : `Claim ${selectedMember?.display_name || 'Profile'} & Sign In`}
+                  : `Claim ${selectedMember?.display_name || 'Profile'} & Lock With PIN`}
               </span>
             </button>
           </form>

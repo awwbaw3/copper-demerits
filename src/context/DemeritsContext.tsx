@@ -63,9 +63,13 @@ export interface NewSlipPayload {
 }
 
 export interface ClaimProfilePayload {
+  action?: 'login' | 'claim' | 'new';
+  loginIdentifier?: string;
   memberId?: string;
   displayName?: string;
   pin: string;
+  email?: string;
+  phone?: string;
   favoriteTeam?: string;
   tagline?: string;
   role?: 'staff' | 'patron' | 'both';

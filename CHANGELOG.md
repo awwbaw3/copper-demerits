@@ -2,6 +2,17 @@
 
 All notable changes to the **Copper Athletic Club — Ring of Honor** web application are documented in this file.
 
+## [1.6.3] - 2026-10-18
+
+### Added & Hardened
+- **Email or 10-Digit Phone Required When Claiming / Signing Up (`cloudflare/worker.js`, `src/components/ClaimProfileModal.tsx`, `src/context/DemeritsContext.tsx`)**:
+  - When claiming an unclaimed name from the board (`action === 'claim'`) or creating a new profile (`action === 'new'`), the user must enter either their **Email Address** OR their **10-Digit Phone Number** (or both) along with their **4–8 digit Bar PIN**.
+  - Automatically normalizes and checks uniqueness of email and 10-digit phone numbers across claimed profiles on Cloudflare D1.
+- **Returning User Sign-In via Email or Phone + 4–8 Digit PIN (`POST /api/claim-profile`, `POST /api/login`)**:
+  - Added a dedicated **`Sign In`** tab (`mode === 'login'`) so returning patrons and staff sign in directly using their **Email Address OR 10-Digit Phone Number + 4–8 Digit Bar PIN** instead of scrolling through a long list of names.
+- **Claimed Profiles Hidden from Claimable List (`unclaimedMembers`)**:
+  - Added the `is_claimed INTEGER NOT NULL DEFAULT 0` column to `members` on Cloudflare D1 (`copper-demerits-db`), synced claimed rows (`Rick`), and filtered the `Claim Name` list (`unclaimedMembers = members.filter((m) => !m.is_claimed)`) so once a profile is claimed, it never appears in the list of names available to be claimed.
+
 ## [1.6.2] - 2026-10-18
 
 ### Added

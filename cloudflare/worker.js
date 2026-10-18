@@ -209,6 +209,18 @@ Text to check: ${JSON.stringify(combinedText)}`,
   };
 }
 
+function normalizeEmail(raw) {
+  return String(raw || '').trim().toLowerCase();
+}
+
+function normalizePhone(raw) {
+  const digits = String(raw || '').replace(/\D/g, '');
+  if (digits.length === 11 && digits.startsWith('1')) {
+    return digits.slice(1);
+  }
+  return digits;
+}
+
 /**
  * Formats a Member row for PUBLIC responses — strictly strips all PII (phone, email, PIN, verification codes)
  */
@@ -220,7 +232,7 @@ function formatPublicMember(row) {
     is_staff: Boolean(row.is_staff),
     is_patron: Boolean(row.is_patron),
     is_admin: Boolean(row.is_admin),
-    is_claimed: Boolean(row.is_claimed),
+    is_claimed: Boolean(row.is_claimed || (row.claimed_pin && String(row.claimed_pin).trim() !== '')),
     claimed_at: row.claimed_at || null,
     favorite_team: row.favorite_team || 'lions',
     tagline: row.tagline || null,
@@ -235,10 +247,13 @@ function formatPublicMember(row) {
  */
 function formatPrivateMember(row) {
   if (!row) return null;
+  const rawContact = String(row.claimed_by_contact || '').trim();
+  const fallbackEmail = rawContact.includes('@') ? rawContact : '';
+  const fallbackPhone = !rawContact.includes('@') ? rawContact : '';
   return {
     ...formatPublicMember(row),
-    notification_email: row.notification_email || '',
-    notification_phone: row.notification_phone || row.claimed_by_contact || '',
+    notification_email: row.notification_email || fallbackEmail || '',
+    notification_phone: row.notification_phone || fallbackPhone || '',
     notification_carrier: row.notification_carrier || 'none',
   };
 }
@@ -448,6 +463,7 @@ async function ensureSchemaAndSeed(db) {
 
   // Safe column additions for existing D1 tables
   const memberCols = [
+    'ALTER TABLE members ADD COLUMN is_claimed INTEGER NOT NULL DEFAULT 0',
     'ALTER TABLE members ADD COLUMN is_admin INTEGER NOT NULL DEFAULT 0',
     'ALTER TABLE members ADD COLUMN notification_email TEXT',
     'ALTER TABLE members ADD COLUMN notification_phone TEXT',
@@ -687,15 +703,142 @@ export default {
         });
       }
 
-      // 5. Claim or Sign In to a Staff / Patron Profile (`POST /api/claim-profile`)
-      if (path === '/api/claim-profile' && request.method === 'POST') {
+      // 5. Claim an Unclaimed Profile, Create New Profile, or Sign In via Email/Phone + PIN (`POST /api/claim-profile` or `POST /api/login`)
+      if ((path === '/api/claim-profile' || path === '/api/login') && request.method === 'POST') {
         const body = await request.json();
-        const { memberId, displayName, pin, favoriteTeam, tagline, role } = body;
-        const cleanPin = (pin || '').trim();
+        const {
+          action,
+          loginIdentifier,
+          memberId,
+          displayName,
+          pin,
+          email,
+          phone,
+          favoriteTeam,
+          tagline,
+          role,
+        } = body;
+        const cleanPin = String(pin || '').trim();
 
         if (cleanPin.length < 4 || cleanPin.length > 8) {
           return jsonResponse(
             { ok: false, error: 'Please enter a 4 to 8 digit Bar PIN.' },
+            400
+          );
+        }
+
+        const isLoginRequest =
+          path === '/api/login' || action === 'login' || Boolean(loginIdentifier);
+
+        // --- A. RETURNING USER SIGN-IN (Email or 10-Digit Phone + 4-8 Digit PIN) ---
+        if (isLoginRequest) {
+          const rawId = String(loginIdentifier || email || phone || '').trim();
+          if (!rawId) {
+            return jsonResponse(
+              {
+                ok: false,
+                error: 'Enter your Email Address or 10-Digit Phone Number to sign in.',
+              },
+              400
+            );
+          }
+
+          const targetEmail = rawId.includes('@') ? normalizeEmail(rawId) : '';
+          const targetPhone = !rawId.includes('@') ? normalizePhone(rawId) : '';
+
+          if (!targetEmail && targetPhone.length < 7) {
+            return jsonResponse(
+              {
+                ok: false,
+                error: 'Enter a valid Email Address or 10-Digit Phone Number to sign in.',
+              },
+              400
+            );
+          }
+
+          const allMembersRes = await env.DB.prepare('SELECT * FROM members').all();
+          const allMembers = allMembersRes.results || [];
+
+          const matchedMember = allMembers.find((m) => {
+            const isClaimedRow = Boolean(
+              m.is_claimed || (m.claimed_pin && String(m.claimed_pin).trim() !== '')
+            );
+            if (!isClaimedRow) return false;
+
+            const rowEmail = normalizeEmail(m.notification_email);
+            const rowContactEmail = String(m.claimed_by_contact || '').includes('@')
+              ? normalizeEmail(m.claimed_by_contact)
+              : '';
+            const rowPhone = normalizePhone(m.notification_phone);
+            const rowContactPhone = !String(m.claimed_by_contact || '').includes('@')
+              ? normalizePhone(m.claimed_by_contact)
+              : '';
+
+            if (targetEmail) {
+              return rowEmail === targetEmail || rowContactEmail === targetEmail;
+            }
+            if (targetPhone) {
+              return (
+                (rowPhone && rowPhone === targetPhone) ||
+                (rowContactPhone && rowContactPhone === targetPhone)
+              );
+            }
+            return false;
+          });
+
+          if (!matchedMember) {
+            return jsonResponse(
+              {
+                ok: false,
+                error:
+                  'No claimed profile found for that email address or phone number. If you have not claimed your card yet, switch to the "Claim Unclaimed Name" tab!',
+              },
+              404
+            );
+          }
+
+          if (String(matchedMember.claimed_pin || '').trim() !== cleanPin) {
+            return jsonResponse(
+              {
+                ok: false,
+                error: 'Incorrect 4–8 digit Bar PIN for that email address or phone number.',
+              },
+              403
+            );
+          }
+
+          return jsonResponse({
+            ok: true,
+            mode: 'logged-in',
+            member: formatPrivateMember(matchedMember),
+          });
+        }
+
+        // --- B. CLAIMING AN UNCLAIMED PROFILE OR CREATING A NEW PROFILE ---
+        const cleanEmail = normalizeEmail(email);
+        const cleanPhone = normalizePhone(phone);
+
+        if (!cleanEmail && !cleanPhone) {
+          return jsonResponse(
+            {
+              ok: false,
+              error:
+                'Please enter either your Email Address or your 10-Digit Phone Number to claim your profile (you will use this with your PIN to sign in next time).',
+            },
+            400
+          );
+        }
+
+        if (cleanEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
+          return jsonResponse(
+            { ok: false, error: 'Please enter a valid email address.' },
+            400
+          );
+        }
+
+        if (cleanPhone && cleanPhone.length !== 10) {
+          return jsonResponse(
+            { ok: false, error: 'Please enter a valid 10-digit phone number (e.g. 269-274-9665).' },
             400
           );
         }
@@ -714,28 +857,68 @@ export default {
           );
         }
 
+        // Ensure no other claimed profile already uses this email or phone number
+        const allMembersRes = await env.DB.prepare('SELECT * FROM members').all();
+        const allMembers = allMembersRes.results || [];
+
         let existing = null;
         if (memberId) {
-          existing = await env.DB.prepare('SELECT * FROM members WHERE id = ?')
-            .bind(memberId)
-            .first();
+          existing = allMembers.find((m) => m.id === memberId) || null;
         } else if (displayName) {
-          existing = await env.DB.prepare(
-            'SELECT * FROM members WHERE LOWER(display_name) = LOWER(?)'
-          )
-            .bind(displayName.trim())
-            .first();
+          existing =
+            allMembers.find(
+              (m) => String(m.display_name || '').toLowerCase() === displayName.trim().toLowerCase()
+            ) || null;
+        }
+
+        const duplicateContactOwner = allMembers.find((m) => {
+          if (existing && m.id === existing.id) return false;
+          const isClaimedRow = Boolean(
+            m.is_claimed || (m.claimed_pin && String(m.claimed_pin).trim() !== '')
+          );
+          if (!isClaimedRow) return false;
+
+          const mEmail = normalizeEmail(m.notification_email);
+          const mContactEmail = String(m.claimed_by_contact || '').includes('@')
+            ? normalizeEmail(m.claimed_by_contact)
+            : '';
+          const mPhone = normalizePhone(m.notification_phone);
+          const mContactPhone = !String(m.claimed_by_contact || '').includes('@')
+            ? normalizePhone(m.claimed_by_contact)
+            : '';
+
+          if (cleanEmail && (mEmail === cleanEmail || mContactEmail === cleanEmail)) {
+            return true;
+          }
+          if (cleanPhone && (mPhone === cleanPhone || mContactPhone === cleanPhone)) {
+            return true;
+          }
+          return false;
+        });
+
+        if (duplicateContactOwner) {
+          return jsonResponse(
+            {
+              ok: false,
+              error: `That email or phone number is already linked to a claimed profile (${duplicateContactOwner.display_name}). Switch to the "Sign In" tab to log in with your PIN!`,
+            },
+            409
+          );
         }
 
         if (existing) {
-          if (existing.is_claimed && existing.claimed_pin && existing.claimed_pin !== cleanPin) {
+          const alreadyClaimed = Boolean(
+            existing.is_claimed ||
+              (existing.claimed_pin && String(existing.claimed_pin).trim() !== '')
+          );
+          if (alreadyClaimed) {
             return jsonResponse(
               {
                 ok: false,
                 error:
-                  'This profile is already claimed. Enter the matching 4–8 digit Bar PIN to sign in.',
+                  'This profile has already been claimed! Please use the "Sign In" tab with your email or phone number and 4–8 digit Bar PIN.',
               },
-              403
+              409
             );
           }
 
@@ -745,6 +928,9 @@ export default {
              SET is_claimed = 1,
                  claimed_pin = ?,
                  claimed_at = COALESCE(claimed_at, ?),
+                 claimed_by_contact = ?,
+                 notification_email = COALESCE(?, notification_email),
+                 notification_phone = COALESCE(?, notification_phone),
                  favorite_team = COALESCE(?, favorite_team),
                  tagline = COALESCE(?, tagline)
              WHERE id = ?`
@@ -752,8 +938,11 @@ export default {
             .bind(
               cleanPin,
               now,
+              cleanEmail || cleanPhone,
+              cleanEmail || null,
+              cleanPhone || null,
               favoriteTeam || existing.favorite_team || 'lions',
-              tagline !== undefined ? tagline : existing.tagline,
+              tagline !== undefined && tagline !== '' ? tagline : existing.tagline,
               existing.id
             )
             .run();
@@ -763,7 +952,7 @@ export default {
             .first();
           return jsonResponse({
             ok: true,
-            mode: existing.is_claimed ? 'logged-in' : 'claimed',
+            mode: 'claimed',
             member: formatPrivateMember(updated),
           });
         }
@@ -779,21 +968,26 @@ export default {
         const isPatron = role === 'staff' ? 0 : 1;
 
         await env.DB.prepare(
-          `INSERT INTO members (id, display_name, is_staff, is_patron, is_admin, claimed_pin, is_claimed, claimed_at, favorite_team, tagline, created_at)
-           VALUES (?, ?, ?, ?, 0, ?, 1, ?, ?, ?, ?)`
+          `INSERT INTO members (id, display_name, is_staff, is_patron, is_admin, claimed_by_contact, claimed_pin, is_claimed, claimed_at, notification_email, notification_phone, favorite_team, tagline, created_at)
+           VALUES (?, ?, ?, ?, 0, ?, ?, 1, ?, ?, ?, ?, ?, ?)`
         )
           .bind(
             newId,
             displayName.trim(),
             isStaff,
             isPatron,
+            cleanEmail || cleanPhone,
             cleanPin,
             now,
+            cleanEmail || null,
+            cleanPhone || null,
             favoriteTeam || 'lions',
             tagline || 'Copper AC Regular',
             now
           )
           .run();
+
+        await syncSlipsWithAliasesAndNames(env.DB);
 
         const created = await env.DB.prepare('SELECT * FROM members WHERE id = ?')
           .bind(newId)
@@ -840,6 +1034,52 @@ export default {
           return jsonResponse({ ok: false, error: 'Incorrect current Bar PIN.' }, 403);
         }
 
+        const nextEmail =
+          notificationEmail !== undefined
+            ? normalizeEmail(notificationEmail)
+            : normalizeEmail(existing.notification_email);
+        const nextPhone =
+          notificationPhone !== undefined
+            ? normalizePhone(notificationPhone)
+            : normalizePhone(existing.notification_phone || existing.claimed_by_contact);
+
+        if (!nextEmail && (!nextPhone || nextPhone.length !== 10)) {
+          return jsonResponse(
+            {
+              ok: false,
+              error:
+                'Please keep at least a valid Email Address or 10-Digit Phone Number on your profile so you can sign in with your PIN.',
+            },
+            400
+          );
+        }
+
+        // Ensure updated email/phone does not collide with another claimed profile
+        const allMembersRes = await env.DB.prepare('SELECT * FROM members WHERE id != ?')
+          .bind(memberId)
+          .all();
+        const collision = (allMembersRes.results || []).find((m) => {
+          const isClaimedRow = Boolean(
+            m.is_claimed || (m.claimed_pin && String(m.claimed_pin).trim() !== '')
+          );
+          if (!isClaimedRow) return false;
+          const mEmail = normalizeEmail(m.notification_email);
+          const mPhone = normalizePhone(m.notification_phone || m.claimed_by_contact);
+          if (nextEmail && mEmail && mEmail === nextEmail) return true;
+          if (nextPhone && mPhone && mPhone === nextPhone) return true;
+          return false;
+        });
+
+        if (collision) {
+          return jsonResponse(
+            {
+              ok: false,
+              error: 'That email address or phone number is already linked to another claimed profile.',
+            },
+            409
+          );
+        }
+
         // Moderate updated displayName & tagline
         const mod = await moderateContent(env, {
           texts: [displayName || existing.display_name, tagline || ''],
@@ -859,14 +1099,9 @@ export default {
             ? String(newPin).trim()
             : existing.claimed_pin || String(currentPin).trim();
 
-        const emailChanged =
-          notificationEmail !== undefined &&
-          String(notificationEmail).trim().toLowerCase() !==
-            String(existing.notification_email || '').trim().toLowerCase();
+        const emailChanged = nextEmail !== normalizeEmail(existing.notification_email);
         const phoneChanged =
-          notificationPhone !== undefined &&
-          String(notificationPhone).replace(/\D/g, '') !==
-            String(existing.notification_phone || existing.claimed_by_contact || '').replace(/\D/g, '');
+          nextPhone !== normalizePhone(existing.notification_phone || existing.claimed_by_contact);
 
         const nextVerified =
           emailChanged || phoneChanged ? 0 : Number(existing.notification_verified) || 0;
@@ -877,6 +1112,7 @@ export default {
                tagline = ?,
                favorite_team = ?,
                claimed_pin = ?,
+               claimed_by_contact = ?,
                is_claimed = 1,
                notification_email = ?,
                notification_phone = ?,
@@ -890,8 +1126,9 @@ export default {
             tagline !== undefined ? tagline.trim() : existing.tagline,
             favoriteTeam || existing.favorite_team || 'lions',
             finalPin,
-            notificationEmail !== undefined ? notificationEmail.trim() : existing.notification_email,
-            notificationPhone !== undefined ? notificationPhone.trim() : existing.notification_phone,
+            nextEmail || nextPhone,
+            nextEmail || null,
+            nextPhone || null,
             notificationCarrier || existing.notification_carrier || 'none',
             notificationOptIn ? 1 : 0,
             notificationOptIn ? nextVerified : 0,

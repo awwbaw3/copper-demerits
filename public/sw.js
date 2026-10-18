@@ -1,4 +1,4 @@
-const CACHE_NAME = 'copper-demerits-pwa-v1.6.2';
+const CACHE_NAME = 'copper-demerits-pwa-v1.6.3';
 const APP_SHELL = [
   '/',
   '/index.html',
