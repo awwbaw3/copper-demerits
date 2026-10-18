@@ -13,7 +13,7 @@ import {
 import { useDemerits } from '../context/DemeritsContext';
 import {
   EnrichedDemeritSlip,
-  LeaderboardPeriodKey,
+  PeriodMode,
 } from '../types/demerits';
 import { SlipModalViewer } from '../components/SlipModalViewer';
 import {
@@ -27,16 +27,16 @@ import { normalizeSlipDemeritItems } from '../lib/defaultData';
 export const LeaderboardPage: React.FC = () => {
   const { computeStandings, loading } = useDemerits();
 
-  const [periodKey, setPeriodKey] = useState<LeaderboardPeriodKey>('all-time');
+  const [periodKey, setPeriodKey] = useState<PeriodMode>('all-time');
   const [customStartDate, setCustomStartDate] = useState<string>('2026-10-01');
   const [customEndDate, setCustomEndDate] = useState<string>('2026-10-31');
   const [selectedDemeritType, setSelectedDemeritType] = useState<string | null>(null);
   const [activeSlipModal, setActiveSlipModal] = useState<EnrichedDemeritSlip | null>(null);
 
   const { patronStandings, typeSummaries, periodSlips } = computeStandings({
-    period: periodKey,
-    customStartDate: periodKey === 'custom' ? customStartDate : undefined,
-    customEndDate: periodKey === 'custom' ? customEndDate : undefined,
+    mode: periodKey,
+    startDate: periodKey === 'custom' ? customStartDate : undefined,
+    endDate: periodKey === 'custom' ? customEndDate : undefined,
     demeritType: selectedDemeritType,
   });
 
@@ -49,7 +49,7 @@ export const LeaderboardPage: React.FC = () => {
   const totalPeriodPoints = periodSlips.reduce((sum, s) => sum + s.demerit_count, 0);
   const activeRankings = patronStandings.filter((p) => p.totalDemerits > 0 || !selectedDemeritType);
 
-  const periodOptions: { key: LeaderboardPeriodKey; label: string }[] = [
+  const periodOptions: { key: PeriodMode; label: string }[] = [
     { key: 'all-time', label: 'All-Time' },
     { key: 'oct-17-session', label: 'Oct 17 Game Night' },
     { key: 'this-month', label: 'This Month' },
@@ -532,7 +532,7 @@ export const LeaderboardPage: React.FC = () => {
                     <div className="absolute bottom-2 left-2.5 right-2.5 flex items-end justify-between">
                       <div>
                         <span className="block font-display-tall text-2xl font-black uppercase text-white leading-none">
-                          {slip.patron_name}
+                          {slip.patronDisplayName}
                         </span>
                         <span className="text-[10px] font-mono-docket text-[#E8B888]">
                           {slip.location_area}
@@ -548,7 +548,7 @@ export const LeaderboardPage: React.FC = () => {
                       “{slip.infractions.join(' • ')}”
                     </p>
                     <div className="flex items-center justify-between text-[10px] font-mono-docket text-[#9E8F82] pt-1 border-t border-white/10">
-                      <span>REF: {slip.issuer_name.toUpperCase()}</span>
+                      <span>REF: {slip.issuerDisplayName.toUpperCase()}</span>
                       <span className="text-[#DFC15E]">{slip.raw_signature}</span>
                     </div>
                   </div>

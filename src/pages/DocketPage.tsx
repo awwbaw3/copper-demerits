@@ -26,9 +26,9 @@ export const DocketPage: React.FC = () => {
     if (!searchQuery.trim()) return true;
     const q = searchQuery.toLowerCase();
     return (
-      slip.patron_name.toLowerCase().includes(q) ||
+      slip.patronDisplayName.toLowerCase().includes(q) ||
       slip.raw_student.toLowerCase().includes(q) ||
-      slip.issuer_name.toLowerCase().includes(q) ||
+      slip.issuerDisplayName.toLowerCase().includes(q) ||
       slip.raw_signature.toLowerCase().includes(q) ||
       slip.location_area.toLowerCase().includes(q) ||
       slip.infractions.some((inf) => inf.toLowerCase().includes(q))
@@ -114,7 +114,7 @@ export const DocketPage: React.FC = () => {
                       CITED PATRON
                     </span>
                     <h2 className="font-display-tall text-4xl font-black uppercase text-white leading-none">
-                      {slip.patron_name}
+                      {slip.patronDisplayName}
                     </h2>
                   </div>
                   <MichiganTeamEmblem iconType={primaryMeta.iconType} size="md" />
@@ -154,7 +154,7 @@ export const DocketPage: React.FC = () => {
                 <div className="pt-3 border-t border-white/10 flex items-center justify-between text-xs">
                   <div className="font-mono-docket text-[#A3968A]">
                     SIGNED: <span className="font-handwriting text-lg text-[#DFC15E] ml-1">{slip.raw_signature}</span>{' '}
-                    <span className="text-[#E8B888]">({slip.issuer_name})</span>
+                    <span className="text-[#E8B888]">({slip.issuerDisplayName})</span>
                   </div>
                   <span className="inline-flex items-center gap-1 rounded-xl bg-[#B87333]/20 border border-[#B87333]/50 px-3 py-1 font-athletic uppercase tracking-wider text-[#E8B888] group-hover:bg-[#B87333] group-hover:text-[#121212] transition">
                     <Eye className="h-3.5 w-3.5" />
