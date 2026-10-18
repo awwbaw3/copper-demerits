@@ -689,9 +689,12 @@ function formatSlip(row, includeAdminOriginals = false) {
 }
 
 /**
- * Sends a rate-limited Opt-In Email or Carrier SMS Gateway message via Resend (Free Tier, hard-capped)
+ * Sends a rate-limited Opt-In Email and/or Carrier SMS Gateway message via Resend (Free Tier, hard-capped)
  */
-async function sendControlledNotification(env, { memberId, eventType, toEmail, toPhone, carrier, subject, htmlText, smsText }) {
+async function sendControlledNotification(
+  env,
+  { memberId, eventType, toEmail, toPhone, carrier, subject, htmlText, smsText }
+) {
   if (!env.RESEND_API_KEY) {
     return { sent: false, reason: 'RESEND_API_KEY not configured' };
   }
@@ -704,72 +707,112 @@ async function sendControlledNotification(env, { memberId, eventType, toEmail, t
     return { sent: false, reason: 'Daily free notification cap reached (25/day)' };
   }
 
-  const recipients = [];
-  if (toEmail && toEmail.includes('@')) {
-    recipients.push(toEmail.trim());
-  }
-
-  // Optional Free Carrier Email-to-SMS Gateway if user selected a carrier and opted in
+  const cleanEmail = (toEmail || '').trim().toLowerCase();
   const cleanDigits = (toPhone || '').replace(/\D/g, '');
-  if (cleanDigits.length === 10 && carrier && carrier !== 'none') {
-    const gatewayMap = {
-      verizon: `${cleanDigits}@vtext.com`,
-      att: `${cleanDigits}@txt.att.net`,
-      tmobile: `${cleanDigits}@tmomail.net`,
-      uscellular: `${cleanDigits}@email.uscc.net`,
-    };
-    if (gatewayMap[carrier]) {
-      recipients.push(gatewayMap[carrier]);
-    }
-  }
+  const normalizedDigits =
+    cleanDigits.length === 11 && cleanDigits.startsWith('1') ? cleanDigits.slice(1) : cleanDigits;
 
-  if (recipients.length === 0) {
+  const gatewayMap = {
+    verizon: [
+      `${normalizedDigits}@vtext.com`,
+      `${normalizedDigits}@vzwpix.com`,
+    ],
+    att: [
+      `${normalizedDigits}@txt.att.net`,
+      `${normalizedDigits}@mms.att.net`,
+    ],
+    tmobile: [`${normalizedDigits}@tmomail.net`],
+    uscellular: [`${normalizedDigits}@email.uscc.net`],
+    all_major: [
+      `${normalizedDigits}@vtext.com`,
+      `${normalizedDigits}@txt.att.net`,
+      `${normalizedDigits}@tmomail.net`,
+    ],
+  };
+
+  const smsRecipients =
+    normalizedDigits.length === 10 && carrier && carrier !== 'none' && gatewayMap[carrier]
+      ? gatewayMap[carrier]
+      : [];
+
+  if (!cleanEmail && smsRecipients.length === 0) {
     return { sent: false, reason: 'No verified opt-in email or carrier SMS gateway configured' };
   }
 
-  try {
-    // Try sending from verified copperdemerits.com domain, fallback to drit.ninja if DNS still propagating
-    let res = await fetch('https://api.resend.com/emails', {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${env.RESEND_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        from: 'Ring of Honor Referee <referee@copperdemerits.com>',
-        to: recipients,
-        subject,
-        html: htmlText,
-        text: smsText || subject,
-      }),
-    });
+  let emailSent = false;
+  let smsSent = false;
+  const dispatchDetails = [];
 
-    if (!res.ok) {
-      res = await fetch('https://api.resend.com/emails', {
+  try {
+    // 1. Send Rich HTML + Plain-Text Email to the Member's Email Address
+    if (cleanEmail && cleanEmail.includes('@')) {
+      const emailRes = await fetch('https://api.resend.com/emails', {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${env.RESEND_API_KEY}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          from: 'Ring of Honor Referee <onboarding@resend.dev>',
-          to: recipients,
+          from: 'Ring of Honor Referee <referee@copperdemerits.com>',
+          to: [cleanEmail],
           subject,
           html: htmlText,
           text: smsText || subject,
         }),
+      });
+      emailSent = emailRes.ok;
+      const emailData = await emailRes.json().catch(() => ({}));
+      dispatchDetails.push({ channel: 'email', to: cleanEmail, ok: emailRes.ok, id: emailData?.id });
+    }
+
+    // 2. Send Pure Plain-Text (No HTML, Short Subject) to Carrier SMS Gateway(s)
+    // Carrier gateways (@vtext.com, @txt.att.net, @tmomail.net) require short plain-text bodies without HTML tags
+    if (smsRecipients.length > 0) {
+      const smsRes = await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${env.RESEND_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          from: 'Copper Demerits <referee@copperdemerits.com>',
+          to: smsRecipients,
+          subject: 'Copper Demerits',
+          text: (smsText || subject).slice(0, 155),
+        }),
+      });
+      smsSent = smsRes.ok;
+      const smsData = await smsRes.json().catch(() => ({}));
+      dispatchDetails.push({
+        channel: 'carrier_sms',
+        to: smsRecipients,
+        ok: smsRes.ok,
+        id: smsData?.id,
       });
     }
 
     await env.DB.prepare(
       `INSERT INTO notification_log (id, member_id, event_type, recipient_masked) VALUES (?, ?, ?, ?)`
     )
-      .bind(crypto.randomUUID(), memberId || null, eventType, `${recipients.length} recipient(s)`)
+      .bind(
+        crypto.randomUUID(),
+        memberId || null,
+        eventType,
+        `email:${emailSent ? 1 : 0},sms:${smsSent ? smsRecipients.length : 0}`
+      )
       .run();
 
-    return { sent: res.ok };
+    return {
+      sent: emailSent || smsSent,
+      emailSent,
+      smsSent,
+      dispatchDetails,
+    };
   } catch (err) {
-    return { sent: false, reason: err instanceof Error ? err.message : 'Notification error' };
+    return {
+      sent: false,
+      reason: err instanceof Error ? err.message : 'Notification error',
+    };
   }
 }
 
@@ -1690,6 +1733,76 @@ export default {
           .first();
         return jsonResponse({
           ok: true,
+          member: formatPrivateMember(updated),
+        });
+      }
+
+      // 8B. Send a Live Test Email & Carrier SMS Alert to a Verified/Claimed Profile (`POST /api/notifications/test`)
+      if (path === '/api/notifications/test' && request.method === 'POST') {
+        const body = await request.json();
+        const { memberId, pin, email, phone, carrier } = body;
+
+        const existing = await env.DB.prepare('SELECT * FROM members WHERE id = ?')
+          .bind(memberId)
+          .first();
+        if (!existing || (existing.claimed_pin && existing.claimed_pin !== String(pin || '').trim())) {
+          return jsonResponse({ ok: false, error: 'Valid Bar PIN required.' }, 403);
+        }
+
+        const targetEmail = normalizeEmail(email || existing.notification_email);
+        const targetPhone = normalizePhone(
+          phone || existing.notification_phone || existing.claimed_by_contact
+        );
+        const targetCarrier = carrier || existing.notification_carrier || 'all_major';
+
+        // Also save the email/phone/carrier and mark opt-in verified on the profile if provided
+        if (targetEmail || targetPhone) {
+          await env.DB.prepare(
+            `UPDATE members
+             SET notification_email = COALESCE(?, notification_email),
+                 notification_phone = COALESCE(?, notification_phone),
+                 notification_carrier = ?,
+                 notification_opt_in = 1,
+                 notification_verified = 1
+             WHERE id = ?`
+          )
+            .bind(
+              targetEmail || null,
+              targetPhone || null,
+              targetCarrier === 'all_major' ? existing.notification_carrier || 'verizon' : targetCarrier,
+              memberId
+            )
+            .run();
+        }
+
+        const testRes = await sendControlledNotification(env, {
+          memberId,
+          eventType: 'profile_test_alert',
+          toEmail: targetEmail,
+          toPhone: targetPhone,
+          carrier: targetCarrier,
+          subject: `🍺 Ring of Honor Test Alert for ${existing.display_name}!`,
+          htmlText: `<div style="font-family:sans-serif;background:#121212;color:#F5F2EB;padding:24px;border-radius:16px;border:2px solid #B87333;">
+            <h2 style="color:#DFC15E;margin-top:0;">🍺 COPPER DEMERITS • LIVE SYSTEM TEST</h2>
+            <p>Hey <strong>${existing.display_name}</strong>,</p>
+            <p>Your <strong>Ring of Honor</strong> profile notifications are live and connected!</p>
+            <div style="background:#1A1512;border:1px solid #B87333;border-radius:12px;padding:14px;margin:16px 0;">
+              <p style="margin:0 0 6px 0;color:#E08A4E;font-weight:bold;">Current Standing: #1 Ring of Honor (3 Demerits)</p>
+              <p style="margin:0;font-size:13px;color:#D6C7B8;">Latest Slip: &ldquo;Too many seat moves, Tried to order Gin &amp; Diet Coke, The headband&rdquo; — Signed by The Boss - AKA Sarah</p>
+            </div>
+            <p style="margin-top:16px;"><a href="https://copperdemerits.com" style="color:#121212;background:#DFC15E;padding:10px 18px;border-radius:10px;text-decoration:none;font-weight:bold;display:inline-block;">Open Ring of Honor Leaderboard</a></p>
+            <p style="font-size:11px;color:#9E8F82;margin-top:18px;">Unofficial Patron-Run Fan Site for Good-Natured Fun Only — Not Affiliated with Copper Athletic Club.</p>
+          </div>`,
+          smsText: `Copper Demerits Test for ${existing.display_name}: Ring of Honor alerts are LIVE! (#1 with 3 Demerits). View board: https://copperdemerits.com`,
+        });
+
+        const updated = await env.DB.prepare('SELECT * FROM members WHERE id = ?')
+          .bind(memberId)
+          .first();
+
+        return jsonResponse({
+          ok: true,
+          ...testRes,
           member: formatPrivateMember(updated),
         });
       }
