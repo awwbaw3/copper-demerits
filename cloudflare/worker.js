@@ -1,5 +1,5 @@
 /**
- * Copper Demerits (`copperdemerits.com`) — Cloudflare Worker + D1 + R2 + Workers AI Backend (v1.6.0)
+ * Copper Demerits (`copperdemerits.com`) — Cloudflare Worker + D1 + R2 + Workers AI Backend (v1.6.7)
  * - Database: Cloudflare D1 (`DB` binding -> `copper-demerits-db`)
  * - Object Storage: Cloudflare R2 (`SLIPS_BUCKET` binding -> `copper-demerits-slips`)
  * - AI Moderation: Cloudflare Workers AI (`AI` binding) + Optional `GEMINI_API_KEY` (Gemini 2.5 Flash)
@@ -753,7 +753,8 @@ async function sendControlledNotification(
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          from: 'Ring of Honor Referee <referee@copperdemerits.com>',
+          from: 'Copper Demerits <noreply@drit.ninja>',
+          reply_to: 'info@drit.ninja',
           to: [cleanEmail],
           subject,
           html: htmlText,
@@ -775,7 +776,8 @@ async function sendControlledNotification(
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          from: 'Copper Demerits <referee@copperdemerits.com>',
+          from: 'Copper Demerits <noreply@drit.ninja>',
+          reply_to: 'info@drit.ninja',
           to: smsRecipients,
           subject: 'Copper Demerits',
           text: (smsText || subject).slice(0, 155),
@@ -1688,6 +1690,7 @@ export default {
             <p>Your 6-digit verification code to enable Ring of Honor notifications is:</p>
             <div style="font-size:28px;font-weight:900;letter-spacing:6px;color:#DFC15E;padding:12px 18px;background:#1E1916;border-radius:12px;display:inline-block;">${code}</div>
             <p style="font-size:12px;color:#9E8F82;margin-top:18px;">Unofficial Patron-Run Fan Site for Good-Natured Fun Only — Not Affiliated with Copper Athletic Club. You can turn off notifications anytime in My Locker.</p>
+            <p style="font-size:11px;color:#8E8074;margin-top:10px;">Website concerns, comments, or complaints? Contact info@drit.ninja.</p>
           </div>`,
           smsText: `Copper Demerits Fan Site Verification Code for ${existing.display_name}: ${code}. Reply STOP or toggle off in My Locker anytime.`,
         });
@@ -1792,6 +1795,7 @@ export default {
             </div>
             <p style="margin-top:16px;"><a href="https://copperdemerits.com" style="color:#121212;background:#DFC15E;padding:10px 18px;border-radius:10px;text-decoration:none;font-weight:bold;display:inline-block;">Open Ring of Honor Leaderboard</a></p>
             <p style="font-size:11px;color:#9E8F82;margin-top:18px;">Unofficial Patron-Run Fan Site for Good-Natured Fun Only — Not Affiliated with Copper Athletic Club.</p>
+            <p style="font-size:11px;color:#8E8074;margin-top:10px;">Website concerns, comments, or complaints? Contact info@drit.ninja.</p>
           </div>`,
           smsText: `Copper Demerits Test for ${existing.display_name}: Ring of Honor alerts are LIVE! (#1 with 3 Demerits). View board: https://copperdemerits.com`,
         });

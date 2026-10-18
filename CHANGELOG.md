@@ -2,6 +2,22 @@
 
 All notable changes to the **Copper Athletic Club — Ring of Honor** web application are documented in this file.
 
+## [1.6.7] - 2026-10-18
+
+### Changed & Decoupled
+- **Decoupled Email & SMS Infrastructure from Agency Account (`cloudflare/worker.js`, `Resend-Ninjas`)**:
+  - Removed `copperdemerits.com` entirely from `Resend-Agency`, leaving 0 agency domains tied to the fan site.
+  - Migrated email and carrier SMS delivery to the user's `drit.ninja` Resend account (`Resend-Ninjas`).
+  - Switched notification sender to `Copper Demerits <noreply@drit.ninja>` with `reply_to: 'info@drit.ninja'`, enabling reliable, verified delivery without cross-account lock blocks.
+  - Generated dedicated `copper-demerits-worker` Resend API key and updated Cloudflare Worker `RESEND_API_KEY` secret.
+- **Updated Website Footer & Live Ticker Branding (`src/App.tsx`, `src/components/Navbar.tsx`, `src/components/ClaimProfileModal.tsx`)**:
+  - Added discrete link to **DR IT - The IT Ninjas** (`https://drit.ninja`) in the footer.
+  - Direct all website feedback, questions, concerns, and complaints to `info@drit.ninja`.
+  - Removed all Cloudflare marketing mentions from the public footer and navbar marquee ticker.
+  - Removed technical internal "Cloudflare D1" mentions from user-facing profile claim and locker save status messages.
+- **Production Guardrail**:
+  - Maintained strict non-publishing rule for Netlify production pending user greenlight.
+
 ## [1.6.6] - 2026-10-18
 
 ### Added & Hardened

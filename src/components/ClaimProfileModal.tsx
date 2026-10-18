@@ -300,7 +300,7 @@ export const ClaimProfileModal: React.FC = () => {
           setPin(newPin.trim());
           setNewPin('');
         }
-        setSuccessMsg('Profile & Locker settings saved to Cloudflare D1!');
+        setSuccessMsg('Profile & Locker settings saved successfully!');
       }
     } finally {
       setSubmitting(false);
@@ -1263,7 +1263,7 @@ export const ClaimProfileModal: React.FC = () => {
               <ShieldCheck className="h-5 w-5" />
               <span>
                 {submitting
-                  ? 'Locking Profile in Cloudflare D1...'
+                  ? 'Saving Profile...'
                   : mode === 'new'
                   ? 'Create & Claim Bar Profile'
                   : `Claim ${selectedMember?.display_name || 'Profile'} & Lock With PIN`}

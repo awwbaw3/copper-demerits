@@ -23,7 +23,7 @@ export const App: React.FC = () => {
           </main>
           <footer className="mt-12 border-t border-[#B87333]/25 bg-[#0E0C0B] py-7 px-4">
             <div className="mx-auto max-w-6xl space-y-4">
-              <div className="rounded-2xl border border-[#B87333]/30 bg-[#151210] px-4 py-3 text-center">
+              <div className="rounded-2xl border border-[#B87333]/30 bg-[#151210] px-4 py-3 text-center space-y-1.5">
                 <p className="font-mono-docket text-[11px] sm:text-xs text-[#D6C7B8]">
                   🍺 <strong className="text-[#DFC15E]">UNOFFICIAL FAN SITE DISCLAIMER:</strong>{' '}
                   Copper Demerits (<code className="text-[#E8B888]">copperdemerits.com</code>) is an
@@ -33,6 +33,16 @@ export const App: React.FC = () => {
                     not owned by, operated by, or officially affiliated with Copper Athletic Club
                   </strong>
                   . Be kind, tip your bartenders, and keep it friendly!
+                </p>
+                <p className="font-mono-docket text-[10px] sm:text-[11px] text-[#A6998C]">
+                  For any website questions, concerns, or complaints, please contact the site administrator at{' '}
+                  <a
+                    href="mailto:info@drit.ninja?subject=Copper%20Demerits%20Website%20Inquiry"
+                    className="text-[#DFC15E] hover:underline font-semibold"
+                  >
+                    info@drit.ninja
+                  </a>
+                  .
                 </p>
               </div>
               <div className="flex flex-col sm:flex-row items-center justify-between gap-3 text-[11px] font-mono-docket text-[#8E8074] text-center sm:text-left">
@@ -50,7 +60,16 @@ export const App: React.FC = () => {
                     Official Menus, Tap List &amp; Hours: Copper Athletic Club (copperac.com) — Marshall, MI ↗
                   </a>
                   <span>·</span>
-                  <span>Cloudflare D1 + R2 + AI Referee · PWA v1.6.6</span>
+                  <a
+                    href="https://drit.ninja"
+                    target="_blank"
+                    rel="noopener"
+                    className="text-[#9E8F82] hover:text-[#DFC15E] transition underline decoration-[#9E8F82]/30"
+                  >
+                    DR IT - The IT Ninjas
+                  </a>
+                  <span>·</span>
+                  <span>PWA v1.6.7</span>
                 </div>
               </div>
             </div>
