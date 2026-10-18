@@ -2,6 +2,17 @@
 
 Chronological log of architectural decisions, database migrations, and infrastructure deployments.
 
+## 2026-10-18 — v1.6.11 Prominent PWA Install Callout, Header Action & Universal Installation Guide
+- **Prominent PWA Installation Callout & Header Button (`src/components/Navbar.tsx`)**:
+  - Made the Progressive Web App install action prominently visible across both mobile and desktop screens whenever a patron has not installed it (`!isStandalone`).
+  - Added an animated glowing `[Install App]` button in the top navigation bar.
+  - Added a dismissible header callout banner that stays suppressed for 3 days once dismissed.
+- **Cross-Platform PWA Installation Guide Modal (`src/components/Navbar.tsx`)**:
+  - Implemented an illustrated guide modal providing exact step-by-step instructions tailored for iOS Safari (Share → Add to Home Screen), Android Chrome (⋮ → Install app), and Desktop browsers (⊕ in address bar).
+  - Handles Chromium `beforeinstallprompt` natively with immediate 1-tap installation and synchronizes standalone state via `appinstalled`.
+
+---
+
 ## 2026-10-18 — v1.6.10 Individual Leaderboard Showcase, Clean Header & "Add Your Demerit" Action
 - **Showcase Individual Leaderboard at the Top (`src/pages/LeaderboardPage.tsx`)**:
   - Reordered home page layout to present the **Individual Leaderboard (`RING OF HONOR STANDINGS`)** immediately below the Penalty Box header, moving the 5-team foul categories below the player cards.

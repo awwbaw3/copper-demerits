@@ -60,3 +60,11 @@
 - [x] Streamlined header layout: purged "A sports bar. Not a gym." and "Official bar demerit jumbotron" taglines.
 - [x] Removed "Actual Copper AC backbar" tag from Sarah's section.
 - [x] Replaced "Oct 17 Game Night" with production period options: All-Time, This Month, This Week, Today, and Custom Dates.
+
+## Phase 12: Prominent Progressive Web App (PWA) Onboarding & Installation Flow (Completed — v1.6.11)
+- [x] Prominently display install action across mobile and desktop for all uninstalled patrons (`!isStandalone`).
+- [x] Added animated glowing `[Install App]` action in top navigation bar.
+- [x] Added dismissible top callout banner with 3-day local storage suppression cooldown.
+- [x] Added universal cross-platform PWA installation guide modal (iOS Safari, Android Chrome, Desktop).
+- [x] Integrated Chromium native `beforeinstallprompt` and `appinstalled` lifecycle events.
+

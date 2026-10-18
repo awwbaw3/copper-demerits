@@ -1,6 +1,15 @@
 # Task Tracker — Copper Demerits (`copperdemerits.com`)
 
-## Active Sprint — v1.6.10 (Individual Leaderboard Showcase, Clean Header & "Add Your Demerit" Action)
+## Active Sprint — v1.6.11 (Prominent PWA Installation Banner & Universal Guide)
+- [x] Make PWA install action prominently visible across mobile and desktop for uninstalled patrons (`!isStandalone`)
+- [x] Add animated glowing `[Install App]` CTA button in top navbar
+- [x] Add dismissible top callout banner with 3-day local storage memory
+- [x] Add cross-platform PWA installation guide modal (iOS Safari, Android Chrome, Desktop)
+- [x] Merge all completed updates from `dev` into `main` and push to `origin/main`
+- [x] Honor user directive: Do NOT publish to Netlify production
+
+## Completed Sprints
+### v1.6.10 (Individual Leaderboard Showcase, Clean Header & "Add Your Demerit" Action)
 - [x] Showcase Individual Leaderboard (`RING OF HONOR STANDINGS`) immediately beneath the Penalty Box header
 - [x] Move 5-team foul category banners below player cards so standings are front and center
 - [x] Rename upload CTA button from `"DROP SLIP"` to **`"ADD YOUR DEMERIT"`**

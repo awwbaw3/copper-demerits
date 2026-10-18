@@ -2,6 +2,18 @@
 
 All notable changes to the **Copper Athletic Club — Ring of Honor** web application are documented in this file.
 
+## [1.6.11] - 2026-10-18
+
+### Added & Enhanced
+- **Prominent PWA Installation Banner & Multi-Screen CTA (`src/components/Navbar.tsx`)**:
+  - Added an animated, glowing **`[Install App]`** action button to the sticky top header across both mobile and desktop viewports whenever the site is not running in standalone mode (`!isStandalone`).
+  - Added a dismissible, copper-accented callout banner below the header ("Get The Official Backbar App — Install on your Home Screen for instant 1-tap live scoreboard & demerit alerts") with a 3-day suppression cooldown upon manual dismissal.
+  - Added a cross-platform **Install Backbar App Guide Modal** with illustrated step-by-step instructions for:
+    - **iPhone / iPad (Safari)**: Tap Share icon (<Share2 />) → "Add to Home Screen" → Add.
+    - **Android (Chrome)**: Tap three-dots menu (⋮) → "Install app" / "Add to Home Screen".
+    - **Desktop (Chrome / Edge / Brave)**: Click the install icon (⊕) in the browser address bar.
+  - Automatically handles native Chromium `beforeinstallprompt` for instant 1-tap installation and monitors `appinstalled` to update UI state immediately.
+
 ## [1.6.10] - 2026-10-18
 
 ### Changed & Streamlined

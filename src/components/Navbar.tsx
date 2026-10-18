@@ -9,6 +9,10 @@ import {
   Download,
   UserCheck,
   KeyRound,
+  Smartphone,
+  Share2,
+  PlusSquare,
+  X,
 } from 'lucide-react';
 import { useDemerits } from '../context/DemeritsContext';
 import { ClaimProfileModal } from './ClaimProfileModal';
@@ -22,21 +26,75 @@ interface BeforeInstallPromptEvent extends Event {
 export const Navbar: React.FC = () => {
   const { demerits, currentMember, setIsProfileModalOpen } = useDemerits();
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
+  const [isStandalone, setIsStandalone] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    return (
+      window.matchMedia('(display-mode: standalone)').matches ||
+      (window.navigator as unknown as { standalone?: boolean }).standalone === true ||
+      document.referrer.includes('android-app://')
+    );
+  });
+  const [showInstallGuideModal, setShowInstallGuideModal] = useState<boolean>(false);
+  const [isBannerDismissed, setIsBannerDismissed] = useState<boolean>(() => {
+    try {
+      const dismissedUntil = localStorage.getItem('pwa_prompt_dismissed_until');
+      return Boolean(dismissedUntil && Number(dismissedUntil) > Date.now());
+    } catch {
+      return false;
+    }
+  });
 
   useEffect(() => {
+    const checkStandalone = () => {
+      const standalone =
+        window.matchMedia('(display-mode: standalone)').matches ||
+        (window.navigator as unknown as { standalone?: boolean }).standalone === true ||
+        document.referrer.includes('android-app://');
+      setIsStandalone(Boolean(standalone));
+    };
+
+    checkStandalone();
+
     const handler = (e: Event) => {
       e.preventDefault();
       setDeferredPrompt(e as BeforeInstallPromptEvent);
     };
+
+    const handleAppInstalled = () => {
+      setIsStandalone(true);
+      setDeferredPrompt(null);
+      setShowInstallGuideModal(false);
+    };
+
     window.addEventListener('beforeinstallprompt', handler);
-    return () => window.removeEventListener('beforeinstallprompt', handler);
+    window.addEventListener('appinstalled', handleAppInstalled);
+
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handler);
+      window.removeEventListener('appinstalled', handleAppInstalled);
+    };
   }, []);
 
-  const handleInstallPwa = async () => {
-    if (!deferredPrompt) return;
-    await deferredPrompt.prompt();
-    await deferredPrompt.userChoice;
-    setDeferredPrompt(null);
+  const handleInstallClick = async () => {
+    if (deferredPrompt) {
+      await deferredPrompt.prompt();
+      const choice = await deferredPrompt.userChoice;
+      if (choice.outcome === 'accepted') {
+        setIsStandalone(true);
+        setDeferredPrompt(null);
+      }
+    } else {
+      setShowInstallGuideModal(true);
+    }
+  };
+
+  const handleDismissBanner = () => {
+    setIsBannerDismissed(true);
+    try {
+      localStorage.setItem('pwa_prompt_dismissed_until', String(Date.now() + 1000 * 60 * 60 * 24 * 3));
+    } catch {
+      // Ignore
+    }
   };
 
   const approvedSlips = demerits.filter((d) => d.status === 'approved' && Boolean(d.image_url));
@@ -96,14 +154,16 @@ export const Navbar: React.FC = () => {
           </NavLink>
 
           <div className="flex items-center gap-2">
-            {deferredPrompt && (
+            {!isStandalone && (
               <button
                 type="button"
-                onClick={handleInstallPwa}
-                className="hidden sm:inline-flex items-center gap-1.5 rounded-xl border border-[#B87333] bg-[#B87333]/20 px-3 py-1.5 font-athletic text-xs font-bold uppercase tracking-wider text-[#E8B888] transition hover:bg-[#B87333] hover:text-[#121212] cursor-pointer"
+                onClick={handleInstallClick}
+                className="inline-flex items-center gap-1.5 rounded-xl border border-[#DFC15E] bg-gradient-to-r from-[#DFC15E] via-[#E8B888] to-[#B87333] px-2.5 sm:px-3 py-1.5 font-athletic text-xs font-black uppercase tracking-wider text-[#121212] shadow-[0_0_18px_rgba(223,193,94,0.45)] transition hover:brightness-110 active:scale-95 cursor-pointer animate-pulse"
+                title="Install Copper Demerits App on Home Screen"
               >
-                <Download className="h-3.5 w-3.5" />
-                <span>Install App</span>
+                <Download className="h-3.5 w-3.5 stroke-[2.5]" />
+                <span className="hidden xs:inline">Install App</span>
+                <span className="xs:hidden">Install</span>
               </button>
             )}
 
@@ -167,6 +227,44 @@ export const Navbar: React.FC = () => {
             </button>
           </div>
         </div>
+
+        {/* Prominent PWA Install Callout Banner */}
+        {!isStandalone && !isBannerDismissed && (
+          <div className="relative border-t border-[#DFC15E]/40 bg-gradient-to-r from-[#2B1A12] via-[#1A1411] to-[#2B1A12] px-3 sm:px-4 py-2 sm:py-2.5 shadow-md">
+            <div className="mx-auto flex max-w-6xl items-center justify-between gap-3">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[#DFC15E]/20 text-[#DFC15E] border border-[#DFC15E]/40">
+                  <Smartphone className="h-4 w-4" />
+                </div>
+                <div className="min-w-0 text-xs">
+                  <span className="block font-athletic font-bold uppercase tracking-wider text-[#DFC15E]">
+                    Get The Official Backbar App
+                  </span>
+                  <p className="truncate text-[11px] text-[#E8B888]/80 font-mono-docket">
+                    Install on your Home Screen for instant 1-tap live scoreboard &amp; demerit alerts.
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                <button
+                  type="button"
+                  onClick={handleInstallClick}
+                  className="rounded-lg bg-[#DFC15E] px-3 py-1 text-xs font-athletic font-black uppercase tracking-wider text-[#121212] hover:bg-[#E8B888] shadow-[0_0_12px_rgba(223,193,94,0.4)] transition cursor-pointer"
+                >
+                  Install Now
+                </button>
+                <button
+                  type="button"
+                  onClick={handleDismissBanner}
+                  className="rounded-md p-1 text-[#B5A99D] hover:bg-white/10 hover:text-[#F5F2EB] transition cursor-pointer"
+                  title="Dismiss banner"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </header>
 
       {/* Mobile Fixed Bottom Navigation Bar */}
@@ -197,6 +295,84 @@ export const Navbar: React.FC = () => {
           </NavLink>
         ))}
       </nav>
+
+      {/* PWA Install Guide Modal */}
+      {showInstallGuideModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-fadeIn">
+          <div className="relative w-full max-w-md rounded-2xl border-2 border-[#DFC15E] bg-[#1A1411] p-5 sm:p-6 shadow-[0_0_50px_rgba(223,193,94,0.25)] text-[#F5F2EB]">
+            <button
+              type="button"
+              onClick={() => setShowInstallGuideModal(false)}
+              className="absolute top-4 right-4 rounded-lg p-1.5 text-[#B5A99D] hover:bg-white/10 hover:text-white transition cursor-pointer"
+            >
+              <X className="h-5 w-5" />
+            </button>
+
+            <div className="flex items-center gap-3 border-b border-[#B87333]/30 pb-3 mb-4">
+              <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#DFC15E]/20 text-[#DFC15E] border border-[#DFC15E]/40">
+                <Smartphone className="h-6 w-6" />
+              </div>
+              <div>
+                <h3 className="font-athletic text-lg font-black uppercase tracking-wider text-[#DFC15E]">
+                  Install Backbar App
+                </h3>
+                <p className="text-xs text-[#E8B888] font-mono-docket">
+                  Add Copper Demerits to your Home Screen
+                </p>
+              </div>
+            </div>
+
+            <div className="space-y-4 text-xs font-sans">
+              {/* iOS Safari */}
+              <div className="rounded-xl border border-white/10 bg-white/5 p-3.5 space-y-1.5">
+                <div className="flex items-center gap-2 font-athletic font-bold text-sm uppercase text-[#DFC15E]">
+                  <Share2 className="h-4 w-4 text-[#DFC15E]" />
+                  <span>iPhone / iPad (Safari)</span>
+                </div>
+                <ol className="list-decimal list-inside space-y-1 text-[#E5DCD3] text-[11px] leading-relaxed">
+                  <li>Tap the <span className="font-semibold text-white">Share</span> button at the bottom of Safari (<Share2 className="inline h-3 w-3 mx-0.5 text-[#DFC15E]" />).</li>
+                  <li>Scroll down and tap <span className="font-semibold text-white">"Add to Home Screen"</span> (<PlusSquare className="inline h-3 w-3 mx-0.5 text-[#DFC15E]" />).</li>
+                  <li>Tap <span className="font-semibold text-white">Add</span> in the top-right corner.</li>
+                </ol>
+              </div>
+
+              {/* Android Chrome */}
+              <div className="rounded-xl border border-white/10 bg-white/5 p-3.5 space-y-1.5">
+                <div className="flex items-center gap-2 font-athletic font-bold text-sm uppercase text-[#DFC15E]">
+                  <Download className="h-4 w-4 text-[#DFC15E]" />
+                  <span>Android (Chrome)</span>
+                </div>
+                <ol className="list-decimal list-inside space-y-1 text-[#E5DCD3] text-[11px] leading-relaxed">
+                  <li>Tap the three dots menu (<span className="font-semibold text-white">⋮</span>) at the top right of Chrome.</li>
+                  <li>Tap <span className="font-semibold text-white">"Install app"</span> or <span className="font-semibold text-white">"Add to Home Screen"</span>.</li>
+                  <li>Follow the prompt to install.</li>
+                </ol>
+              </div>
+
+              {/* Desktop (Chrome / Edge / Brave) */}
+              <div className="rounded-xl border border-white/10 bg-white/5 p-3.5 space-y-1.5">
+                <div className="flex items-center gap-2 font-athletic font-bold text-sm uppercase text-[#DFC15E]">
+                  <Download className="h-4 w-4 text-[#DFC15E]" />
+                  <span>Desktop (Chrome / Edge)</span>
+                </div>
+                <p className="text-[#E5DCD3] text-[11px] leading-relaxed">
+                  Click the install icon (<span className="font-semibold text-white">⊕</span>) in your browser address bar to install Copper Demerits as a standalone desktop app.
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-5 pt-3 border-t border-[#B87333]/30 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setShowInstallGuideModal(false)}
+                className="rounded-xl bg-[#DFC15E] px-4 py-2 font-athletic text-xs font-black uppercase tracking-wider text-[#121212] hover:bg-[#E8B888] transition cursor-pointer"
+              >
+                Got It
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Claim / Login Modal */}
       <ClaimProfileModal />
