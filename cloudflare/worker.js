@@ -1,5 +1,5 @@
 /**
- * Copper Demerits (`copperdemerits.com`) — Cloudflare Worker + D1 + R2 + Workers AI Backend (v1.6.14)
+ * Copper Demerits (`copperdemerits.com`) — Cloudflare Worker + D1 + R2 + Workers AI Backend (v1.6.15)
  * - Database: Cloudflare D1 (`DB` binding -> `copper-demerits-db`)
  * - Object Storage: Cloudflare R2 (`SLIPS_BUCKET` binding -> `copper-demerits-slips`)
  * - AI Moderation: Cloudflare Workers AI (`AI` binding) + Optional `GEMINI_API_KEY` (Gemini 2.5 Flash)
@@ -2593,10 +2593,10 @@ export default {
                   <p>Hey <strong>${patronRow.display_name}</strong>,</p>
                   <p>The Official Bar Referee reviewed a slip logged under your name:</p>
                   <p><strong>Decision:</strong> ${actionLabel}</p>
-                  <p><strong>Cited Name:</strong> ${slipRow.raw_student}</p>
+                  <p><strong>Cited Name:</strong> ${patronRow.display_name || slipRow.raw_student}</p>
                   <p><a href="https://copperdemerits.com/docket" style="color:#DFC15E;font-weight:bold;">View Current Wall of Slips →</a></p>
                 </div>`,
-                smsText: `Referee Decision: Your slip for "${slipRow.raw_student}" was reviewed in the Ref Booth (${actionLabel}). View docket: https://copperdemerits.com/docket`,
+                smsText: `Referee Decision: Your slip for "${patronRow.display_name || slipRow.raw_student}" was reviewed in the Ref Booth (${actionLabel}). View docket: https://copperdemerits.com/docket`,
               });
             }
           }

@@ -1055,7 +1055,7 @@ export const DemeritsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           throw new Error(
             `Duplicate image detected (${imgDup.similarityPercent ?? 100}% match with ${
               imgDup.matchedDescription ||
-              `${imgDup.matchedSlip?.raw_student || 'patron'} slip at ${
+              `${(imgDup.matchedSlip?.patron_id ? members.find((m) => m.id === imgDup.matchedSlip?.patron_id)?.display_name : null) || imgDup.matchedSlip?.raw_student || 'patron'} slip at ${
                 imgDup.matchedSlip?.incident_time || imgDup.matchedSlip?.incident_date
               }`
             }).`

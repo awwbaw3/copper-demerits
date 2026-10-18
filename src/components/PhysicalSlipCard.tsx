@@ -72,16 +72,17 @@ export const PhysicalSlipCard: React.FC<PhysicalSlipCardProps> = ({ slip, compac
           <span className="block font-mono-docket text-[10px] font-bold uppercase tracking-wider text-[#6B5A45]">
             STUDENT (PATRON):
           </span>
-          <div className="mt-0.5 flex items-baseline justify-between gap-2">
+          <div className="mt-0.5 flex flex-wrap items-baseline justify-between gap-2">
             <span className="font-handwriting text-2xl sm:text-3xl font-bold text-[#152C5B]">
-              {slip.raw_student || 'Anonymous Patron'}
+              {slip.patronDisplayName || slip.raw_student || 'Anonymous Patron'}
             </span>
-            {slip.patronDisplayName.toLowerCase() !==
-              (slip.raw_student || '').trim().toLowerCase() && (
-              <span className="rounded bg-[#B87333]/20 px-1.5 py-0.5 font-mono-docket text-[10px] font-bold text-[#7C4414]">
-                → {slip.patronDisplayName}
-              </span>
-            )}
+            {slip.raw_student &&
+              slip.raw_student.trim().toLowerCase() !==
+                (slip.patronDisplayName || '').trim().toLowerCase() && (
+                <span className="rounded bg-[#B87333]/20 px-1.5 py-0.5 font-mono-docket text-[10px] font-bold text-[#7C4414]">
+                  Slip: &ldquo;{slip.raw_student}&rdquo;
+                </span>
+              )}
           </div>
         </div>
 

@@ -389,7 +389,7 @@ export const LeaderboardPage: React.FC = () => {
                         >
                           <img
                             src={slip.image_url || '/slips/20261017_211324.jpg'}
-                            alt={slip.raw_student}
+                            alt={slip.patronDisplayName || slip.raw_student}
                             className="h-full w-full object-cover"
                           />
                           <span className="absolute bottom-0 inset-x-0 bg-black/75 text-[9px] font-mono-docket text-center text-[#E8B888]">
@@ -558,7 +558,7 @@ export const LeaderboardPage: React.FC = () => {
                   <div className="relative h-48 w-full overflow-hidden rounded-xl border border-white/15 bg-black">
                     <img
                       src={slip.image_url || '/slips/20261017_211324.jpg'}
-                      alt={`Demerit Slip for ${slip.raw_student}`}
+                      alt={`Demerit Slip for ${slip.patronDisplayName || slip.raw_student}`}
                       className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-110"
                     />
                     <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-transparent to-black/30" />

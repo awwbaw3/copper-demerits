@@ -159,7 +159,7 @@ export const Navbar: React.FC = () => {
     items.push(`🔥 TOTAL ACTIVE DEMERITS: ${totalDemeritPoints} PTS ACROSS ${approvedSlips.length} VERIFIED SLIPS`);
 
     // 4. Referee Calls & Infraction Records
-    items.push(`🚨 HEAD REFEREE REVIEW: SARAH ("THE BOSS") HAS 4-FOR-4 SLIPS SUSTAINED (100% CONVICTION RATE)`);
+    items.push(`🚨 HEAD REFEREE REVIEW: SARAH ("THE BOSS") HAS ${approvedSlips.length}-FOR-${approvedSlips.length} SLIPS SUSTAINED (100% CONVICTION RATE)`);
 
     // 5. Individual Slip Infractions & Citation Highlights
     approvedSlips.forEach((slip) => {

@@ -647,12 +647,14 @@ export const SubmitSlipPage: React.FC = () => {
                 >
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <div className="font-athletic text-xl font-black uppercase text-white">
-                      {s.rawStudent}{' '}
-                      {resolvedPatron.member && (
-                        <span className="font-mono-docket text-xs font-normal text-emerald-300">
-                          (&rarr; {resolvedPatron.member.display_name})
-                        </span>
-                      )}
+                      {resolvedPatron.member?.display_name || s.rawStudent}{' '}
+                      {resolvedPatron.member &&
+                        s.rawStudent.trim().toLowerCase() !==
+                          resolvedPatron.member.display_name.trim().toLowerCase() && (
+                          <span className="font-mono-docket text-xs font-normal text-emerald-300">
+                            (Slip: &ldquo;{s.rawStudent}&rdquo;)
+                          </span>
+                        )}
                     </div>
                     <span className="rounded-lg bg-[#C86D51]/25 border border-[#C86D51]/50 px-2.5 py-0.5 font-mono-docket text-xs font-bold text-[#E08A4E]">
                       +{totalPts} {totalPts === 1 ? 'DEMERIT' : 'DEMERITS'}
@@ -894,7 +896,7 @@ export const SubmitSlipPage: React.FC = () => {
                     {citationDup.isDuplicate && (
                       <span className="inline-flex items-center gap-1 rounded-lg border border-amber-500/40 bg-amber-500/15 px-2.5 py-1 font-mono-docket text-[11px] text-amber-300">
                         <Fingerprint className="h-3.5 w-3.5" />
-                        Matches existing {draft.rawStudent} ({draft.incidentTime}) slip — will merge
+                        Matches existing {resolvedPatron.member?.display_name || draft.rawStudent} ({draft.incidentTime}) slip — will merge
                         photo
                       </span>
                     )}

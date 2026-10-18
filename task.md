@@ -1,6 +1,17 @@
 # Task Tracker — Copper Demerits (`copperdemerits.com`)
 
-## Active Sprint — v1.6.14 (iPhone Safe-Zone Header Login Button & Font Legibility Overhaul)
+## Active Sprint — v1.6.15 (Universal Profile Display Name Prioritization)
+- [x] Prioritize user's chosen profile display name (`patronDisplayName`) across all features over physical demerit slip text (`raw_student`) whenever a profile exists
+- [x] Update `PhysicalSlipCard.tsx` to display `slip.patronDisplayName` as the primary student name with secondary `Slip: "${slip.raw_student}"` note
+- [x] Standardize image alt tags and titles in `DocketPage.tsx` and `LeaderboardPage.tsx`
+- [x] Update `SubmitSlipPage.tsx` summary cards and duplicate warnings to display profile display name
+- [x] Compute Head Referee Sarah's sustained citation rate dynamically in `Navbar.tsx` (`5-for-5`, 100% conviction rate)
+- [x] Standardize Ref Booth notifications in `cloudflare/worker.js`
+- [x] Reassigned Kristine Boley's 2-demerit citation in live Cloudflare D1 and purged phantom "Josh" member
+- [x] Honor user directive: Do NOT publish to Netlify production
+
+## Completed Sprints
+### v1.6.14 (iPhone Safe-Zone Header Login Button & Font Legibility Overhaul)
 - [x] Add CSS environment safe-area-inset padding to header (`pt-[env(safe-area-inset-top,0px)] pr-[env(safe-area-inset-right,0px)] pl-[env(safe-area-inset-left,0px)]`)
 - [x] Expand upper login button to Apple HIG 44x44pt touch target (`min-h-[44px] px-3.5 py-2`)
 - [x] Add `touch-manipulation` to eliminate mobile 300ms tap delay and `active:scale-95` tactile depression feedback

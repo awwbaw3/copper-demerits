@@ -88,5 +88,12 @@
 - [x] Replaced narrow condensed headline typography with high-contrast, universally recognizable Apple system / Inter sans-serif typography (`font-sans font-black text-xs sm:text-sm`).
 - [x] Enhanced `ClaimProfileModal.tsx` and mobile bottom bar with safe-area bottom padding and 44pt+ touch targets.
 
+## Phase 16: Universal Profile Display Name Prioritization & Slip Attribution Rule (Completed — v1.6.15)
+- [x] Standardized all application features to prioritize the patron's chosen profile display name (`patronDisplayName`) over the handwritten slip form text (`raw_student`) whenever a profile exists.
+- [x] Updated `PhysicalSlipCard.tsx` to render the profile display name as the primary student name with a secondary `Slip: "${raw_student}"` note.
+- [x] Standardized image alt text, card headers, and duplicate messages across `DocketPage.tsx`, `LeaderboardPage.tsx`, `SubmitSlipPage.tsx`, and `DemeritsContext.tsx`.
+- [x] Dynamically computed Referee Sarah's sustained citation conviction rate in `Navbar.tsx`.
+- [x] Fixed slip attribution for Kristine Boley in live Cloudflare D1 and purged phantom "Josh" member.
+
 
 

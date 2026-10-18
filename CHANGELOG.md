@@ -2,6 +2,18 @@
 
 All notable changes to the **Copper Athletic Club — Ring of Honor** web application are documented in this file.
 
+## [1.6.15] - 2026-10-18
+
+### Changed & Standardized
+- **Universal Profile Display Name Prioritization across All Features**:
+  - Enforced the architectural rule that **all features must use the user's chosen profile display name** (`patronDisplayName`) over the handwritten name on the physical demerit form (`raw_student`) whenever a profile exists.
+  - **`PhysicalSlipCard.tsx`**: Updated the prominent handwriting student name to display the patron's chosen profile display name (`Kristine Boley`, `Rick`, `Burtis`, `David Lee`). If the handwritten slip name differs (e.g. `Kristi`), it displays a subtle badge: `Slip: "Kristi"`. Falls back to the raw demerit form name only if the patron does not have a profile.
+  - **`LeaderboardPage.tsx` & `DocketPage.tsx`**: Standardized image `alt` attributes and card displays to use `patronDisplayName`.
+  - **`SubmitSlipPage.tsx`**: Updated slip submission review cards and duplicate citation alerts to display the matched profile display name as the primary headline with a secondary note for the handwritten slip name.
+  - **`DemeritsContext.tsx`**: Updated duplicate warning messages to resolve the profile display name.
+  - **`Navbar.tsx`**: Dynamically computed Head Referee Sarah's sustained citation rate to reflect live database totals (`5-for-5`, 100% conviction rate).
+  - **`cloudflare/worker.js`**: Standardized Ref Booth override email and SMS notifications to prioritize the patron's chosen display name over raw slip text.
+
 ## [1.6.14] - 2026-10-18
 
 ### Added & Enhanced

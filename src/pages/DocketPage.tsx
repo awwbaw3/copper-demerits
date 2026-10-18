@@ -110,7 +110,7 @@ export const DocketPage: React.FC = () => {
               <div className="relative h-64 w-full overflow-hidden bg-black">
                 <img
                   src={slip.image_url || '/slips/20261017_211324.jpg'}
-                  alt={`Slip for ${slip.raw_student}`}
+                  alt={`Slip for ${slip.patronDisplayName || slip.raw_student}`}
                   className={`h-full w-full object-cover transition-transform duration-500 group-hover:scale-105 ${
                     slip.is_blurred ? 'blur-md scale-105' : ''
                   }`}

@@ -2,6 +2,17 @@
 
 Chronological log of architectural decisions, database migrations, and infrastructure deployments.
 
+## 2026-10-18 — v1.6.15 Profile Display Name Prioritization & Slip Attribution Rule
+- **Universal Chosen Display Name Priority Across All Features**:
+  - Implemented the core rule: All features must display the user's chosen profile display name (`patronDisplayName`) over the raw handwritten name on the physical demerit form (`raw_student`) whenever a profile exists.
+  - **`PhysicalSlipCard.tsx`**: Renders `slip.patronDisplayName` as the primary student name in authentic sports-docket styling. If `slip.raw_student` differs (e.g. `Kristi` on the paper slip vs. `Kristine Boley` on her profile), a secondary badge displays `Slip: "Kristi"`.
+  - **`DocketPage.tsx` & `LeaderboardPage.tsx`**: Updated slip alt text, titles, and headers to prioritize `patronDisplayName`.
+  - **`SubmitSlipPage.tsx`**: Auto-logged citation cards and duplicate alerts display the profile display name as the primary headline with secondary notes for raw slip text.
+  - **`Navbar.tsx`**: Upgraded Head Referee Sarah's sustained citation rate to dynamically compute based on live database slips (`${approvedSlips.length}-FOR-${approvedSlips.length}`).
+  - **`cloudflare/worker.js`**: Standardized Ref Booth override email and SMS notifications to prioritize `patronRow.display_name`.
+
+---
+
 ## 2026-10-18 — v1.6.14 iPhone Safe-Zone Header Login Button & Font Legibility Overhaul
 - **iOS Safe-Zone Padding on Sticky Header (`src/components/Navbar.tsx`)**:
   - Implemented `pt-[env(safe-area-inset-top,0px)] pr-[env(safe-area-inset-right,0px)] pl-[env(safe-area-inset-left,0px)]` on the sticky top header.
