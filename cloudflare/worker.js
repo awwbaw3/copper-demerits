@@ -495,6 +495,104 @@ async function ensureSchemaAndSeed(db) {
   await db
     .prepare(`UPDATE members SET is_admin = 1 WHERE id = '11111111-1111-4111-8111-111111111111'`)
     .run();
+
+  // Ensure baseline friendly nicknames exist for the 4 authentic members
+  const baselineNicknames = [
+    { id: 'c0000000-0000-4000-8000-000000000011', alias: 'rick', member_id: '11111111-1111-4111-8111-111111111111' },
+    { id: 'c0000000-0000-4000-8000-000000000012', alias: 'burtis', member_id: '22222222-2222-4222-8222-222222222222' },
+    { id: 'c0000000-0000-4000-8000-000000000013', alias: 'david lee', member_id: '55555555-5555-4555-8555-555555555555' },
+  ];
+  for (const nick of baselineNicknames) {
+    await db
+      .prepare('INSERT OR IGNORE INTO staff_aliases (id, alias, member_id) VALUES (?, ?, ?)')
+      .bind(nick.id, nick.alias, nick.member_id)
+      .run();
+  }
+}
+
+/**
+ * Resolves a raw student name or raw signature written on a slip to a Member ID
+ * using both members.display_name and staff_aliases (nicknames).
+ */
+function matchMemberFromAliases(rawText, members, aliases, roleFilter = null) {
+  const cleaned = String(rawText || '').trim().toLowerCase();
+  if (!cleaned) return null;
+
+  const candidateMembers = roleFilter
+    ? members.filter((m) => (roleFilter === 'staff' ? Boolean(m.is_staff) : Boolean(m.is_patron)))
+    : members;
+  const candidateIds = new Set(candidateMembers.map((m) => m.id));
+
+  // 1. Exact display_name match
+  const exactDisplay = candidateMembers.find(
+    (m) => String(m.display_name || '').trim().toLowerCase() === cleaned
+  );
+  if (exactDisplay) return exactDisplay.id;
+
+  // 2. Exact nickname/alias match
+  const exactAlias = aliases.find(
+    (a) => candidateIds.has(a.member_id) && String(a.alias || '').trim().toLowerCase() === cleaned
+  );
+  if (exactAlias) return exactAlias.member_id;
+
+  // 3. Substring nickname/alias match (longest alias first, min 3 chars)
+  const sortedAliases = [...aliases]
+    .filter((a) => candidateIds.has(a.member_id) && String(a.alias || '').trim().length >= 3)
+    .sort((a, b) => b.alias.length - a.alias.length);
+
+  for (const a of sortedAliases) {
+    if (cleaned.includes(String(a.alias).trim().toLowerCase())) {
+      return a.member_id;
+    }
+  }
+
+  // 4. Display name substring match
+  for (const m of candidateMembers) {
+    const dName = String(m.display_name || '').trim().toLowerCase();
+    if (dName.length >= 3 && cleaned.includes(dName)) {
+      return m.id;
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Automatically merges/reassigns slip stats (`patron_id` and `issuer_id`) whenever
+ * nicknames or display names are added or updated.
+ */
+async function syncSlipsWithAliasesAndNames(db) {
+  const [membersRes, aliasesRes, slipsRes] = await Promise.all([
+    db.prepare('SELECT * FROM members').all(),
+    db.prepare('SELECT * FROM staff_aliases').all(),
+    db.prepare('SELECT * FROM demerits').all(),
+  ]);
+
+  const members = membersRes.results || [];
+  const aliases = aliasesRes.results || [];
+  const slips = slipsRes.results || [];
+
+  let updatedCount = 0;
+  for (const slip of slips) {
+    const matchedPatronId =
+      matchMemberFromAliases(slip.raw_student, members, aliases, 'patron') ||
+      matchMemberFromAliases(slip.raw_student, members, aliases, null) ||
+      slip.patron_id;
+
+    const matchedIssuerId =
+      matchMemberFromAliases(slip.raw_signature, members, aliases, 'staff') ||
+      slip.issuer_id;
+
+    if (matchedPatronId !== slip.patron_id || matchedIssuerId !== slip.issuer_id) {
+      await db
+        .prepare('UPDATE demerits SET patron_id = ?, issuer_id = ? WHERE id = ?')
+        .bind(matchedPatronId || null, matchedIssuerId || null, slip.id)
+        .run();
+      updatedCount++;
+    }
+  }
+
+  return updatedCount;
 }
 
 export default {
@@ -801,12 +899,16 @@ export default {
           )
           .run();
 
+        // Sync any slips that match the updated display_name or member nicknames
+        const mergedCount = await syncSlipsWithAliasesAndNames(env.DB);
+
         const updated = await env.DB.prepare('SELECT * FROM members WHERE id = ?')
           .bind(memberId)
           .first();
 
         return jsonResponse({
           ok: true,
+          mergedCount,
           member: formatPrivateMember(updated),
         });
       }
@@ -969,6 +1071,15 @@ export default {
           .bind(id, displayName, body.is_staff ? 1 : 0, body.is_patron !== false ? 1 : 0)
           .run();
 
+        // Also seed their display_name lowercase as a baseline nickname in staff_aliases
+        await env.DB.prepare(
+          'INSERT OR IGNORE INTO staff_aliases (id, alias, member_id) VALUES (?, ?, ?)'
+        )
+          .bind(crypto.randomUUID(), displayName.toLowerCase(), id)
+          .run();
+
+        await syncSlipsWithAliasesAndNames(env.DB);
+
         const created = await env.DB.prepare('SELECT * FROM members WHERE id = ?')
           .bind(id)
           .first();
@@ -1002,6 +1113,25 @@ export default {
           description: sanitizedInfractions[idx] || deterministicModerateText(item.description || '').sanitized,
         }));
 
+        // Resolve patron_id and issuer_id from nicknames / aliases if a different nickname was written on the slip
+        const [membersRes, aliasesRes] = await Promise.all([
+          env.DB.prepare('SELECT * FROM members').all(),
+          env.DB.prepare('SELECT * FROM staff_aliases').all(),
+        ]);
+        const allMembers = membersRes.results || [];
+        const allAliases = aliasesRes.results || [];
+
+        const resolvedPatronId =
+          body.patron_id ||
+          matchMemberFromAliases(sanitizedStudent, allMembers, allAliases, 'patron') ||
+          matchMemberFromAliases(sanitizedStudent, allMembers, allAliases, null) ||
+          null;
+
+        const resolvedIssuerId =
+          body.issuer_id ||
+          matchMemberFromAliases(sanitizedSignature, allMembers, allAliases, 'staff') ||
+          null;
+
         // If flagged, do NOT deny — blur it and send it to Site Admin Rick's Override Queue ('pending')!
         const finalStatus = isFlaggedOrBlurred ? 'pending' : body.status || 'approved';
         const flagReason = isFlaggedOrBlurred
@@ -1019,9 +1149,9 @@ export default {
         )
           .bind(
             id,
-            body.patron_id || null,
+            resolvedPatronId,
             sanitizedStudent,
-            body.issuer_id || null,
+            resolvedIssuerId,
             sanitizedSignature,
             Number(body.demerit_count) || 1,
             body.incident_date,
@@ -1066,12 +1196,12 @@ export default {
               smsText: `Copper Demerits Ref Booth: Blurred slip for ${sanitizedStudent} queued for your admin override at copperdemerits.com/admin`,
             });
           }
-        } else if (body.patron_id) {
+        } else if (resolvedPatronId) {
           // If clean and approved, notify the cited patron if they opted into verified notifications
           const patronRow = await env.DB.prepare(
             `SELECT * FROM members WHERE id = ? AND notification_opt_in = 1 AND notification_verified = 1`
           )
-            .bind(body.patron_id)
+            .bind(resolvedPatronId)
             .first();
           if (patronRow) {
             await sendControlledNotification(env, {
@@ -1252,13 +1382,48 @@ export default {
         }
       }
 
-      // 14. Add or Delete Staff Alias (`/api/aliases`) — Moderated for friendly tone
+      // 14. Add or Delete Member Nickname / Staff Alias (`/api/aliases`)
+      // Restricted to: Site Admins/Staff OR the signed-in Claimed Profile owner adjusting their OWN nicknames!
       if (path === '/api/aliases' && request.method === 'POST') {
         const body = await request.json();
         const alias = (body.alias || '').trim().toLowerCase();
         const memberId = body.member_id;
+        const actorMemberId = body.actor_member_id || memberId;
+        const actorPin = body.actor_pin ? String(body.actor_pin).trim() : '';
+
         if (!alias || !memberId) {
           return jsonResponse({ ok: false, error: 'alias and member_id required' }, 400);
+        }
+
+        const actor = actorMemberId
+          ? await env.DB.prepare('SELECT * FROM members WHERE id = ?').bind(actorMemberId).first()
+          : null;
+
+        if (!actor) {
+          return jsonResponse(
+            { ok: false, error: 'Sign in to your claimed profile or Admin account to adjust nicknames.' },
+            401
+          );
+        }
+
+        const isAdminOrStaff = Boolean(actor.is_admin || actor.is_staff);
+        const isOwnClaimedProfile = actor.id === memberId && Boolean(actor.is_claimed);
+
+        if (!isAdminOrStaff && !isOwnClaimedProfile) {
+          return jsonResponse(
+            {
+              ok: false,
+              error: 'Only Site Admins or the claimed profile owner can adjust nicknames for this profile.',
+            },
+            403
+          );
+        }
+
+        if (actor.claimed_pin && actorPin && actor.claimed_pin !== actorPin) {
+          return jsonResponse(
+            { ok: false, error: 'Incorrect Bar PIN for profile verification.' },
+            403
+          );
         }
 
         const mod = await moderateContent(env, { texts: [alias] });
@@ -1266,9 +1431,25 @@ export default {
           return jsonResponse(
             {
               ok: false,
-              error: `Referee Whistle: Staff aliases cannot contain insults, name-calling, or profanity! (${mod.reason})`,
+              error: `Referee Whistle: Nicknames and aliases must be bar-friendly and cannot contain insults, name-calling, or profanity! (${mod.reason})`,
             },
             400
+          );
+        }
+
+        const existingAlias = await env.DB.prepare(
+          'SELECT * FROM staff_aliases WHERE LOWER(alias) = LOWER(?)'
+        )
+          .bind(alias)
+          .first();
+
+        if (existingAlias) {
+          return jsonResponse(
+            {
+              ok: false,
+              error: `The nickname "${alias}" is already mapped to a profile.`,
+            },
+            409
           );
         }
 
@@ -1279,15 +1460,51 @@ export default {
           .bind(id, alias, memberId)
           .run();
 
+        // Automatically merge any existing slips written with this nickname into the target profile!
+        const mergedCount = await syncSlipsWithAliasesAndNames(env.DB);
+
         const created = await env.DB.prepare('SELECT * FROM staff_aliases WHERE id = ?')
           .bind(id)
           .first();
-        return jsonResponse({ ok: true, alias: created });
+        return jsonResponse({ ok: true, alias: created, mergedCount });
       }
 
       if (path.startsWith('/api/aliases/') && request.method === 'DELETE') {
         const id = decodeURIComponent(path.replace('/api/aliases/', ''));
+        const actorMemberId = url.searchParams.get('actor_member_id') || '';
+        const actorPin = (url.searchParams.get('actor_pin') || '').trim();
+
+        const aliasRow = await env.DB.prepare('SELECT * FROM staff_aliases WHERE id = ?')
+          .bind(id)
+          .first();
+        if (!aliasRow) {
+          return jsonResponse({ ok: false, error: 'Nickname not found' }, 404);
+        }
+
+        if (actorMemberId) {
+          const actor = await env.DB.prepare('SELECT * FROM members WHERE id = ?')
+            .bind(actorMemberId)
+            .first();
+          const isAdminOrStaff = Boolean(actor && (actor.is_admin || actor.is_staff));
+          const isOwnClaimedProfile = Boolean(
+            actor && actor.id === aliasRow.member_id && actor.is_claimed
+          );
+          if (!isAdminOrStaff && !isOwnClaimedProfile) {
+            return jsonResponse(
+              {
+                ok: false,
+                error: 'Only Site Admins or the claimed profile owner can remove this nickname.',
+              },
+              403
+            );
+          }
+          if (actor?.claimed_pin && actorPin && actor.claimed_pin !== actorPin) {
+            return jsonResponse({ ok: false, error: 'Incorrect Bar PIN.' }, 403);
+          }
+        }
+
         await env.DB.prepare('DELETE FROM staff_aliases WHERE id = ?').bind(id).run();
+        await syncSlipsWithAliasesAndNames(env.DB);
         return jsonResponse({ ok: true });
       }
 
@@ -1303,3 +1520,4 @@ export default {
     }
   },
 };
+

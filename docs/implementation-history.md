@@ -4,6 +4,17 @@ Chronological log of architectural decisions, database migrations, and infrastru
 
 ---
 
+## 2026-10-18 — v1.6.1 Frictionless Post-Claim Profile Editing, Claimed Profile & Admin-Only Nicknames & Automatic Slip Stat Merging
+- **Frictionless Post-Claim Self-Service Profile Editing ("My Locker")**:
+  - Added `activePin` session persistence in `src/context/DemeritsContext.tsx` and pre-populated `pin` inside `src/components/ClaimProfileModal.tsx` (`My Locker & Edit Profile` tab) so newly claimed or signed-in users can immediately adjust their display name, email address, phone number, carrier SMS gateway, notification opt-in settings, friendly bar tagline, and team badge without re-typing their PIN.
+- **Claimed Profile & Admin-Only Nicknames + Automatic Slip Stat Merging**:
+  - Upgraded `cloudflare/worker.js` (`POST /api/aliases`, `DELETE /api/aliases/:id`, `PATCH /api/my-profile`, `POST /api/demerits`) and deployed Worker Version `14d236b9-0440-4a2f-b90f-009dfcd4c081` to `https://api.copperdemerits.com`.
+  - Enforced RBAC so only Site Admins/Staff (`actor.is_admin || actor.is_staff`) or the signed-in Claimed Profile owner (`actor.id === memberId && actor.is_claimed`) can add or remove nicknames for a profile, with every nickname checked by `moderateContent` / `moderateTextInstant` for bar-friendly rules.
+  - Added `syncSlipsWithAliasesAndNames(env.DB)` on Cloudflare D1 and `resolvePatronNickname(rawStudent)` in `DemeritsContext.tsx` so any slip written with a member's nickname automatically merges its points and stats into the target profile.
+  - Added the **My Bar Nicknames & Slip Aliases** manager in `ClaimProfileModal.tsx`, the live **Stats Merge Into Profile** badge on `SubmitSlipPage.tsx`, and full Patron + Staff nickname mapping in `AdminPage.tsx`.
+
+---
+
 ## 2026-10-18 — v1.6.0 AI Referee Auto-Blur & Admin Override Queue, Self-Service Profile Editor, Zero-Cost Verified Notifications & Fan Site Disclaimer
 - **Roster Cleanup (`Matt Barnes` & Negative Aliases Purged)**:
   - Executed Cloudflare D1 SQL cleanup removing `Matt Barnes` (`44444444-4444-4444-8444-444444444444`) and any negative aliases from `copper-demerits-db`, `cloudflare/worker.js`, `src/lib/defaultData.ts`, `supabase/seed.sql`, and UI placeholders.

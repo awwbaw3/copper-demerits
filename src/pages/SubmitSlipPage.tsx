@@ -64,6 +64,7 @@ export const SubmitSlipPage: React.FC = () => {
     currentMember,
     setIsProfileModalOpen,
     resolveStaffSignature,
+    resolvePatronNickname,
     checkImageDuplicate,
     checkCitationDuplicate,
     submitDemeritSlip,
@@ -603,6 +604,7 @@ export const SubmitSlipPage: React.FC = () => {
         {/* Step 2: Individual Slip Details for Each Slip in the Image */}
         {slipDrafts.map((draft, draftIdx) => {
           const resolvedStaff = resolveStaffSignature(draft.rawSignature);
+          const resolvedPatron = resolvePatronNickname(draft.rawStudent);
           const totalSlipPoints = draft.items.reduce(
             (sum, item) => sum + (Number(item.points) || 1),
             0
@@ -643,33 +645,61 @@ export const SubmitSlipPage: React.FC = () => {
               {/* Patron */}
               <div>
                 <label className="block font-mono-docket text-xs font-bold uppercase text-[#D6C7B8]">
-                  STUDENT (PATRON ON SLIP) *
+                  STUDENT (PATRON OR NICKNAME WRITTEN ON SLIP) *
                 </label>
                 <input
                   type="text"
                   required
                   value={draft.rawStudent}
                   onChange={(e) => updateDraft(draftIdx, { rawStudent: e.target.value })}
-                  placeholder="Rick, Burtis, or Anonymous Patron"
+                  placeholder="Rick, Burtis, Dave, or any linked Patron Nickname"
                   className="mt-1.5 w-full rounded-xl border border-white/15 bg-[#121212] px-3.5 py-2.5 text-sm text-[#F5F2EB] focus:border-[#B87333] focus:outline-none"
                 />
-                <div className="mt-2 flex flex-wrap items-center gap-1.5">
-                  {members
-                    .filter((m) => m.is_patron)
-                    .map((m) => (
-                      <button
-                        key={m.id}
-                        type="button"
-                        onClick={() => updateDraft(draftIdx, { rawStudent: m.display_name })}
-                        className={`rounded-lg border px-2.5 py-1 font-mono-docket text-xs transition ${
-                          draft.rawStudent.trim().toLowerCase() === m.display_name.toLowerCase()
-                            ? 'border-[#B87333] bg-[#B87333]/20 text-[#E8B888] font-bold'
-                            : 'border-white/10 bg-[#121212] text-[#B5A99D]'
-                        }`}
-                      >
-                        {m.display_name}
-                      </button>
-                    ))}
+
+                <div className="mt-2.5 rounded-xl border border-[#B87333]/30 bg-[#121212] p-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <span className="flex items-center gap-1.5 font-mono-docket text-xs text-[#D6C7B8]">
+                      <Sparkles className="h-3.5 w-3.5 text-[#B87333]" />
+                      Stats Merge Into Profile:
+                    </span>
+                    {resolvedPatron.member ? (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/20 border border-emerald-500/40 px-2.5 py-0.5 font-mono-docket text-xs font-bold text-emerald-300">
+                        <CheckCircle2 className="h-3.5 w-3.5" />
+                        {resolvedPatron.member.display_name}
+                        {resolvedPatron.matchedAlias &&
+                          resolvedPatron.matchedAlias.toLowerCase() !==
+                            resolvedPatron.member.display_name.toLowerCase() && (
+                            <span className="text-[10px] font-normal text-emerald-200/80">
+                              (via nickname &ldquo;{resolvedPatron.matchedAlias}&rdquo;)
+                            </span>
+                          )}
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/20 border border-amber-500/40 px-2.5 py-0.5 font-mono-docket text-[11px] text-amber-300">
+                        <AlertCircle className="h-3.5 w-3.5" />
+                        New Patron Profile (&ldquo;{draft.rawStudent.trim() || 'Unknown'}&rdquo;)
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                    {members
+                      .filter((m) => m.is_patron)
+                      .map((m) => (
+                        <button
+                          key={m.id}
+                          type="button"
+                          onClick={() => updateDraft(draftIdx, { rawStudent: m.display_name })}
+                          className={`rounded-lg border px-2.5 py-1 font-mono-docket text-xs transition ${
+                            resolvedPatron.member?.id === m.id
+                              ? 'border-[#B87333] bg-[#B87333]/20 text-[#E8B888] font-bold'
+                              : 'border-white/10 bg-[#1A1715] text-[#B5A99D] hover:border-[#B87333]/50'
+                          }`}
+                        >
+                          {m.display_name}
+                        </button>
+                      ))}
+                  </div>
                 </div>
               </div>
 

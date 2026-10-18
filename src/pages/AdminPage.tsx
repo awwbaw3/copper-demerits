@@ -29,6 +29,7 @@ export const AdminPage: React.FC = () => {
     isAdminOrStaff,
     setIsProfileModalOpen,
     resolveStaffSignature,
+    resolvePatronNickname,
     deleteSlip,
     updateSlipAssignment,
     addStaffAlias,
@@ -44,7 +45,7 @@ export const AdminPage: React.FC = () => {
   // Alias Mapper State
   const [newAliasInput, setNewAliasInput] = useState('');
   const [selectedStaffId, setSelectedStaffId] = useState<string>(
-    () => members.find((m) => m.is_staff)?.id || ''
+    () => members.find((m) => m.is_staff)?.id || members[0]?.id || ''
   );
   const [feedback, setFeedback] = useState<{
     type: 'ok' | 'err';
@@ -179,7 +180,9 @@ export const AdminPage: React.FC = () => {
     }
   };
 
-  const testResolution = resolveStaffSignature(testSignature);
+  const staffRes = resolveStaffSignature(testSignature);
+  const patronRes = resolvePatronNickname(testSignature);
+  const testResolution = staffRes.member ? staffRes : patronRes;
 
   return (
     <div className="mx-auto max-w-6xl px-3 sm:px-4 py-5 sm:py-8 space-y-8">
@@ -462,10 +465,15 @@ export const AdminPage: React.FC = () => {
       {/* Staff Alias Mapper + Roster Grid */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
         <section className="lg:col-span-7 rounded-2xl border border-[#B87333]/35 bg-[#1A1715] p-4 sm:p-6 space-y-5">
-          <h2 className="font-athletic text-2xl font-bold uppercase tracking-wide text-[#F5F2EB] flex items-center gap-2">
-            <KeyRound className="h-5 w-5 text-[#B87333]" />
-            <span>STAFF SIGNATURE ALIAS MAPPER</span>
-          </h2>
+          <div>
+            <h2 className="font-athletic text-2xl font-bold uppercase tracking-wide text-[#F5F2EB] flex items-center gap-2">
+              <KeyRound className="h-5 w-5 text-[#B87333]" />
+              <span>PATRON NICKNAME &amp; STAFF ALIAS MAPPER</span>
+            </h2>
+            <p className="mt-1 font-mono-docket text-[11px] text-[#9E8F82]">
+              Only Admins and signed-in Claimed Profiles can adjust nicknames. Any slip written with a mapped nickname automatically merges its points and stats into that profile.
+            </p>
+          </div>
 
           <form onSubmit={handleAddAlias} className="grid grid-cols-1 gap-2.5 sm:grid-cols-12">
             <div className="sm:col-span-6">
@@ -474,7 +482,7 @@ export const AdminPage: React.FC = () => {
                 required
                 value={newAliasInput}
                 onChange={(e) => setNewAliasInput(e.target.value)}
-                placeholder='Friendly alias (e.g. "the boss - aka sarah")'
+                placeholder='Friendly nickname/alias (e.g. "ricky", "big burt", "the boss")'
                 className="w-full rounded-xl border border-white/15 bg-[#121212] px-3.5 py-2 text-xs text-[#F5F2EB]"
               />
             </div>
@@ -483,12 +491,12 @@ export const AdminPage: React.FC = () => {
               <select
                 value={selectedStaffId}
                 onChange={(e) => setSelectedStaffId(e.target.value)}
-                aria-label="Target staff member"
+                aria-label="Target member profile"
                 className="w-full rounded-xl border border-white/15 bg-[#121212] px-3 py-2 text-xs text-[#F5F2EB]"
               >
-                {staffMembers.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.display_name}
+                {members.map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.display_name} ({m.is_staff && m.is_patron ? 'Staff & Patron' : m.is_staff ? 'Staff' : 'Patron'})
                   </option>
                 ))}
               </select>
@@ -497,7 +505,7 @@ export const AdminPage: React.FC = () => {
             <div className="sm:col-span-2">
               <button
                 type="submit"
-                className="flex w-full items-center justify-center gap-1 rounded-xl bg-[#B87333] px-3 py-2 font-athletic text-xs font-bold uppercase text-[#121212]"
+                className="flex w-full items-center justify-center gap-1 rounded-xl bg-[#B87333] px-3 py-2 font-athletic text-xs font-bold uppercase text-[#121212] cursor-pointer"
               >
                 <Plus className="h-4 w-4" />
                 <span>Map</span>
@@ -506,19 +514,28 @@ export const AdminPage: React.FC = () => {
           </form>
 
           <div className="space-y-2.5">
-            {staffMembers.map((staff) => {
-              const memberAliases = aliases.filter((a) => a.member_id === staff.id);
+            {members.map((member) => {
+              const memberAliases = aliases.filter((a) => a.member_id === member.id);
               return (
                 <div
-                  key={staff.id}
+                  key={member.id}
                   className="rounded-xl border border-white/10 bg-[#121212] p-3.5 space-y-2"
                 >
                   <div className="flex items-center justify-between">
-                    <span className="font-athletic text-lg font-bold uppercase text-[#F5F2EB]">
-                      {staff.display_name}
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <span className="font-athletic text-lg font-bold uppercase text-[#F5F2EB]">
+                        {member.display_name}
+                      </span>
+                      <span className="rounded bg-white/5 px-2 py-0.5 font-mono-docket text-[10px] uppercase text-[#B5A99D]">
+                        {member.is_staff && member.is_patron
+                          ? 'Staff & Patron'
+                          : member.is_staff
+                          ? 'Staff'
+                          : 'Patron'}
+                      </span>
+                    </div>
                     <span className="font-mono-docket text-[11px] text-[#9E8F82]">
-                      {memberAliases.length} aliases
+                      {memberAliases.length} {memberAliases.length === 1 ? 'nickname' : 'nicknames'}
                     </span>
                   </div>
 
@@ -533,7 +550,7 @@ export const AdminPage: React.FC = () => {
                           type="button"
                           onClick={() => deleteStaffAlias(aliasObj.id)}
                           aria-label={`Remove alias ${aliasObj.alias}`}
-                          className="text-[#9E8F82] hover:text-rose-400"
+                          className="text-[#9E8F82] hover:text-rose-400 cursor-pointer"
                         >
                           <X className="h-3 w-3" />
                         </button>
@@ -548,7 +565,7 @@ export const AdminPage: React.FC = () => {
           <div className="rounded-xl border border-dashed border-[#B87333]/40 bg-[#121212]/80 p-3.5">
             <div className="flex items-center gap-2 font-mono-docket text-xs font-bold uppercase text-[#B87333] mb-2">
               <Sparkles className="h-4 w-4" />
-              <span>Test Signature Resolver</span>
+              <span>Test Signature / Nickname Resolver</span>
             </div>
             <div className="flex flex-col sm:flex-row sm:items-center gap-2.5">
               <input

@@ -36,6 +36,7 @@ const STORAGE_KEYS = {
   SLIPS: 'cac_demerits_slips_v6',
   AUTO_APPROVE: 'cac_demerits_auto_approve_v6',
   ACTIVE_MEMBER: 'cac_demerits_active_member_v6',
+  ACTIVE_PIN: 'cac_demerits_active_pin_v6',
 };
 
 export interface NewSlipPayload {
@@ -92,6 +93,7 @@ interface DemeritsContextValue {
   isSupabaseConnected: boolean;
   isCloudflareConnected: boolean;
   currentMember: Member | null;
+  activePin: string;
   isAdminOrStaff: boolean;
   isProfileModalOpen: boolean;
   setIsProfileModalOpen: (open: boolean) => void;
@@ -118,6 +120,7 @@ interface DemeritsContextValue {
   autoApproveSubmissions: boolean;
   setAutoApproveSubmissions: (val: boolean) => void;
   resolveStaffSignature: (rawSignature: string) => { member: Member | null; matchedAlias: string | null };
+  resolvePatronNickname: (rawStudent: string) => { member: Member | null; matchedAlias: string | null };
   resolvePatronName: (rawStudent: string) => Member | null;
   checkImageDuplicate: (
     fingerprint: Pick<ImageFingerprint, 'sha256' | 'dhash' | 'rotatedDhashes'>
@@ -151,8 +154,8 @@ interface DemeritsContextValue {
   updateSlipStatus: (id: string, status: SlipStatus) => Promise<void>;
   deleteSlip: (id: string) => Promise<void>;
   updateSlipAssignment: (id: string, patronId: string | null, issuerId: string | null) => Promise<void>;
-  addStaffAlias: (alias: string, memberId: string) => Promise<{ ok: boolean; error?: string }>;
-  deleteStaffAlias: (id: string) => Promise<void>;
+  addStaffAlias: (alias: string, memberId: string) => Promise<{ ok: boolean; mergedCount?: number; error?: string }>;
+  deleteStaffAlias: (id: string) => Promise<{ ok: boolean; error?: string }>;
   rerunAliasNormalization: () => Promise<number>;
   addOrUpdateMember: (displayName: string, isPatron: boolean, isStaff: boolean) => Promise<Member>;
   deduplicateExistingSlips: () => Promise<number>;
@@ -268,6 +271,9 @@ export const DemeritsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const [currentMember, setCurrentMember] = useState<Member | null>(() =>
     loadFromStorage<Member | null>(STORAGE_KEYS.ACTIVE_MEMBER, null)
   );
+  const [activePin, setActivePin] = useState<string>(() =>
+    loadFromStorage<string>(STORAGE_KEYS.ACTIVE_PIN, '')
+  );
   const [isProfileModalOpen, setIsProfileModalOpen] = useState<boolean>(false);
   const [autoApproveSubmissions, setAutoApproveState] = useState<boolean>(() =>
     loadFromStorage(STORAGE_KEYS.AUTO_APPROVE, true)
@@ -317,6 +323,18 @@ export const DemeritsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       // Ignore
     }
   }, [currentMember]);
+
+  useEffect(() => {
+    try {
+      if (activePin) {
+        localStorage.setItem(STORAGE_KEYS.ACTIVE_PIN, JSON.stringify(activePin));
+      } else {
+        localStorage.removeItem(STORAGE_KEYS.ACTIVE_PIN);
+      }
+    } catch {
+      // Ignore
+    }
+  }, [activePin]);
 
   const setAutoApproveSubmissions = useCallback((val: boolean) => {
     setAutoApproveState(val);
@@ -419,6 +437,7 @@ export const DemeritsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
             return [...prev, res.member];
           });
           setCurrentMember(res.member);
+          setActivePin(cleanPin);
           return { ok: true, member: res.member, mode: res.mode };
         }
         return { ok: false, error: 'Could not claim profile.' };
@@ -457,6 +476,11 @@ export const DemeritsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
             prev.map((m) => (m.id === res.member.id ? { ...m, ...res.member } : m))
           );
           setCurrentMember(res.member);
+          if (payload.newPin && payload.newPin.trim().length >= 4) {
+            setActivePin(payload.newPin.trim());
+          } else if (payload.currentPin) {
+            setActivePin(payload.currentPin.trim());
+          }
           return { ok: true, member: res.member };
         }
         return { ok: false, error: 'Could not update profile.' };
@@ -542,6 +566,7 @@ export const DemeritsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
   const logoutProfile = useCallback(() => {
     setCurrentMember(null);
+    setActivePin('');
   }, []);
 
   const resolveStaffSignature = useCallback(
@@ -577,8 +602,8 @@ export const DemeritsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     [aliases, members]
   );
 
-  const resolvePatronName = useCallback(
-    (rawStudent: string): Member | null => {
+  const resolvePatronNickname = useCallback(
+    (rawStudent: string): { member: Member | null; matchedAlias: string | null } => {
       const normalized = rawStudent.trim().toLowerCase();
       if (
         !normalized ||
@@ -586,16 +611,57 @@ export const DemeritsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         normalized === 'anonymous patron' ||
         normalized === 'unknown'
       ) {
-        return null;
+        return { member: null, matchedAlias: null };
       }
 
-      return (
-        members.find(
-          (m) => m.is_patron && m.display_name.trim().toLowerCase() === normalized
-        ) || null
+      // 1. Exact display_name match
+      const directPatron = members.find(
+        (m) => m.is_patron && m.display_name.trim().toLowerCase() === normalized
       );
+      if (directPatron) {
+        return { member: directPatron, matchedAlias: directPatron.display_name.toLowerCase() };
+      }
+
+      // 2. Exact nickname/alias match in aliases
+      const exactAlias = aliases.find((a) => a.alias.toLowerCase() === normalized);
+      if (exactAlias) {
+        const matchedMember = members.find((m) => m.id === exactAlias.member_id) || null;
+        if (matchedMember) {
+          return { member: matchedMember, matchedAlias: exactAlias.alias };
+        }
+      }
+
+      // 3. Substring nickname match (longest alias first, min 3 chars)
+      const sortedAliases = [...aliases]
+        .filter((a) => a.alias.trim().length >= 3)
+        .sort((a, b) => b.alias.length - a.alias.length);
+      for (const candidate of sortedAliases) {
+        if (normalized.includes(candidate.alias.toLowerCase())) {
+          const matchedMember = members.find((m) => m.id === candidate.member_id) || null;
+          if (matchedMember) {
+            return { member: matchedMember, matchedAlias: candidate.alias };
+          }
+        }
+      }
+
+      // 4. Substring display_name match
+      for (const m of members) {
+        const dName = m.display_name.trim().toLowerCase();
+        if (m.is_patron && dName.length >= 3 && normalized.includes(dName)) {
+          return { member: m, matchedAlias: dName };
+        }
+      }
+
+      return { member: null, matchedAlias: null };
     },
-    [members]
+    [aliases, members]
+  );
+
+  const resolvePatronName = useCallback(
+    (rawStudent: string): Member | null => {
+      return resolvePatronNickname(rawStudent).member;
+    },
+    [resolvePatronNickname]
   );
 
   const checkImageDuplicate = useCallback(
@@ -1322,10 +1388,31 @@ export const DemeritsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   );
 
   const addStaffAlias = useCallback(
-    async (alias: string, memberId: string): Promise<{ ok: boolean; error?: string }> => {
+    async (
+      alias: string,
+      memberId: string
+    ): Promise<{ ok: boolean; mergedCount?: number; error?: string }> => {
       const normalized = alias.trim().toLowerCase();
       if (!normalized) {
-        return { ok: false, error: 'Alias cannot be empty.' };
+        return { ok: false, error: 'Nickname / alias cannot be empty.' };
+      }
+
+      if (!currentMember) {
+        return {
+          ok: false,
+          error: 'Sign in to your claimed profile or Admin account to adjust nicknames.',
+        };
+      }
+
+      const isOwnClaimedProfile = Boolean(
+        currentMember.id === memberId && (currentMember.is_claimed ?? true)
+      );
+      if (!isAdminOrStaff && !isOwnClaimedProfile) {
+        return {
+          ok: false,
+          error:
+            'Only Site Admins or the claimed profile owner can adjust nicknames for this profile.',
+        };
       }
 
       const mod = moderateTextInstant(normalized);
@@ -1333,7 +1420,7 @@ export const DemeritsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         return {
           ok: false,
           error:
-            'Referee Whistle: Staff aliases cannot contain insults, name-calling, or profanity!',
+            'Referee Whistle: Nicknames and aliases must be bar-friendly and cannot contain insults, name-calling, or profanity!',
         };
       }
 
@@ -1342,7 +1429,7 @@ export const DemeritsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         const owner = members.find((m) => m.id === duplicate.member_id);
         return {
           ok: false,
-          error: `Alias "${normalized}" is already mapped to ${owner?.display_name || 'a staff member'}.`,
+          error: `Nickname "${normalized}" is already mapped to ${owner?.display_name || 'a profile'}.`,
         };
       }
 
@@ -1353,53 +1440,119 @@ export const DemeritsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         created_at: new Date().toISOString(),
       };
 
+      let mergedCount = 0;
+
       if (isCloudflareConnected) {
         try {
-          const res = await cloudflareFetch<{ ok: boolean; alias: StaffAlias }>('/api/aliases', {
+          const res = await cloudflareFetch<{
+            ok: boolean;
+            alias: StaffAlias;
+            mergedCount?: number;
+          }>('/api/aliases', {
             method: 'POST',
-            body: JSON.stringify({ alias: normalized, member_id: memberId }),
+            body: JSON.stringify({
+              alias: normalized,
+              member_id: memberId,
+              actor_member_id: currentMember.id,
+              actor_pin: activePin,
+            }),
           });
           if (res.alias?.id) {
             newAlias.id = res.alias.id;
           }
+          if (typeof res.mergedCount === 'number') {
+            mergedCount = res.mergedCount;
+          }
         } catch (err) {
           return {
             ok: false,
-            error: err instanceof Error ? err.message : 'Could not save alias.',
+            error: err instanceof Error ? err.message : 'Could not save nickname.',
           };
         }
       }
 
       setAliases((prev) => [...prev, newAlias]);
 
+      const targetMember = members.find((m) => m.id === memberId);
       setRawSlips((prev) =>
         prev.map((s) => {
-          if (s.raw_signature.trim().toLowerCase() === normalized) {
-            return { ...s, issuer_id: memberId };
+          const rawStudentNorm = s.raw_student.trim().toLowerCase();
+          const rawSigNorm = s.raw_signature.trim().toLowerCase();
+          let updated = s;
+          if (
+            targetMember?.is_patron &&
+            (rawStudentNorm === normalized ||
+              (normalized.length >= 3 && rawStudentNorm.includes(normalized)))
+          ) {
+            if (updated.patron_id !== memberId) {
+              mergedCount++;
+              updated = { ...updated, patron_id: memberId };
+            }
           }
-          return s;
+          if (
+            targetMember?.is_staff &&
+            (rawSigNorm === normalized ||
+              (normalized.length >= 3 && rawSigNorm.includes(normalized)))
+          ) {
+            if (updated.issuer_id !== memberId) {
+              mergedCount++;
+              updated = { ...updated, issuer_id: memberId };
+            }
+          }
+          return updated;
         })
       );
 
-      return { ok: true };
+      return { ok: true, mergedCount };
     },
-    [aliases, members, isCloudflareConnected]
+    [aliases, members, isCloudflareConnected, currentMember, isAdminOrStaff, activePin]
   );
 
   const deleteStaffAlias = useCallback(
-    async (id: string) => {
+    async (id: string): Promise<{ ok: boolean; error?: string }> => {
+      const targetAlias = aliases.find((a) => a.id === id);
+      if (!targetAlias) {
+        return { ok: false, error: 'Nickname not found.' };
+      }
+
+      if (!currentMember) {
+        return {
+          ok: false,
+          error: 'Sign in to your claimed profile or Admin account to remove nicknames.',
+        };
+      }
+
+      const isOwnClaimedProfile = Boolean(
+        currentMember.id === targetAlias.member_id && (currentMember.is_claimed ?? true)
+      );
+      if (!isAdminOrStaff && !isOwnClaimedProfile) {
+        return {
+          ok: false,
+          error:
+            'Only Site Admins or the claimed profile owner can remove nicknames from this profile.',
+        };
+      }
+
       setAliases((prev) => prev.filter((a) => a.id !== id));
       if (isCloudflareConnected) {
         try {
-          await cloudflareFetch(`/api/aliases/${id}`, {
+          const qs = new URLSearchParams({
+            actor_member_id: currentMember.id,
+            actor_pin: activePin || '',
+          }).toString();
+          await cloudflareFetch(`/api/aliases/${encodeURIComponent(id)}?${qs}`, {
             method: 'DELETE',
           });
-        } catch {
-          // Keep local
+        } catch (err) {
+          return {
+            ok: false,
+            error: err instanceof Error ? err.message : 'Could not remove nickname.',
+          };
         }
       }
+      return { ok: true };
     },
-    [isCloudflareConnected]
+    [aliases, currentMember, isAdminOrStaff, activePin, isCloudflareConnected]
   );
 
   const rerunAliasNormalization = useCallback(async (): Promise<number> => {
@@ -1484,6 +1637,7 @@ export const DemeritsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         isSupabaseConnected: isCloudflareConnected,
         isCloudflareConnected,
         currentMember,
+        activePin,
         isAdminOrStaff,
         isProfileModalOpen,
         setIsProfileModalOpen,
@@ -1495,6 +1649,7 @@ export const DemeritsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         autoApproveSubmissions,
         setAutoApproveSubmissions,
         resolveStaffSignature,
+        resolvePatronNickname,
         resolvePatronName,
         checkImageDuplicate,
         checkCitationDuplicate,

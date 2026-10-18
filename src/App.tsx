@@ -50,7 +50,7 @@ export const App: React.FC = () => {
                     Visit Official Copper AC (copperac.com) ↗
                   </a>
                   <span>·</span>
-                  <span>Cloudflare D1 + R2 + AI Referee · PWA v1.6.0</span>
+                  <span>Cloudflare D1 + R2 + AI Referee · PWA v1.6.1</span>
                 </div>
               </div>
             </div>

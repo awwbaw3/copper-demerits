@@ -182,6 +182,16 @@ export const DEFAULT_STAFF_ALIASES: StaffAlias[] = [
     alias: 'burtis',
     member_id: MEMBER_IDS.BURTIS,
   },
+  {
+    id: 'c0000000-0000-4000-8000-000000000011',
+    alias: 'rick',
+    member_id: MEMBER_IDS.RICK,
+  },
+  {
+    id: 'c0000000-0000-4000-8000-000000000013',
+    alias: 'david lee',
+    member_id: MEMBER_IDS.DAVID_LEE,
+  },
 ];
 
 export const KNOWN_UPLOADED_FILE_HASHES: Record<

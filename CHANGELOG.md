@@ -2,6 +2,16 @@
 
 All notable changes to the **Copper Athletic Club — Ring of Honor** web application are documented in this file.
 
+## [1.6.1] - 2026-10-18
+
+### Added & Hardened
+- **Frictionless Post-Claim Profile Editing ("My Locker") (`src/components/ClaimProfileModal.tsx`, `src/context/DemeritsContext.tsx`)**:
+  - Persisted the active signed-in user's PIN (`activePin`) in session state so immediately after claiming or signing in to their profile, the user can adjust their **display name**, **email address**, **phone number**, **mobile carrier**, **opt-in notification settings**, **friendly bar tagline**, **team emblem**, and **4–8 digit PIN** without having to re-type their PIN, while strictly enforcing our bar-friendly Referee moderation rules.
+- **Claimed Profile & Admin-Only Nicknames + Automatic Slip Stat Merging (`cloudflare/worker.js`, `src/context/DemeritsContext.tsx`, `src/components/ClaimProfileModal.tsx`, `src/pages/SubmitSlipPage.tsx`, `src/pages/AdminPage.tsx`)**:
+  - Enforced strict RBAC on `POST /api/aliases` and `DELETE /api/aliases/:id` so **only Site Admins/Referees (`Rick`, `Sarah`) or the signed-in Claimed Profile owner** can add or remove nicknames for a profile.
+  - Added a **"My Bar Nicknames & Slip Aliases"** self-service manager inside `My Locker` (`ClaimProfileModal.tsx`) and expanded the **Ref Booth Nickname Mapper** (`/admin`) to cover all members (Patrons and Staff).
+  - Added automatic slip nickname normalization (`resolvePatronNickname` + `syncSlipsWithAliasesAndNames` in Cloudflare D1) so whenever a slip is written with a linked nickname (e.g., `"Ricky"`, `"Headband Rick"`, `"Big Burt"`, `"Dave"`, `"Boss Lady"`), its demerit points, offenses, and standings automatically merge into the correct profile.
+
 ## [1.6.0] - 2026-10-18
 
 ### Added & Hardened

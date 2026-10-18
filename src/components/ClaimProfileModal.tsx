@@ -17,6 +17,8 @@ import {
   Bell,
   Mail,
   Smartphone,
+  Tag,
+  Trash2,
 } from 'lucide-react';
 
 export const TEAM_CHOICES: {
@@ -35,11 +37,15 @@ export const TEAM_CHOICES: {
 export const ClaimProfileModal: React.FC = () => {
   const {
     members,
+    aliases,
     currentMember,
+    activePin,
     isProfileModalOpen,
     setIsProfileModalOpen,
     claimOrLoginProfile,
     updateMyProfile,
+    addStaffAlias,
+    deleteStaffAlias,
     requestNotificationVerification,
     verifyNotificationCode,
     logoutProfile,
@@ -53,6 +59,10 @@ export const ClaimProfileModal: React.FC = () => {
   const [newPin, setNewPin] = useState('');
   const [favoriteTeam, setFavoriteTeam] = useState<TeamBadgeMeta['iconType']>('lions');
   const [tagline, setTagline] = useState('');
+
+  // Self-Service Nickname / Slip Alias State (My Locker)
+  const [nicknameInput, setNicknameInput] = useState('');
+  const [addingNickname, setAddingNickname] = useState(false);
 
   // Opt-In Notification State (My Locker)
   const [notifEmail, setNotifEmail] = useState('');
@@ -84,6 +94,9 @@ export const ClaimProfileModal: React.FC = () => {
         setNotifPhone(currentMember.notification_phone || '');
         setNotifCarrier(currentMember.notification_carrier || 'none');
         setOptInAccepted(Boolean(currentMember.notification_opt_in));
+        if (activePin) {
+          setPin(activePin);
+        }
       } else {
         setMode('existing');
         const defaultTarget =
@@ -97,7 +110,7 @@ export const ClaimProfileModal: React.FC = () => {
         }
       }
     }
-  }, [isProfileModalOpen, currentMember, members]);
+  }, [isProfileModalOpen, currentMember, members, activePin]);
 
   if (!isProfileModalOpen) return null;
 
@@ -288,6 +301,53 @@ export const ClaimProfileModal: React.FC = () => {
     }
   };
 
+  const myAliases = currentMember
+    ? aliases.filter((a) => a.member_id === currentMember.id)
+    : [];
+
+  const handleAddMyNickname = async () => {
+    if (!currentMember) return;
+    setErrorMsg(null);
+    setSuccessMsg(null);
+
+    const trimmed = nicknameInput.trim();
+    if (!trimmed) {
+      setErrorMsg('Enter a nickname or slip alias to link to your profile.');
+      return;
+    }
+
+    const modCheck = moderateTextInstant(trimmed);
+    if (modCheck.flagged) {
+      setErrorMsg(
+        'Referee Whistle: Nicknames must stay friendly, jovial, and free of profanity or name-calling!'
+      );
+      return;
+    }
+
+    setAddingNickname(true);
+    try {
+      const res = await addStaffAlias(trimmed, currentMember.id);
+      if (!res.ok) {
+        setErrorMsg(res.error || 'Could not add nickname.');
+      } else {
+        setNicknameInput('');
+        setSuccessMsg(
+          `Nickname "${trimmed}" linked! Any demerit slip written with "${trimmed}" now merges directly into ${currentMember.display_name}'s stats.`
+        );
+      }
+    } finally {
+      setAddingNickname(false);
+    }
+  };
+
+  const handleDeleteMyNickname = async (aliasId: string, aliasText: string) => {
+    if (!currentMember) return;
+    setErrorMsg(null);
+    setSuccessMsg(null);
+    await deleteStaffAlias(aliasId);
+    setSuccessMsg(`Removed nickname "${aliasText}" from your profile.`);
+  };
+
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-3 sm:p-4 backdrop-blur-md"
@@ -471,6 +531,85 @@ export const ClaimProfileModal: React.FC = () => {
                   placeholder="e.g. Never ordering Gin & Diet Coke again!"
                   className="mt-1.5 w-full rounded-xl border border-white/15 bg-[#0D0B0A] px-3.5 py-2.5 text-sm text-[#F5F2EB] focus:border-[#B87333] focus:outline-none"
                 />
+              </div>
+            </div>
+
+            {/* Self-Service Bar Nicknames & Slip Aliases (Auto-Merges Slip Stats) */}
+            <div className="rounded-2xl border border-[#B87333]/35 bg-[#0E0C0B] p-4 space-y-2.5">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <Tag className="h-4 w-4 text-[#DFC15E]" />
+                  <span className="font-athletic text-base font-bold uppercase tracking-wider text-[#F5F2EB]">
+                    MY BAR NICKNAMES &amp; SLIP ALIASES
+                  </span>
+                </div>
+                <span className="rounded-full bg-[#B87333]/20 border border-[#B87333]/40 px-2.5 py-0.5 font-mono-docket text-[10px] font-bold uppercase text-[#E8B888]">
+                  Claimed Profile &amp; Admin Only
+                </span>
+              </div>
+
+              <p className="font-mono-docket text-[11px] text-[#9E8F82]">
+                Add any friendly bar nicknames people write on physical slips for you (e.g.{' '}
+                <span className="text-[#DFC15E]">
+                  &ldquo;Ricky&rdquo;, &ldquo;Headband Rick&rdquo;, &ldquo;Big Burt&rdquo;, &ldquo;Dave&rdquo;
+                </span>
+                ). When a slip is written with one of your nicknames, its demerit points and stats{' '}
+                <strong className="text-[#F5F2EB]">automatically merge into your profile</strong>!
+              </p>
+
+              {/* Existing Nickname Pills */}
+              <div className="flex flex-wrap gap-1.5 pt-0.5">
+                {myAliases.length === 0 ? (
+                  <span className="font-mono-docket text-[11px] italic text-[#8E8074]">
+                    No extra slip nicknames added yet.
+                  </span>
+                ) : (
+                  myAliases.map((a) => (
+                    <span
+                      key={a.id}
+                      className="inline-flex items-center gap-1.5 rounded-xl border border-[#B87333]/40 bg-[#181411] px-2.5 py-1 font-mono-docket text-xs text-[#F5F2EB]"
+                    >
+                      <span className="text-[#DFC15E]">&ldquo;{a.alias}&rdquo;</span>
+                      <span className="text-[10px] text-[#8E8074]">
+                        &rarr; {currentMember.display_name}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteMyNickname(a.id, a.alias)}
+                        title={`Remove "${a.alias}" nickname`}
+                        className="ml-0.5 rounded p-0.5 text-[#8E8074] hover:bg-rose-500/20 hover:text-rose-300 cursor-pointer"
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </button>
+                    </span>
+                  ))
+                )}
+              </div>
+
+              {/* Add New Bar-Friendly Nickname Input */}
+              <div className="flex flex-col sm:flex-row gap-2 pt-1">
+                <input
+                  type="text"
+                  value={nicknameInput}
+                  onChange={(e) => setNicknameInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      handleAddMyNickname();
+                    }
+                  }}
+                  placeholder="Add a bar-friendly slip nickname (e.g. Ricky, Big Dave)..."
+                  className="flex-1 rounded-xl border border-white/15 bg-[#151210] px-3 py-2 font-mono-docket text-xs text-white focus:border-[#B87333] focus:outline-none"
+                />
+                <button
+                  type="button"
+                  onClick={handleAddMyNickname}
+                  disabled={addingNickname}
+                  className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-[#B87333]/60 bg-[#B87333]/20 px-3.5 py-2 font-athletic text-xs font-bold uppercase tracking-wider text-[#E8B888] hover:bg-[#B87333] hover:text-[#121212] transition disabled:opacity-50 cursor-pointer shrink-0"
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  <span>{addingNickname ? 'Linking...' : 'Add Nickname'}</span>
+                </button>
               </div>
             </div>
 
