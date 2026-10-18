@@ -1,8 +1,8 @@
 # Task Tracker — Copper Demerits (`copperdemerits.com`)
 
-## Active Sprint — v1.4.0 (Graphical `copperac.com` + Detroit/Michigan Sports Jumbotron UI & 100% Sarah Attribution)
-- [x] Attribute all 4 slips (`"The Boss Lady"`, `"YOUR BOSS!"`, `"Sarah (Cursive Signature)"`, `"The Boss - AKA Sarah"`) to **Sarah** in live `copper_demerits` DB and frontend fallback state
-- [x] Integrate official `copperac.com` Stag logo (`CopperLogo_Web.png`) and bar interior photos (`CAC_Homepage_Wall.jpg`, `CAC_Homepage_About.jpg`, `CAC_Taps_web.jpg`)
-- [x] Build animated Detroit Pro Team (Lions, Red Wings, Pistons Bad Boys, Tigers) & Michigan / MSU graphics + Copper Moscow Mule Mug meter (`src/components/MichiganSportsGraphics.tsx`)
-- [x] Redesign Leaderboard (`/`) and Wall of Slips (`/docket`) to be mostly graphical, animated, and tongue-in-cheek with minimal text
-- [x] Complete VD/VDC workflow (`v1.4.0`) and deploy to `https://copperdemerits.com`
+## Active Sprint — v1.5.0 (Cloudflare D1 + R2 Edge Backend & Staff/Patron Profile Claiming)
+- [x] Provision Cloudflare D1 database `copper-demerits-db` (`feb899d8-606e-4937-91b7-9076e2741961`) and seed all 5 members, 12 aliases, and 4 verified slips
+- [x] Provision Cloudflare R2 bucket `copper-demerits-slips` and upload all 7 authentic slip photos & crops
+- [x] Deploy Cloudflare Worker `copper-demerits-api` on `https://api.copperdemerits.com` and clean up `Supabase5`
+- [x] Build Staff & Patron Profile Claiming + 4-digit Bar PIN Login (`ClaimProfileModal.tsx`) and require login on `/submit`
+- [x] Complete VD/VDC workflow (`v1.5.0`) and deploy to `https://copperdemerits.com`

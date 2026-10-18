@@ -1,7 +1,18 @@
 import React, { useEffect, useState } from 'react';
 import { NavLink } from 'react-router-dom';
-import { Trophy, FileText, Camera, ShieldAlert, Flame, Download } from 'lucide-react';
+import {
+  Trophy,
+  FileText,
+  Camera,
+  ShieldAlert,
+  Flame,
+  Download,
+  UserCheck,
+  KeyRound,
+} from 'lucide-react';
 import { useDemerits } from '../context/DemeritsContext';
+import { ClaimProfileModal } from './ClaimProfileModal';
+import { MichiganTeamBadge, TeamBadgeMeta } from './MichiganSportsGraphics';
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>;
@@ -9,7 +20,7 @@ interface BeforeInstallPromptEvent extends Event {
 }
 
 export const Navbar: React.FC = () => {
-  const { demerits } = useDemerits();
+  const { demerits, currentMember, setIsProfileModalOpen } = useDemerits();
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
 
   useEffect(() => {
@@ -47,6 +58,7 @@ export const Navbar: React.FC = () => {
     '🏀 BAD BOYS TECH: DAVID LEE LOGGED AT 6:27 PM ("1 - SO FAR")',
     '🐙 RED WINGS PENALTY BOX: BURTIS CITED FOR NO-CALL / NO-SHOW',
     '🦁 LIONS COUNTRY: RICK CITED FOR TOO MANY SEAT MOVES + GIN & DIET COKE + THE HEADBAND',
+    '⚡ CLOUDFLARE D1 + R2 EDGE BACKEND LIVE ON COPPERDEMERITS.COM',
   ];
 
   return (
@@ -88,7 +100,7 @@ export const Navbar: React.FC = () => {
               <button
                 type="button"
                 onClick={handleInstallPwa}
-                className="inline-flex items-center gap-1.5 rounded-xl border border-[#B87333] bg-[#B87333]/20 px-3 py-1.5 font-athletic text-xs font-bold uppercase tracking-wider text-[#E8B888] transition hover:bg-[#B87333] hover:text-[#121212] cursor-pointer"
+                className="hidden sm:inline-flex items-center gap-1.5 rounded-xl border border-[#B87333] bg-[#B87333]/20 px-3 py-1.5 font-athletic text-xs font-bold uppercase tracking-wider text-[#E8B888] transition hover:bg-[#B87333] hover:text-[#121212] cursor-pointer"
               >
                 <Download className="h-3.5 w-3.5" />
                 <span>Install App</span>
@@ -103,7 +115,7 @@ export const Navbar: React.FC = () => {
                   to={to}
                   end={to === '/'}
                   className={({ isActive }) =>
-                    `relative flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-athletic uppercase tracking-wider transition-all ${
+                    `relative flex items-center gap-2 rounded-xl px-3.5 py-2 text-sm font-athletic uppercase tracking-wider transition-all ${
                       highlight
                         ? isActive
                           ? 'bg-[#B87333] text-[#121212] font-bold shadow-[0_0_18px_rgba(184,115,51,0.5)] scale-105'
@@ -124,6 +136,35 @@ export const Navbar: React.FC = () => {
                 </NavLink>
               ))}
             </nav>
+
+            {/* Claim / Login Bar Locker Pass Pill */}
+            <button
+              type="button"
+              onClick={() => setIsProfileModalOpen(true)}
+              className={`inline-flex items-center gap-2 rounded-xl border px-3 py-1.5 font-athletic text-xs sm:text-sm font-bold uppercase tracking-wider transition cursor-pointer ${
+                currentMember
+                  ? 'border-emerald-500/50 bg-emerald-950/40 text-emerald-200 hover:border-emerald-400'
+                  : 'border-[#DFC15E]/50 bg-[#DFC15E]/15 text-[#DFC15E] hover:bg-[#DFC15E] hover:text-[#121212]'
+              }`}
+            >
+              {currentMember ? (
+                <>
+                  <MichiganTeamBadge
+                    iconType={
+                      (currentMember.favorite_team as TeamBadgeMeta['iconType']) || 'lions'
+                    }
+                    size="sm"
+                  />
+                  <span className="max-w-[95px] truncate">{currentMember.display_name}</span>
+                  <UserCheck className="h-3.5 w-3.5 text-emerald-400 shrink-0" />
+                </>
+              ) : (
+                <>
+                  <KeyRound className="h-3.5 w-3.5" />
+                  <span>Claim / Sign In</span>
+                </>
+              )}
+            </button>
           </div>
         </div>
       </header>
@@ -156,6 +197,9 @@ export const Navbar: React.FC = () => {
           </NavLink>
         ))}
       </nav>
+
+      {/* Claim / Login Modal */}
+      <ClaimProfileModal />
     </>
   );
 };

@@ -13,6 +13,7 @@ import {
 import { useDemerits } from '../context/DemeritsContext';
 import {
   EnrichedDemeritSlip,
+  Member,
   PeriodMode,
 } from '../types/demerits';
 import { SlipModalViewer } from '../components/SlipModalViewer';
@@ -24,8 +25,17 @@ import {
 } from '../components/MichiganSportsGraphics';
 import { normalizeSlipDemeritItems } from '../lib/defaultData';
 
+function memberRecordTagline(members: Member[], memberId: string | null, fallback: string): string {
+  if (!memberId) return fallback;
+  const found = members.find((m) => m.id === memberId);
+  if (found?.tagline && found.tagline.trim()) {
+    return `"${found.tagline.trim().toUpperCase()}"`;
+  }
+  return fallback;
+}
+
 export const LeaderboardPage: React.FC = () => {
-  const { computeStandings, loading } = useDemerits();
+  const { computeStandings, loading, members, currentMember, setIsProfileModalOpen } = useDemerits();
 
   const [periodKey, setPeriodKey] = useState<PeriodMode>('all-time');
   const [customStartDate, setCustomStartDate] = useState<string>('2026-10-01');
@@ -281,16 +291,41 @@ export const LeaderboardPage: React.FC = () => {
                   <div>
                     <div className="flex items-start justify-between gap-3">
                       <div>
-                        <span
-                          className={`inline-block rounded-lg px-2.5 py-0.5 font-athletic text-xs font-black uppercase tracking-wider ${theme.badgeBg}`}
-                        >
-                          {theme.rankIcon}
-                        </span>
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <span
+                            className={`inline-block rounded-lg px-2.5 py-0.5 font-athletic text-xs font-black uppercase tracking-wider ${theme.badgeBg}`}
+                          >
+                            {theme.rankIcon}
+                          </span>
+                          {(() => {
+                            const memberRecord = members.find((m) => m.id === patron.memberId);
+                            const isMe = currentMember?.id === patron.memberId;
+                            return (
+                              <button
+                                type="button"
+                                onClick={() => setIsProfileModalOpen(true)}
+                                className={`inline-flex items-center gap-1 rounded-lg border px-2 py-0.5 font-mono-docket text-[10px] font-bold uppercase transition cursor-pointer ${
+                                  isMe
+                                    ? 'border-emerald-400/60 bg-emerald-500/20 text-emerald-200'
+                                    : memberRecord?.is_claimed
+                                    ? 'border-white/20 bg-black/50 text-[#D6C7B8] hover:border-[#B87333]'
+                                    : 'border-[#DFC15E]/60 bg-[#DFC15E]/15 text-[#DFC15E] hover:bg-[#DFC15E] hover:text-[#121212]'
+                                }`}
+                              >
+                                {isMe
+                                  ? '✓ YOUR CARD'
+                                  : memberRecord?.is_claimed
+                                  ? '🔒 CLAIMED'
+                                  : '⚡ CLAIM PROFILE'}
+                              </button>
+                            );
+                          })()}
+                        </div>
                         <h3 className="mt-2 font-display-tall text-4xl sm:text-5xl font-black uppercase tracking-wider text-[#F5F2EB] leading-none">
                           {patron.displayName}
                         </h3>
                         <p className="font-mono-docket text-[11px] font-bold text-[#DFC15E] mt-0.5">
-                          {theme.nickname}
+                          {memberRecordTagline(members, patron.memberId, theme.nickname)}
                         </p>
                       </div>
 

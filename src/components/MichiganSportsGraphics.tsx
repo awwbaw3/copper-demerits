@@ -377,3 +377,6 @@ export const DetroitSportsBannerStrip: React.FC<{
     </div>
   );
 };
+
+export const MichiganTeamBadge = MichiganTeamEmblem;
+

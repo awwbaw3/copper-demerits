@@ -2,6 +2,18 @@
 
 All notable changes to the **Copper Athletic Club — Ring of Honor** web application are documented in this file.
 
+## [1.5.0] - 2026-10-18
+
+### Added
+- **Full Migration to Native Cloudflare Edge Backend (`Cloudflare D1` + `Cloudflare R2` + `Cloudflare Worker`)**:
+  - Provisioned **Cloudflare D1** database `copper-demerits-db` (`feb899d8-606e-4937-91b7-9076e2741961`), **Cloudflare R2** bucket `copper-demerits-slips`, and **Cloudflare Worker** `copper-demerits-api` mapped to custom domain **`https://api.copperdemerits.com`** (and proxied via `/api/*` in `netlify.toml`).
+  - Uploaded all 7 authentic slip photos and crops to **Cloudflare R2** (`copper-demerits-slips`) and seeded all 5 members (`Rick`, `Burtis`, `Sarah`, `Matt Barnes`, `David Lee`), 12 staff aliases, and 4 verified slips into **Cloudflare D1**.
+  - Removed the temporary `copper_demerits` schema from `Supabase5` (`iqbpnkttwtugxkospdqt`) so `Supabase5` is 100% free of Copper Demerits.
+- **Staff & Patron Profile Claiming + Bar Locker Login Gate (`ClaimProfileModal.tsx`)**:
+  - Added `POST /api/claim-profile` in the Cloudflare Worker + D1 schema (`is_claimed`, `claimed_pin`, `claimed_by_contact`, `favorite_team`, `tagline`, `submitted_by_member_id`).
+  - Added [`src/components/ClaimProfileModal.tsx`](file:///D:/p/copperdemerits/src/components/ClaimProfileModal.tsx) and top-nav / leaderboard `"Claim / Sign In"` buttons so patrons (`Rick`, `Burtis`, `David Lee`, or new patrons) and staff (`Sarah`, `Burtis`, `Matt Barnes`) can claim their profile with a 4-digit Bar PIN and choose their Detroit/Michigan team emblem.
+  - Updated **Drop A Slip (`/submit`)** to require an active claimed/signed-in profile before uploading slip photos to Cloudflare R2 & D1.
+
 ## [1.4.0] - 2026-10-18
 
 ### Added

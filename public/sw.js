@@ -1,4 +1,4 @@
-const CACHE_NAME = 'copper-demerits-pwa-v1.4.0';
+const CACHE_NAME = 'copper-demerits-pwa-v1.5.0';
 const APP_SHELL = [
   '/',
   '/index.html',
@@ -37,7 +37,7 @@ self.addEventListener('fetch', (event) => {
   if (request.method !== 'GET') return;
 
   const url = new URL(request.url);
-  if (url.hostname.includes('supabase.co')) return;
+  if (url.hostname.includes('api.copperdemerits.com') || url.pathname.startsWith('/api/')) return;
 
   if (request.mode === 'navigate') {
     event.respondWith(

@@ -5,6 +5,11 @@ export interface Member {
   display_name: string;
   is_staff: boolean;
   is_patron: boolean;
+  is_claimed?: boolean;
+  claimed_by_contact?: string | null;
+  claimed_at?: string | null;
+  favorite_team?: string | null;
+  tagline?: string | null;
   created_at?: string;
 }
 
@@ -27,6 +32,7 @@ export interface DemeritSlip {
   raw_student: string;
   issuer_id: string | null;
   raw_signature: string;
+  submitted_by_member_id?: string | null;
   demerit_count: number;
   incident_date: string; // YYYY-MM-DD
   incident_time: string | null; // HH:MM

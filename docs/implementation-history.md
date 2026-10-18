@@ -4,6 +4,18 @@ Chronological log of architectural decisions, database migrations, and infrastru
 
 ---
 
+## 2026-10-18 — v1.5.0 Cloudflare D1 + R2 + Worker Backend Migration & Staff/Patron Profile Claiming
+- **Cloudflare Backend Provisioning (`https://api.copperdemerits.com`)**:
+  - Provisioned **Cloudflare D1** database `copper-demerits-db` (`feb899d8-606e-4937-91b7-9076e2741961`) and applied `cloudflare/schema.sql` (`members`, `staff_aliases`, `demerits`) + seeded all 5 members, 12 aliases, and 4 verified slips.
+  - Provisioned **Cloudflare R2** bucket `copper-demerits-slips` and uploaded all 7 slip image files (`28318.jpg`, `28318_david_lee_1827.jpg`, `20261017_211324.jpg`, `20261017_211324_burtis_2050.jpg`, `20261017_211324_burtis_2056.jpg`, `20261017_211324_rick_2109.jpg`, `Scan_20261017_212309.jpg`).
+  - Deployed **Cloudflare Worker** `copper-demerits-api` (`cloudflare/worker.js`, `wrangler.toml`) bound to `DB` (D1) and `SLIPS_BUCKET` (R2) on custom domain `https://api.copperdemerits.com`.
+  - Dropped the temporary `copper_demerits` schema from `Supabase5` (`iqbpnkttwtugxkospdqt`) so `Supabase5` is 100% untouched.
+- **Staff & Patron Profile Claiming + Upload Login Gate**:
+  - Built `src/components/ClaimProfileModal.tsx` and `/api/claim-profile` so patrons and staff can claim their roster profile (`Sarah`, `Rick`, `Burtis`, `David Lee`, `Matt Barnes`) or create a new Patron profile with a 4-digit Bar PIN and Detroit/Michigan team emblem.
+  - Updated `src/pages/SubmitSlipPage.tsx` to require a signed-in profile before uploading a slip and to record `submitted_by_member_id` on every new citation.
+
+---
+
 ## 2026-10-18 — v1.4.0 Graphical `copperac.com` & Detroit / Michigan Sports Memorabilia Jumbotron UI + 100% Sarah Attribution
 - Updated `copper_demerits.demerits` and `copper_demerits.staff_aliases` so Slip #2 (`20:56`, `Burtis`, `+2 Demerits`) maps its cursive signature (`"Sarah (Cursive Signature)"`) to **Sarah** (`33333333-3333-4333-8333-333333333333`), confirming all 4 slips / 7 demerits were issued by Sarah.
 - Downloaded official `copperac.com` visual assets (`CopperLogo_Web.png`, `CAC_Homepage_Wall.jpg`, `CAC_Homepage_About.jpg`, `CAC_Taps_web.jpg`) into `public/brand/`.

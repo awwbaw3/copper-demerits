@@ -19,7 +19,7 @@ import {
   UPLOADED_SOURCE_FILES,
   normalizeSlipDemeritItems,
 } from '../lib/defaultData';
-import { supabase, isSupabaseConfigured } from '../lib/supabase';
+import { cloudflareFetch, isCloudflareConfigured } from '../lib/supabase';
 import {
   checkDuplicateSlipImage,
   checkDuplicateCitationContent,
@@ -29,15 +29,17 @@ import {
 } from '../lib/imageDedup';
 
 const STORAGE_KEYS = {
-  MEMBERS: 'cac_demerits_members_v4',
-  ALIASES: 'cac_demerits_aliases_v4',
-  SLIPS: 'cac_demerits_slips_v4',
-  AUTO_APPROVE: 'cac_demerits_auto_approve_v4',
+  MEMBERS: 'cac_demerits_members_v5',
+  ALIASES: 'cac_demerits_aliases_v5',
+  SLIPS: 'cac_demerits_slips_v5',
+  AUTO_APPROVE: 'cac_demerits_auto_approve_v5',
+  ACTIVE_MEMBER: 'cac_demerits_active_member_v5',
 };
 
 export interface NewSlipPayload {
   raw_student: string;
   raw_signature: string;
+  submitted_by_member_id?: string | null;
   demerit_count: number;
   incident_date: string;
   incident_time: string | null;
@@ -55,6 +57,16 @@ export interface NewSlipPayload {
   mergeIfCitationDuplicate?: boolean;
 }
 
+export interface ClaimProfilePayload {
+  memberId?: string;
+  displayName?: string;
+  contact?: string;
+  pin: string;
+  favoriteTeam?: string;
+  tagline?: string;
+  role?: 'staff' | 'patron' | 'both';
+}
+
 interface DemeritsContextValue {
   members: Member[];
   aliases: StaffAlias[];
@@ -62,6 +74,14 @@ interface DemeritsContextValue {
   uploadedSourceFiles: UploadedSourceFile[];
   loading: boolean;
   isSupabaseConnected: boolean;
+  isCloudflareConnected: boolean;
+  currentMember: Member | null;
+  isProfileModalOpen: boolean;
+  setIsProfileModalOpen: (open: boolean) => void;
+  claimOrLoginProfile: (
+    payload: ClaimProfilePayload
+  ) => Promise<{ ok: boolean; member?: Member; mode?: string; error?: string }>;
+  logoutProfile: () => void;
   autoApproveSubmissions: boolean;
   setAutoApproveSubmissions: (val: boolean) => void;
   resolveStaffSignature: (rawSignature: string) => { member: Member | null; matchedAlias: string | null };
@@ -171,24 +191,15 @@ export const DemeritsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const [rawSlips, setRawSlips] = useState<DemeritSlip[]>(() =>
     sanitizeAndDeduplicateSlips(loadFromStorage(STORAGE_KEYS.SLIPS, DEFAULT_DEMERITS))
   );
+  const [currentMember, setCurrentMember] = useState<Member | null>(() =>
+    loadFromStorage<Member | null>(STORAGE_KEYS.ACTIVE_MEMBER, null)
+  );
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState<boolean>(false);
   const [autoApproveSubmissions, setAutoApproveState] = useState<boolean>(() =>
     loadFromStorage(STORAGE_KEYS.AUTO_APPROVE, true)
   );
   const [loading, setLoading] = useState<boolean>(false);
-  const [isSupabaseConnected, setIsSupabaseConnected] = useState<boolean>(false);
-
-  useEffect(() => {
-    try {
-      localStorage.removeItem('cac_demerits_members_v1');
-      localStorage.removeItem('cac_demerits_aliases_v1');
-      localStorage.removeItem('cac_demerits_slips_v1');
-      localStorage.removeItem('cac_demerits_members_v2');
-      localStorage.removeItem('cac_demerits_aliases_v2');
-      localStorage.removeItem('cac_demerits_slips_v2');
-    } catch {
-      // Ignore
-    }
-  }, []);
+  const [isCloudflareConnected, setIsCloudflareConnected] = useState<boolean>(false);
 
   useEffect(() => {
     try {
@@ -214,6 +225,18 @@ export const DemeritsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     }
   }, [rawSlips]);
 
+  useEffect(() => {
+    try {
+      if (currentMember) {
+        localStorage.setItem(STORAGE_KEYS.ACTIVE_MEMBER, JSON.stringify(currentMember));
+      } else {
+        localStorage.removeItem(STORAGE_KEYS.ACTIVE_MEMBER);
+      }
+    } catch {
+      // Ignore
+    }
+  }, [currentMember]);
+
   const setAutoApproveSubmissions = useCallback((val: boolean) => {
     setAutoApproveState(val);
     try {
@@ -223,36 +246,37 @@ export const DemeritsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     }
   }, []);
 
-  // Sync with isolated copper_demerits schema in Supabase
+  // Sync with Cloudflare D1 + R2 Worker API (`https://api.copperdemerits.com/api/bootstrap`)
   useEffect(() => {
-    if (!isSupabaseConfigured) return;
+    if (!isCloudflareConfigured) return;
 
     let cancelled = false;
-    async function syncSupabase() {
+    async function syncCloudflare() {
       setLoading(true);
       try {
-        const [membersRes, aliasesRes, slipsRes] = await Promise.all([
-          supabase.from('members').select('*').order('display_name'),
-          supabase.from('staff_aliases').select('*').order('alias'),
-          supabase
-            .from('demerits')
-            .select('*')
-            .order('incident_date', { ascending: false })
-            .order('incident_time', { ascending: false }),
-        ]);
+        const data = await cloudflareFetch<{
+          ok: boolean;
+          members: Member[];
+          aliases: StaffAlias[];
+          demerits: DemeritSlip[];
+        }>('/api/bootstrap');
 
-        if (cancelled) return;
+        if (cancelled || !data?.ok) return;
 
-        if (!membersRes.error && membersRes.data && membersRes.data.length > 0) {
-          setMembers(membersRes.data as Member[]);
+        if (Array.isArray(data.members) && data.members.length > 0) {
+          setMembers(data.members);
+          setCurrentMember((prev) => {
+            if (!prev) return null;
+            const refreshed = data.members.find((m) => m.id === prev.id);
+            return refreshed || prev;
+          });
         }
-        if (!aliasesRes.error && aliasesRes.data && aliasesRes.data.length > 0) {
-          setAliases(aliasesRes.data as StaffAlias[]);
+        if (Array.isArray(data.aliases) && data.aliases.length > 0) {
+          setAliases(data.aliases);
         }
-
-        if (!slipsRes.error && slipsRes.data && slipsRes.data.length > 0) {
+        if (Array.isArray(data.demerits) && data.demerits.length > 0) {
           const remoteSlips = sanitizeAndDeduplicateSlips(
-            (slipsRes.data as DemeritSlip[]).map((s) => ({
+            data.demerits.map((s) => ({
               ...s,
               infractions: Array.isArray(s.infractions) ? s.infractions : [],
               demerit_items: normalizeSlipDemeritItems(s),
@@ -260,19 +284,64 @@ export const DemeritsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
             }))
           );
           setRawSlips(remoteSlips);
-          setIsSupabaseConnected(true);
         }
+        setIsCloudflareConnected(true);
       } catch {
-        // Fallback to local state
+        // Fallback to local state if offline
       } finally {
         if (!cancelled) setLoading(false);
       }
     }
 
-    syncSupabase();
+    syncCloudflare();
     return () => {
       cancelled = true;
     };
+  }, []);
+
+  const claimOrLoginProfile = useCallback(
+    async (
+      payload: ClaimProfilePayload
+    ): Promise<{ ok: boolean; member?: Member; mode?: string; error?: string }> => {
+      const cleanPin = (payload.pin || '').trim();
+      if (cleanPin.length < 4) {
+        return { ok: false, error: 'Please enter a 4-digit Bar PIN.' };
+      }
+
+      try {
+        const res = await cloudflareFetch<{
+          ok: boolean;
+          mode: string;
+          member: Member;
+        }>('/api/claim-profile', {
+          method: 'POST',
+          body: JSON.stringify(payload),
+        });
+
+        if (res.ok && res.member) {
+          setMembers((prev) => {
+            const exists = prev.some((m) => m.id === res.member.id);
+            if (exists) {
+              return prev.map((m) => (m.id === res.member.id ? res.member : m));
+            }
+            return [...prev, res.member];
+          });
+          setCurrentMember(res.member);
+          return { ok: true, member: res.member, mode: res.mode };
+        }
+        return { ok: false, error: 'Could not claim profile.' };
+      } catch (err) {
+        return {
+          ok: false,
+          error: err instanceof Error ? err.message : 'Profile verification failed.',
+        };
+      }
+    },
+    []
+  );
+
+  const logoutProfile = useCallback(() => {
+    setCurrentMember(null);
   }, []);
 
   const resolveStaffSignature = useCallback(
@@ -402,7 +471,6 @@ export const DemeritsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       const nowIso = new Date().toISOString().slice(0, 10);
       const monthPrefix = nowIso.slice(0, 7);
 
-      // 1. Filter approved slips by the selected Period
       const periodSlips = demerits.filter((s) => {
         if (s.status !== 'approved' || !s.image_url) return false;
 
@@ -426,7 +494,6 @@ export const DemeritsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         return true;
       });
 
-      // 2. Build DemeritTypeSummary across all periodSlips (so the type pills show full period totals)
       const typeMap = new Map<
         string,
         {
@@ -473,7 +540,6 @@ export const DemeritsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         })
         .sort((a, b) => b.totalPoints - a.totalPoints || b.offenseCount - a.offenseCount);
 
-      // 3. Calculate Patron Standings (filtered by optional demeritType)
       const activeTypeFilter =
         filter.demeritType && filter.demeritType !== 'all' ? filter.demeritType : null;
 
@@ -604,11 +670,19 @@ export const DemeritsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           is_staff: isStaff,
         };
         setMembers((prev) => prev.map((m) => (m.id === existing.id ? updated : m)));
-        if (isSupabaseConnected) {
-          await supabase
-            .from('members')
-            .update({ is_patron: isPatron, is_staff: isStaff })
-            .eq('id', existing.id);
+        if (isCloudflareConnected) {
+          try {
+            await cloudflareFetch('/api/members', {
+              method: 'POST',
+              body: JSON.stringify({
+                display_name: trimmed,
+                is_patron: isPatron,
+                is_staff: isStaff,
+              }),
+            });
+          } catch {
+            // Keep local
+          }
         }
         return updated;
       }
@@ -621,25 +695,28 @@ export const DemeritsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         created_at: new Date().toISOString(),
       };
 
-      if (isSupabaseConnected) {
-        const { data } = await supabase
-          .from('members')
-          .insert({
-            display_name: trimmed,
-            is_patron: isPatron,
-            is_staff: isStaff,
-          })
-          .select()
-          .single();
-        if (data) {
-          newMember.id = data.id;
+      if (isCloudflareConnected) {
+        try {
+          const res = await cloudflareFetch<{ ok: boolean; member: Member }>('/api/members', {
+            method: 'POST',
+            body: JSON.stringify({
+              display_name: trimmed,
+              is_patron: isPatron,
+              is_staff: isStaff,
+            }),
+          });
+          if (res.member?.id) {
+            newMember.id = res.member.id;
+          }
+        } catch {
+          // Keep local UUID
         }
       }
 
       setMembers((prev) => [...prev, newMember]);
       return newMember;
     },
-    [members, isSupabaseConnected]
+    [members, isCloudflareConnected]
   );
 
   const submitDemeritSlip = useCallback(
@@ -700,14 +777,18 @@ export const DemeritsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
           setRawSlips((prev) => prev.map((s) => (s.id === target.id ? updatedSlip : s)));
 
-          if (isSupabaseConnected) {
-            await supabase
-              .from('demerits')
-              .update({
-                secondary_image_url: updatedSlip.secondary_image_url,
-                capture_note: updatedSlip.capture_note,
-              })
-              .eq('id', target.id);
+          if (isCloudflareConnected) {
+            try {
+              await cloudflareFetch(`/api/demerits/${target.id}`, {
+                method: 'PATCH',
+                body: JSON.stringify({
+                  secondary_image_url: updatedSlip.secondary_image_url,
+                  capture_note: updatedSlip.capture_note,
+                }),
+              });
+            } catch {
+              // Keep local
+            }
           }
 
           const patron = resolvePatronName(updatedSlip.raw_student);
@@ -753,6 +834,7 @@ export const DemeritsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         raw_student: studentTrimmed,
         issuer_id: issuer ? issuer.id : null,
         raw_signature: sigTrimmed,
+        submitted_by_member_id: payload.submitted_by_member_id || currentMember?.id || null,
         demerit_count: Math.max(1, Number(payload.demerit_count) || 1),
         incident_date: incidentDate,
         incident_time: incidentTime,
@@ -775,33 +857,17 @@ export const DemeritsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         demerit_items: resolvedItems,
       };
 
-      if (isSupabaseConnected) {
-        const { data } = await supabase
-          .from('demerits')
-          .insert({
-            patron_id: newSlip.patron_id,
-            raw_student: newSlip.raw_student,
-            issuer_id: newSlip.issuer_id,
-            raw_signature: newSlip.raw_signature,
-            demerit_count: newSlip.demerit_count,
-            incident_date: newSlip.incident_date,
-            incident_time: newSlip.incident_time ? `${newSlip.incident_time}:00` : null,
-            location_area: newSlip.location_area,
-            infractions: newSlip.infractions,
-            demerit_items: newSlip.demerit_items,
-            image_url: newSlip.image_url,
-            source_image_url: newSlip.source_image_url,
-            secondary_image_url: newSlip.secondary_image_url,
-            image_sha256: newSlip.image_sha256,
-            image_dhash: newSlip.image_dhash,
-            capture_note: newSlip.capture_note,
-            status: newSlip.status,
-          })
-          .select()
-          .single();
-
-        if (data) {
-          newSlip.id = data.id;
+      if (isCloudflareConnected) {
+        try {
+          const res = await cloudflareFetch<{ ok: boolean; slip: DemeritSlip }>('/api/demerits', {
+            method: 'POST',
+            body: JSON.stringify(newSlip),
+          });
+          if (res.slip?.id) {
+            newSlip.id = res.slip.id;
+          }
+        } catch {
+          // Keep local UUID
         }
       }
 
@@ -826,28 +892,42 @@ export const DemeritsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       resolveStaffSignature,
       addOrUpdateMember,
       autoApproveSubmissions,
-      isSupabaseConnected,
+      isCloudflareConnected,
+      currentMember,
     ]
   );
 
   const updateSlipStatus = useCallback(
     async (id: string, status: SlipStatus) => {
       setRawSlips((prev) => prev.map((s) => (s.id === id ? { ...s, status } : s)));
-      if (isSupabaseConnected) {
-        await supabase.from('demerits').update({ status }).eq('id', id);
+      if (isCloudflareConnected) {
+        try {
+          await cloudflareFetch(`/api/demerits/${id}`, {
+            method: 'PATCH',
+            body: JSON.stringify({ status }),
+          });
+        } catch {
+          // Keep local
+        }
       }
     },
-    [isSupabaseConnected]
+    [isCloudflareConnected]
   );
 
   const deleteSlip = useCallback(
     async (id: string) => {
       setRawSlips((prev) => prev.filter((s) => s.id !== id));
-      if (isSupabaseConnected) {
-        await supabase.from('demerits').delete().eq('id', id);
+      if (isCloudflareConnected) {
+        try {
+          await cloudflareFetch(`/api/demerits/${id}`, {
+            method: 'DELETE',
+          });
+        } catch {
+          // Keep local
+        }
       }
     },
-    [isSupabaseConnected]
+    [isCloudflareConnected]
   );
 
   const updateSlipAssignment = useCallback(
@@ -857,14 +937,18 @@ export const DemeritsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           s.id === id ? { ...s, patron_id: patronId, issuer_id: issuerId } : s
         )
       );
-      if (isSupabaseConnected) {
-        await supabase
-          .from('demerits')
-          .update({ patron_id: patronId, issuer_id: issuerId })
-          .eq('id', id);
+      if (isCloudflareConnected) {
+        try {
+          await cloudflareFetch(`/api/demerits/${id}`, {
+            method: 'PATCH',
+            body: JSON.stringify({ patron_id: patronId, issuer_id: issuerId }),
+          });
+        } catch {
+          // Keep local
+        }
       }
     },
-    [isSupabaseConnected]
+    [isCloudflareConnected]
   );
 
   const addStaffAlias = useCallback(
@@ -890,17 +974,20 @@ export const DemeritsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         created_at: new Date().toISOString(),
       };
 
-      if (isSupabaseConnected) {
-        const { data, error } = await supabase
-          .from('staff_aliases')
-          .insert({ alias: normalized, member_id: memberId })
-          .select()
-          .single();
-        if (error) {
-          return { ok: false, error: error.message };
-        }
-        if (data) {
-          newAlias.id = data.id;
+      if (isCloudflareConnected) {
+        try {
+          const res = await cloudflareFetch<{ ok: boolean; alias: StaffAlias }>('/api/aliases', {
+            method: 'POST',
+            body: JSON.stringify({ alias: normalized, member_id: memberId }),
+          });
+          if (res.alias?.id) {
+            newAlias.id = res.alias.id;
+          }
+        } catch (err) {
+          return {
+            ok: false,
+            error: err instanceof Error ? err.message : 'Could not save alias.',
+          };
         }
       }
 
@@ -917,17 +1004,23 @@ export const DemeritsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
       return { ok: true };
     },
-    [aliases, members, isSupabaseConnected]
+    [aliases, members, isCloudflareConnected]
   );
 
   const deleteStaffAlias = useCallback(
     async (id: string) => {
       setAliases((prev) => prev.filter((a) => a.id !== id));
-      if (isSupabaseConnected) {
-        await supabase.from('staff_aliases').delete().eq('id', id);
+      if (isCloudflareConnected) {
+        try {
+          await cloudflareFetch(`/api/aliases/${id}`, {
+            method: 'DELETE',
+          });
+        } catch {
+          // Keep local
+        }
       }
     },
-    [isSupabaseConnected]
+    [isCloudflareConnected]
   );
 
   const rerunAliasNormalization = useCallback(async (): Promise<number> => {
@@ -989,11 +1082,17 @@ export const DemeritsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     }
 
     setRawSlips(kept);
-    if (isSupabaseConnected && removedIds.length > 0) {
-      await supabase.from('demerits').delete().in('id', removedIds);
+    if (isCloudflareConnected && removedIds.length > 0) {
+      for (const id of removedIds) {
+        try {
+          await cloudflareFetch(`/api/demerits/${id}`, { method: 'DELETE' });
+        } catch {
+          // Ignore
+        }
+      }
     }
     return removedIds.length;
-  }, [rawSlips, isSupabaseConnected]);
+  }, [rawSlips, isCloudflareConnected]);
 
   return (
     <DemeritsContext.Provider
@@ -1003,7 +1102,13 @@ export const DemeritsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         demerits,
         uploadedSourceFiles: UPLOADED_SOURCE_FILES,
         loading,
-        isSupabaseConnected,
+        isSupabaseConnected: isCloudflareConnected,
+        isCloudflareConnected,
+        currentMember,
+        isProfileModalOpen,
+        setIsProfileModalOpen,
+        claimOrLoginProfile,
+        logoutProfile,
         autoApproveSubmissions,
         setAutoApproveSubmissions,
         resolveStaffSignature,

@@ -5,6 +5,7 @@ import { processAndUploadSlipImage, SLIPS_BUCKET } from '../lib/supabase';
 import { DEMERIT_CATEGORIES } from '../lib/defaultData';
 import { DemeritLineItem } from '../types/demerits';
 import { DuplicateCheckResult } from '../lib/imageDedup';
+import { MichiganTeamBadge, TeamBadgeMeta } from '../components/MichiganSportsGraphics';
 import {
   Camera,
   Upload,
@@ -19,6 +20,8 @@ import {
   Layers,
   Clock,
   Tag,
+  KeyRound,
+  UserCheck,
 } from 'lucide-react';
 
 interface SlipDraftItem {
@@ -52,6 +55,8 @@ export const SubmitSlipPage: React.FC = () => {
   const {
     members,
     aliases,
+    currentMember,
+    setIsProfileModalOpen,
     resolveStaffSignature,
     checkImageDuplicate,
     checkCitationDuplicate,
@@ -144,6 +149,12 @@ export const SubmitSlipPage: React.FC = () => {
     const file = e.target.files?.[0];
     if (!file) return;
 
+    if (!currentMember) {
+      setIsProfileModalOpen(true);
+      e.target.value = '';
+      return;
+    }
+
     setUploadingPhoto(true);
     setErrorMsg(null);
     setDuplicateAlert(null);
@@ -164,8 +175,8 @@ export const SubmitSlipPage: React.FC = () => {
         setImageSha256(asset.fingerprint.sha256);
         setImageDhash(asset.fingerprint.dhash);
         setUploadStatusMsg(
-          asset.storageMode === 'supabase'
-            ? `Verified Unique Image · Uploaded to Supabase "${SLIPS_BUCKET}" bucket`
+          asset.storageMode === 'cloudflare-r2'
+            ? `Verified Unique Image · Uploaded to Cloudflare R2 "${SLIPS_BUCKET}"`
             : `Verified Unique Image · Ready for submission`
         );
       }
@@ -180,6 +191,12 @@ export const SubmitSlipPage: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg(null);
+
+    if (!currentMember) {
+      setIsProfileModalOpen(true);
+      setErrorMsg('Please claim or sign in to your Staff or Patron profile before dropping a slip.');
+      return;
+    }
 
     if (!imageUrl) {
       setErrorMsg('Please upload or capture a photo of the physical demerit slip(s) first.');
@@ -208,6 +225,7 @@ export const SubmitSlipPage: React.FC = () => {
         const res = await submitDemeritSlip({
           raw_student: d.rawStudent,
           raw_signature: d.rawSignature,
+          submitted_by_member_id: currentMember.id,
           demerit_count: totalDemeritCount,
           incident_date: d.incidentDate,
           incident_time: d.incidentTime || null,
@@ -252,17 +270,84 @@ export const SubmitSlipPage: React.FC = () => {
       <div className="border-b border-[#B87333]/30 pb-5">
         <div className="inline-flex items-center gap-2 rounded-full border border-[#B87333]/40 bg-[#B87333]/10 px-3 py-1 text-[11px] font-mono-docket uppercase tracking-widest text-[#E8B888]">
           <Camera className="h-3.5 w-3.5 text-[#B87333]" />
-          <span>MULTI-SLIP &amp; DEMERIT TYPE LOGGER · ISOLATED SCHEMA</span>
+          <span>CLOUDFLARE D1 + R2 · PROFILE-VERIFIED SLIP LOGGER</span>
         </div>
         <h1 className="mt-2 font-athletic text-3xl sm:text-5xl font-extrabold uppercase tracking-wide text-[#F5F2EB]">
-          LOG <span className="text-[#B87333]">SLIP PHOTO</span>
+          DROP A <span className="text-[#B87333]">SLIP PHOTO</span>
         </h1>
         <p className="mt-1 text-xs sm:text-sm text-[#B5A99D]">
-          Log single-slip scans or multi-slip bar photos, specifying the exact{' '}
-          <strong>Demerit Type</strong> and <strong>Point Count</strong> for each itemized offense on
-          the slip.
+          Claim or sign in to your Staff or Patron Bar Profile to log single-slip scans or
+          multi-slip bar photos directly to Cloudflare R2 &amp; D1.
         </p>
       </div>
+
+      {/* Bar Locker Pass Gate Banner */}
+      {!currentMember ? (
+        <div className="rounded-3xl border-2 border-[#DFC15E]/60 bg-gradient-to-r from-[#241A10] via-[#1B1510] to-[#14110F] p-5 sm:p-6 shadow-[0_15px_45px_rgba(0,0,0,0.65)]">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="space-y-1.5">
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-[#DFC15E]/50 bg-[#DFC15E]/15 px-3 py-0.5 font-mono-docket text-[10px] font-bold uppercase tracking-widest text-[#DFC15E]">
+                <KeyRound className="h-3 w-3" />
+                BAR LOCKER LOGIN REQUIRED TO UPLOAD
+              </span>
+              <h2 className="font-athletic text-2xl sm:text-3xl font-black uppercase text-[#F5F2EB]">
+                CLAIM YOUR STAFF OR PATRON PROFILE FIRST
+              </h2>
+              <p className="text-xs sm:text-sm text-[#D6C7B8]">
+                Pick your card (<strong className="text-white">Sarah</strong>,{' '}
+                <strong className="text-white">Rick</strong>,{' '}
+                <strong className="text-white">Burtis</strong>,{' '}
+                <strong className="text-white">David Lee</strong>, or create a new Patron pass) with
+                a 4-digit Bar PIN so every uploaded slip is tied to a verified bar member.
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setIsProfileModalOpen(true)}
+              className="inline-flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-[#DFC15E] to-[#B87333] px-5 py-3.5 font-athletic text-base font-black uppercase tracking-wider text-[#121212] shadow-[0_0_25px_rgba(223,193,94,0.4)] hover:brightness-110 shrink-0 cursor-pointer"
+            >
+              <KeyRound className="h-4 w-4" />
+              <span>Claim / Sign In</span>
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-emerald-500/40 bg-emerald-950/25 px-4 py-3">
+          <div className="flex items-center gap-3">
+            <MichiganTeamBadge
+              iconType={
+                (currentMember.favorite_team as TeamBadgeMeta['iconType']) || 'lions'
+              }
+              size="sm"
+            />
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="font-athletic text-lg font-black uppercase text-white">
+                  Dropping Slip as {currentMember.display_name}
+                </span>
+                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/20 border border-emerald-400/40 px-2 py-0.5 font-mono-docket text-[10px] font-bold uppercase text-emerald-300">
+                  <UserCheck className="h-3 w-3" />
+                  Verified Bar Pass
+                </span>
+              </div>
+              <p className="font-mono-docket text-[11px] text-emerald-200/80">
+                {currentMember.is_staff
+                  ? 'Official Bar Referee / Staff Account'
+                  : 'Verified Ring of Honor Patron'}
+              </p>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setIsProfileModalOpen(true)}
+            className="rounded-xl border border-white/15 bg-white/5 px-3 py-1.5 font-mono-docket text-xs text-[#E8B888] hover:border-[#B87333] cursor-pointer"
+          >
+            Switch Profile
+          </button>
+        </div>
+      )}
 
       {/* Duplicate Image Blocked Alert */}
       {duplicateAlert?.isDuplicate && (
