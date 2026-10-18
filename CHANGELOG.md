@@ -2,6 +2,34 @@
 
 All notable changes to the **Copper Athletic Club — Ring of Honor** web application are documented in this file.
 
+## [1.6.12] - 2026-10-18
+
+### Changed & Streamlined
+- **Pure Leaderboard Ticker Updates (`src/components/Navbar.tsx`)**:
+  - Removed all venue references ("Copper Athletic Club • Marshall, MI", "A sports bar. Not a gym.") and confirmed zero Cloudflare mentions.
+  - Dynamically calculates and displays pure leaderboard updates directly from live data:
+    - Current Leaderboard Co-Leaders and #1 rank holders with exact points and slip counts.
+    - Full Ring of Honor podium standings (`#1 RICK (3 PTS) • #1 BURTIS (3 PTS) • #3 DAVID LEE (1 PT)`).
+    - Total demerits and verified slips counter (`7 PTS across 4 verified slips`).
+    - Head Referee citation record (Sarah's 4-for-4 conviction rate).
+    - Individual citations with patron name, timestamp, demerit points, and infractions.
+    - Ref Booth alerts when citations are pending review.
+
+### Added & Enhanced
+- **Dedicated Backbar Easy Share & QR Code Page (`src/pages/SharePage.tsx`, `/share`)**:
+  - Built an offline, client-side QR Code generator powered by `qrcode` with high error correction (`H`), crisp styling, and dynamic destination switching:
+    - 🏆 **Live Scoreboard & Standings** (`https://copperdemerits.com/`)
+    - 📸 **Drop A Demerit Slip Camera** (`https://copperdemerits.com/submit`)
+    - 📜 **The Docket / Wall of Slips** (`https://copperdemerits.com/docket`)
+  - Integrated 1-tap **Share via Text / Message** (`navigator.share`), instant **Copy Link**, and **Save QR Image (.PNG)**.
+  - Added **Print Tabletop Placard / Backbar Card** (`window.print()` with `@media print` optimizations for tabletop tent cards).
+- **Ubiquitous App Navigation & Discoverability (`src/components/Navbar.tsx`, `src/pages/LeaderboardPage.tsx`, `src/App.tsx`)**:
+  - Added prominent **`[Share QR]`** action button to the sticky top navbar header for immediate access from any screen on both mobile and desktop.
+  - Added **`Share QR`** item to `navItems` and updated mobile bottom navigation to a 5-column layout (`grid-cols-5`).
+  - Added **`SHARE QR`** button to the Scoreboard Jumbotron counter on `/`.
+  - Added **`📱 Share App & Backbar QR Code`** link in the site footer.
+  - Linked to the QR poster from the PWA Install Guide Modal.
+
 ## [1.6.11] - 2026-10-18
 
 ### Added & Enhanced

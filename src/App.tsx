@@ -6,6 +6,7 @@ import { LeaderboardPage } from './pages/LeaderboardPage';
 import { DocketPage } from './pages/DocketPage';
 import { SubmitSlipPage } from './pages/SubmitSlipPage';
 import { AdminPage } from './pages/AdminPage';
+import { SharePage } from './pages/SharePage';
 
 export const App: React.FC = () => {
   return (
@@ -18,6 +19,7 @@ export const App: React.FC = () => {
               <Route path="/" element={<LeaderboardPage />} />
               <Route path="/docket" element={<DocketPage />} />
               <Route path="/submit" element={<SubmitSlipPage />} />
+              <Route path="/share" element={<SharePage />} />
               <Route path="/admin" element={<AdminPage />} />
             </Routes>
           </main>
@@ -52,6 +54,13 @@ export const App: React.FC = () => {
                 </div>
                 <div className="flex flex-wrap items-center justify-center sm:justify-end gap-3">
                   <a
+                    href="/share"
+                    className="font-bold text-[#DFC15E] hover:text-[#E8B888] transition underline decoration-[#DFC15E]/50"
+                  >
+                    📱 Share App &amp; Backbar QR Code
+                  </a>
+                  <span>·</span>
+                  <a
                     href="https://copperac.com"
                     target="_blank"
                     rel="noopener"
@@ -69,7 +78,7 @@ export const App: React.FC = () => {
                     DR IT - The IT Ninjas
                   </a>
                   <span>·</span>
-                  <span>PWA v1.6.11</span>
+                  <span>PWA v1.6.12</span>
                 </div>
               </div>
             </div>

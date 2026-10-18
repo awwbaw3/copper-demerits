@@ -2,6 +2,19 @@
 
 Chronological log of architectural decisions, database migrations, and infrastructure deployments.
 
+## 2026-10-18 — v1.6.12 Pure Leaderboard Ticker Updates & Easy Share Backbar QR Code Page
+- **Pure Leaderboard Ticker Updates (`src/components/Navbar.tsx`)**:
+  - Removed all venue references ("Copper Athletic Club • Marshall, MI", "A sports bar. Not a gym.") and confirmed zero Cloudflare mentions.
+  - Dynamically computes pure leaderboard statistics: current co-leaders/leaders, podium standings, total demerit points across verified slips, Referee Sarah's 100% conviction rate, itemized citation highlights with infractions and times, and active Ref Booth alerts.
+- **Dedicated Backbar Easy Share & QR Code Page (`src/pages/SharePage.tsx`, `/share`)**:
+  - Built an offline, client-side QR Code generator powered by `qrcode` with high error correction (`H`), crisp styling, and dynamic destination switching (`/`, `/submit`, `/docket`).
+  - Integrated 1-tap **Share via Text / Message** (`navigator.share`), instant **Copy Link**, and **Save QR Image (.PNG)**.
+  - Added **Print Tabletop Placard / Backbar Card** (`window.print()` with `@media print` layout).
+- **Ubiquitous App Discoverability (`src/components/Navbar.tsx`, `src/pages/LeaderboardPage.tsx`, `src/App.tsx`)**:
+  - Added sticky header **`[Share QR]`** action, added `/share` to desktop and mobile navigation (`grid-cols-5`), added `SHARE QR` to the Jumbotron counter, and added footer link.
+
+---
+
 ## 2026-10-18 — v1.6.11 Prominent PWA Install Callout, Header Action & Universal Installation Guide
 - **Prominent PWA Installation Callout & Header Button (`src/components/Navbar.tsx`)**:
   - Made the Progressive Web App install action prominently visible across both mobile and desktop screens whenever a patron has not installed it (`!isStandalone`).

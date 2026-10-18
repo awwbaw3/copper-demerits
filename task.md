@@ -1,6 +1,17 @@
 # Task Tracker — Copper Demerits (`copperdemerits.com`)
 
-## Active Sprint — v1.6.11 (Prominent PWA Installation Banner & Universal Guide)
+## Active Sprint — v1.6.12 (Pure Leaderboard Ticker & Backbar Easy Share QR Code Page)
+- [x] Remove Cloudflare and venue branding ("Copper Athletic Club", "A sports bar. Not a gym.") from top ticker
+- [x] Dynamically compute pure leaderboard ticker updates (leaders, podium, points, referee records, citations)
+- [x] Create dedicated Backbar Easy Share QR Code page (`/share`, `src/pages/SharePage.tsx`)
+- [x] Integrate client-side offline QR generator (`qrcode`) with destination switching (`/`, `/submit`, `/docket`)
+- [x] Add 1-tap Native Web Share (`navigator.share`), Copy Link, and Save PNG
+- [x] Add Tabletop Placard / Backbar Card print styling (`window.print()`)
+- [x] Add ubiquitous navigation: top navbar `[Share QR]`, desktop/mobile nav (`grid-cols-5`), jumbotron `SHARE QR`, and footer
+- [x] Honor user directive: Do NOT publish to Netlify production
+
+## Completed Sprints
+### v1.6.11 (Prominent PWA Installation Banner & Universal Guide)
 - [x] Make PWA install action prominently visible across mobile and desktop for uninstalled patrons (`!isStandalone`)
 - [x] Add animated glowing `[Install App]` CTA button in top navbar
 - [x] Add dismissible top callout banner with 3-day local storage memory

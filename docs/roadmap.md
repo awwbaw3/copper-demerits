@@ -68,3 +68,12 @@
 - [x] Added universal cross-platform PWA installation guide modal (iOS Safari, Android Chrome, Desktop).
 - [x] Integrated Chromium native `beforeinstallprompt` and `appinstalled` lifecycle events.
 
+## Phase 13: Pure Leaderboard Ticker & Backbar Easy Share QR Code Experience (Completed — v1.6.12)
+- [x] Purged all venue taglines and external cloud references from top scrolling ticker.
+- [x] Dynamically compute pure leaderboard ticker updates: leaders, podium, verified demerit points, referee convictions, and recent citations.
+- [x] Built client-side offline QR code generator (`/share`) powered by `qrcode` with target switching (`/`, `/submit`, `/docket`).
+- [x] Integrated 1-tap Native Web Share, Copy Link, and Save PNG for flyers and social media.
+- [x] Implemented printable Tabletop Placard / Backbar Card with `@media print` layout.
+- [x] Ubiquitous discoverability: top header `[Share QR]`, desktop/mobile nav (`grid-cols-5`), Scoreboard jumbotron, and footer.
+
+

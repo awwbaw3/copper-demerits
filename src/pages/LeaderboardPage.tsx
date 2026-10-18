@@ -8,6 +8,7 @@ import {
   Award,
   Eye,
   X,
+  QrCode,
 } from 'lucide-react';
 import { useDemerits } from '../context/DemeritsContext';
 import {
@@ -163,10 +164,19 @@ export const LeaderboardPage: React.FC = () => {
               <div className="h-10 w-px bg-[#B87333]/30" />
               <Link
                 to="/submit"
-                className="group flex flex-col items-center justify-center rounded-xl bg-gradient-to-b from-[#E08A4E] to-[#B87333] px-4 py-2 text-[#121212] font-athletic font-black uppercase tracking-wider shadow-[0_0_20px_rgba(184,115,51,0.5)] hover:scale-105 transition"
+                className="group flex flex-col items-center justify-center rounded-xl bg-gradient-to-b from-[#E08A4E] to-[#B87333] px-3 sm:px-4 py-2 text-[#121212] font-athletic font-black uppercase tracking-wider shadow-[0_0_20px_rgba(184,115,51,0.5)] hover:scale-105 transition"
               >
                 <Camera className="h-5 w-5 mb-0.5" />
                 <span className="text-xs leading-none">ADD YOUR DEMERIT</span>
+              </Link>
+              <div className="h-10 w-px bg-[#B87333]/30" />
+              <Link
+                to="/share"
+                className="group flex flex-col items-center justify-center rounded-xl border border-[#DFC15E]/60 bg-[#DFC15E]/15 px-3 py-2 text-[#DFC15E] font-athletic font-bold uppercase tracking-wider hover:bg-[#DFC15E] hover:text-[#121212] transition"
+                title="Share Scoreboard & Backbar QR Code"
+              >
+                <QrCode className="h-5 w-5 mb-0.5" />
+                <span className="text-[11px] leading-none">SHARE QR</span>
               </Link>
             </div>
           </div>

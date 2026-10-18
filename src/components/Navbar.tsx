@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { NavLink } from 'react-router-dom';
+import React, { useEffect, useState, useMemo } from 'react';
+import { NavLink, Link } from 'react-router-dom';
 import {
   Trophy,
   FileText,
@@ -13,6 +13,7 @@ import {
   Share2,
   PlusSquare,
   X,
+  QrCode,
 } from 'lucide-react';
 import { useDemerits } from '../context/DemeritsContext';
 import { ClaimProfileModal } from './ClaimProfileModal';
@@ -24,7 +25,7 @@ interface BeforeInstallPromptEvent extends Event {
 }
 
 export const Navbar: React.FC = () => {
-  const { demerits, currentMember, setIsProfileModalOpen } = useDemerits();
+  const { demerits, currentMember, setIsProfileModalOpen, computeStandings } = useDemerits();
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [isStandalone, setIsStandalone] = useState<boolean>(() => {
     if (typeof window === 'undefined') return false;
@@ -97,27 +98,83 @@ export const Navbar: React.FC = () => {
     }
   };
 
-  const approvedSlips = demerits.filter((d) => d.status === 'approved' && Boolean(d.image_url));
-  const totalDemeritPoints = approvedSlips.reduce((sum, s) => sum + s.demerit_count, 0);
-  const pendingCount = demerits.filter((d) => d.status === 'pending').length;
+  const approvedSlips = useMemo(
+    () => demerits.filter((d) => d.status === 'approved' && Boolean(d.image_url)),
+    [demerits]
+  );
+  const totalDemeritPoints = useMemo(
+    () => approvedSlips.reduce((sum, s) => sum + s.demerit_count, 0),
+    [approvedSlips]
+  );
+  const pendingCount = useMemo(
+    () => demerits.filter((d) => d.status === 'pending').length,
+    [demerits]
+  );
 
   const navItems = [
     { to: '/', label: 'Scoreboard', icon: Trophy },
     { to: '/docket', label: 'Wall of Slips', icon: FileText },
     { to: '/submit', label: 'Drop A Slip', icon: Camera, highlight: true },
+    { to: '/share', label: 'Share QR', icon: QrCode },
     { to: '/admin', label: 'Ref Booth', icon: ShieldAlert, badge: pendingCount },
   ];
 
-  const tickerItems = [
-    '🦌 COPPER ATHLETIC CLUB • MARSHALL, MI',
-    '🍻 "A SPORTS BAR. NOT A GYM."',
-    '🚨 HEAD REFEREE SARAH ("THE BOSS / BOSS LADY") IS 4-FOR-4 ON SLIPS ISSUED',
-    '🏆 CO-LEADERS: RICK (3 PTS) & BURTIS (3 PTS)',
-    '🏀 BAD BOYS TECH: DAVID LEE LOGGED AT 6:27 PM ("1 - SO FAR")',
-    '🐙 RED WINGS PENALTY BOX: BURTIS CITED FOR NO-CALL / NO-SHOW',
-    '🦁 LIONS COUNTRY: RICK CITED FOR TOO MANY SEAT MOVES + GIN & DIET COKE + THE HEADBAND',
-    '⚡ RING OF HONOR LIVE LEADERBOARD • COPPERDEMERITS.COM',
-  ];
+  // Pure Leaderboard Updates only: Leaders, Points, Citations, and Infraction Calls (No venue or cloudflare mentions)
+  const tickerItems = useMemo(() => {
+    const items: string[] = [];
+    const { patronStandings } = computeStandings('all-time');
+
+    if (patronStandings && patronStandings.length > 0) {
+      // 1. Leaderboard Leaders
+      const topPts = patronStandings[0]?.totalDemerits || 0;
+      const leaders = patronStandings.filter((p) => p.totalDemerits === topPts);
+      if (leaders.length > 1) {
+        items.push(
+          `🏆 LEADERBOARD CO-LEADERS: ${leaders
+            .map((l) => `${l.displayName.toUpperCase()} (${l.totalDemerits} PTS)`)
+            .join(' & ')}`
+        );
+      } else if (leaders.length === 1) {
+        items.push(
+          `👑 LEADERBOARD #1: ${leaders[0].displayName.toUpperCase()} (${leaders[0].totalDemerits} PTS, ${leaders[0].slipCount} SLIP${leaders[0].slipCount === 1 ? '' : 'S'})`
+        );
+      }
+
+      // 2. Podium standings
+      const podium = patronStandings
+        .slice(0, 4)
+        .map((p, idx) => `#${idx + 1} ${p.displayName.toUpperCase()} (${p.totalDemerits} PTS)`)
+        .join(' • ');
+      items.push(`📊 RING OF HONOR STANDINGS: ${podium}`);
+    }
+
+    // 3. Demerit totals
+    items.push(`🔥 TOTAL ACTIVE DEMERITS: ${totalDemeritPoints} PTS ACROSS ${approvedSlips.length} VERIFIED SLIPS`);
+
+    // 4. Referee Calls & Infraction Records
+    items.push(`🚨 HEAD REFEREE REVIEW: SARAH ("THE BOSS") HAS 4-FOR-4 SLIPS SUSTAINED (100% CONVICTION RATE)`);
+
+    // 5. Individual Slip Infractions & Citation Highlights
+    approvedSlips.forEach((slip) => {
+      const name = (slip.patronDisplayName || slip.raw_student || 'PATRON').toUpperCase();
+      const pts = slip.demerit_count;
+      const infractions = slip.infractions?.filter(Boolean).slice(0, 2).join(' + ').toUpperCase();
+      const timeStr = slip.incident_time ? ` AT ${slip.incident_time}` : '';
+      if (name && infractions) {
+        items.push(`📋 CITATION${timeStr}: ${name} (${pts} PT${pts === 1 ? '' : 'S'}) FOR ${infractions}`);
+      }
+    });
+
+    if (pendingCount > 0) {
+      items.push(`⚖️ REF BOOTH ALERT: ${pendingCount} CITATION${pendingCount === 1 ? '' : 'S'} PENDING OFFICIAL REVIEW`);
+    }
+
+    if (items.length === 0) {
+      items.push('🏆 RING OF HONOR LEADERBOARD LIVE UPDATES', '⚡ LIVE DEMERIT FOUL CALLS & STANDINGS');
+    }
+
+    return items;
+  }, [computeStandings, approvedSlips, totalDemeritPoints, pendingCount]);
 
   return (
     <>
@@ -166,6 +223,22 @@ export const Navbar: React.FC = () => {
                 <span className="xs:hidden">Install</span>
               </button>
             )}
+
+            {/* Quick Share QR Button */}
+            <NavLink
+              to="/share"
+              className={({ isActive }) =>
+                `inline-flex items-center gap-1.5 rounded-xl border px-2.5 sm:px-3 py-1.5 font-athletic text-xs font-bold uppercase tracking-wider transition cursor-pointer ${
+                  isActive
+                    ? 'border-[#DFC15E] bg-[#DFC15E] text-[#121212] shadow-[0_0_15px_rgba(223,193,94,0.4)]'
+                    : 'border-[#DFC15E]/60 bg-[#DFC15E]/15 text-[#DFC15E] hover:bg-[#DFC15E] hover:text-[#121212]'
+                }`
+              }
+              title="Share App & View Backbar QR Code"
+            >
+              <QrCode className="h-3.5 w-3.5 stroke-[2.2]" />
+              <span className="hidden xs:inline">Share QR</span>
+            </NavLink>
 
             {/* Desktop Nav Links */}
             <nav className="hidden md:flex items-center gap-1.5">
@@ -270,7 +343,7 @@ export const Navbar: React.FC = () => {
       {/* Mobile Fixed Bottom Navigation Bar */}
       <nav
         aria-label="Mobile Navigation"
-        className="fixed bottom-0 inset-x-0 z-40 grid grid-cols-4 border-t border-[#B87333]/30 bg-[#14110F]/95 backdrop-blur-lg pb-[env(safe-area-inset-bottom)] md:hidden shadow-[0_-8px_25px_rgba(0,0,0,0.7)]"
+        className="fixed bottom-0 inset-x-0 z-40 grid grid-cols-5 border-t border-[#B87333]/30 bg-[#14110F]/95 backdrop-blur-lg pb-[env(safe-area-inset-bottom)] md:hidden shadow-[0_-8px_25px_rgba(0,0,0,0.7)]"
       >
         {navItems.map(({ to, label, icon: Icon, badge }) => (
           <NavLink
@@ -361,7 +434,15 @@ export const Navbar: React.FC = () => {
               </div>
             </div>
 
-            <div className="mt-5 pt-3 border-t border-[#B87333]/30 flex justify-end">
+            <div className="mt-5 pt-3 border-t border-[#B87333]/30 flex items-center justify-between">
+              <Link
+                to="/share"
+                onClick={() => setShowInstallGuideModal(false)}
+                className="inline-flex items-center gap-1.5 font-athletic text-xs font-bold uppercase tracking-wider text-[#DFC15E] hover:text-[#E8B888] transition cursor-pointer"
+              >
+                <QrCode className="h-4 w-4" />
+                <span>Backbar QR Poster →</span>
+              </Link>
               <button
                 type="button"
                 onClick={() => setShowInstallGuideModal(false)}
