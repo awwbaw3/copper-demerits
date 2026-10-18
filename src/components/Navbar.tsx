@@ -185,10 +185,10 @@ export const Navbar: React.FC = () => {
 
   return (
     <>
-      <header className="sticky top-0 z-40 border-b border-[#B87333]/35 bg-[#0F0D0C]/95 backdrop-blur-md">
+      <header className="sticky top-0 z-40 border-b border-[#B87333]/35 bg-[#0F0D0C]/95 backdrop-blur-md pt-[env(safe-area-inset-top,0px)] pr-[env(safe-area-inset-right,0px)] pl-[env(safe-area-inset-left,0px)]">
         {/* Animated ESPN / Fox Sports Detroit Style Ticker */}
         <div className="overflow-hidden border-b border-[#B87333]/25 bg-gradient-to-r from-[#1A120E] via-[#281A12] to-[#1A120E] py-1.5">
-          <div className="animate-ticker flex items-center gap-8 text-[11px] font-mono-docket uppercase tracking-wider text-[#E8B888]">
+          <div className="animate-ticker flex items-center gap-8 text-xs font-sans font-bold uppercase tracking-wider text-[#E8B888]">
             {[...tickerItems, ...tickerItems].map((item, idx) => (
               <span key={idx} className="inline-flex items-center gap-2 whitespace-nowrap">
                 <span>{item}</span>
@@ -200,37 +200,37 @@ export const Navbar: React.FC = () => {
 
         {/* Main Header with Official CopperAC Stag Logo */}
         <div className="mx-auto flex max-w-6xl items-center justify-between px-3 sm:px-4 py-2.5">
-          <NavLink to="/" className="group flex items-center gap-3">
+          <NavLink to="/" className="group flex items-center gap-2.5 sm:gap-3 shrink-0">
             <img
               src="/brand/CopperLogo_Web.png"
               alt="Copper Athletic Club"
               className="h-10 sm:h-12 w-auto object-contain drop-shadow-[0_0_12px_rgba(184,115,51,0.4)] transition-transform duration-300 group-hover:scale-105"
             />
-            <div className="border-l border-[#B87333]/35 pl-3">
+            <div className="border-l border-[#B87333]/35 pl-2.5 sm:pl-3">
               <span className="block font-athletic text-base sm:text-xl font-black tracking-wider uppercase text-[#F5F2EB] leading-none">
                 RING OF <span className="text-[#B87333]">DEMERITS</span>
               </span>
-              <span className="inline-flex items-center gap-1.5 font-mono-docket text-[10px] tracking-widest uppercase text-[#DFC15E] mt-0.5">
+              <span className="inline-flex items-center gap-1.5 font-sans font-bold text-[11px] tracking-wide uppercase text-[#DFC15E] mt-0.5">
                 <Flame className="h-3 w-3 text-[#C86D51]" />
                 {totalDemeritPoints} PTS · {approvedSlips.length} SLIPS
               </span>
             </div>
           </NavLink>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 sm:gap-2.5">
             {/* Prominent Share QR Code Button in Header (in place of Install button) */}
             <NavLink
               to="/share"
               className={({ isActive }) =>
-                `inline-flex items-center gap-1.5 rounded-xl border px-2.5 sm:px-3 py-1.5 font-athletic text-xs font-black uppercase tracking-wider transition active:scale-95 cursor-pointer ${
+                `inline-flex items-center justify-center gap-1.5 rounded-xl border min-h-[44px] px-3 sm:px-3.5 py-2 font-sans text-xs sm:text-sm font-bold tracking-normal transition-all active:scale-95 touch-manipulation cursor-pointer select-none ${
                   isActive
                     ? 'border-[#DFC15E] bg-gradient-to-r from-[#DFC15E] via-[#E8B888] to-[#B87333] text-[#121212] shadow-[0_0_18px_rgba(223,193,94,0.45)]'
-                    : 'border-[#DFC15E]/70 bg-[#DFC15E]/20 text-[#DFC15E] hover:bg-[#DFC15E] hover:text-[#121212] shadow-[0_0_12px_rgba(223,193,94,0.25)]'
+                    : 'border-[#B87333]/70 bg-[#281A12]/80 text-[#E8B888] hover:border-[#DFC15E] hover:text-[#DFC15E] shadow-sm'
                 }`
               }
               title="Share App & View Backbar QR Code"
             >
-              <QrCode className="h-3.5 w-3.5 stroke-[2.5]" />
+              <QrCode className="h-4 w-4 stroke-[2.2] shrink-0" />
               <span className="hidden xs:inline">Share QR</span>
               <span className="xs:hidden">QR</span>
             </NavLink>
@@ -243,21 +243,21 @@ export const Navbar: React.FC = () => {
                   to={to}
                   end={to === '/'}
                   className={({ isActive }) =>
-                    `relative flex items-center gap-2 rounded-xl px-3.5 py-2 text-sm font-athletic uppercase tracking-wider transition-all ${
+                    `relative flex items-center gap-2 rounded-xl min-h-[44px] px-3.5 py-2 text-sm font-sans font-bold uppercase tracking-wide transition-all ${
                       highlight
                         ? isActive
-                          ? 'bg-[#B87333] text-[#121212] font-bold shadow-[0_0_18px_rgba(184,115,51,0.5)] scale-105'
+                          ? 'bg-[#B87333] text-[#121212] font-black shadow-[0_0_18px_rgba(184,115,51,0.5)] scale-105'
                           : 'border border-[#B87333]/60 bg-[#B87333]/20 text-[#E8B888] hover:bg-[#B87333] hover:text-[#121212] hover:scale-105'
                         : isActive
-                        ? 'bg-white/10 text-[#F5F2EB] border border-[#B87333]/50 font-semibold'
+                        ? 'bg-white/10 text-[#F5F2EB] border border-[#B87333]/50 font-bold'
                         : 'text-[#B5A99D] hover:bg-white/5 hover:text-[#F5F2EB]'
                     }`
                   }
                 >
-                  <Icon className="h-4 w-4" />
+                  <Icon className="h-4 w-4 shrink-0" />
                   <span>{label}</span>
                   {typeof badge === 'number' && badge > 0 && (
-                    <span className="ml-1 rounded-full bg-[#C86D51] px-1.5 py-0.2 text-[10px] font-mono-docket font-bold text-[#121212]">
+                    <span className="ml-1 rounded-full bg-[#C86D51] px-1.5 py-0.2 text-[10px] font-sans font-black text-[#121212]">
                       {badge}
                     </span>
                   )}
@@ -265,15 +265,16 @@ export const Navbar: React.FC = () => {
               ))}
             </nav>
 
-            {/* Claim / Login Bar Locker Pass Pill */}
+            {/* Claim / Login Bar Locker Pass Pill - Safe Zoned 44px+ for iPhone & High Legibility Font */}
             <button
               type="button"
               onClick={() => setIsProfileModalOpen(true)}
-              className={`inline-flex items-center gap-2 rounded-xl border px-3 py-1.5 font-athletic text-xs sm:text-sm font-bold uppercase tracking-wider transition cursor-pointer ${
+              className={`inline-flex items-center justify-center gap-2 rounded-xl border min-h-[44px] px-3.5 sm:px-4 py-2 font-sans text-xs sm:text-sm font-bold tracking-normal transition-all active:scale-95 touch-manipulation cursor-pointer select-none shadow-md ${
                 currentMember
-                  ? 'border-emerald-500/50 bg-emerald-950/40 text-emerald-200 hover:border-emerald-400'
-                  : 'border-[#DFC15E]/50 bg-[#DFC15E]/15 text-[#DFC15E] hover:bg-[#DFC15E] hover:text-[#121212]'
+                  ? 'border-emerald-500/60 bg-emerald-950/70 text-emerald-100 hover:border-emerald-400 hover:bg-emerald-900/60 shadow-[0_0_12px_rgba(16,185,129,0.25)]'
+                  : 'border-[#DFC15E] bg-gradient-to-r from-[#DFC15E] via-[#E8B888] to-[#DFC15E] text-[#121212] hover:brightness-110 active:brightness-95 shadow-[0_0_16px_rgba(223,193,94,0.4)]'
               }`}
+              title={currentMember ? 'Open My Locker' : 'Sign In or Claim Your Profile'}
             >
               {currentMember ? (
                 <>
@@ -283,13 +284,13 @@ export const Navbar: React.FC = () => {
                     }
                     size="sm"
                   />
-                  <span className="max-w-[95px] truncate">{currentMember.display_name}</span>
-                  <UserCheck className="h-3.5 w-3.5 text-emerald-400 shrink-0" />
+                  <span className="max-w-[105px] truncate font-sans font-extrabold text-xs sm:text-sm">{currentMember.display_name}</span>
+                  <UserCheck className="h-4 w-4 text-emerald-400 shrink-0" />
                 </>
               ) : (
                 <>
-                  <KeyRound className="h-3.5 w-3.5" />
-                  <span>Claim / Sign In</span>
+                  <KeyRound className="h-4 w-4 shrink-0 stroke-[2.5]" />
+                  <span className="font-sans font-black text-xs sm:text-sm tracking-tight whitespace-nowrap">Sign In / Claim</span>
                 </>
               )}
             </button>
@@ -338,7 +339,7 @@ export const Navbar: React.FC = () => {
       {/* Mobile Fixed Bottom Navigation Bar */}
       <nav
         aria-label="Mobile Navigation"
-        className="fixed bottom-0 inset-x-0 z-40 grid grid-cols-5 border-t border-[#B87333]/30 bg-[#14110F]/95 backdrop-blur-lg pb-[env(safe-area-inset-bottom)] md:hidden shadow-[0_-8px_25px_rgba(0,0,0,0.7)]"
+        className="fixed bottom-0 inset-x-0 z-40 grid grid-cols-5 border-t border-[#B87333]/30 bg-[#14110F]/95 backdrop-blur-lg pb-[env(safe-area-inset-bottom,0px)] pr-[env(safe-area-inset-right,0px)] pl-[env(safe-area-inset-left,0px)] md:hidden shadow-[0_-8px_25px_rgba(0,0,0,0.7)]"
       >
         {mobileNavItems.map(({ to, label, icon: Icon, badge }) => (
           <NavLink
@@ -346,17 +347,17 @@ export const Navbar: React.FC = () => {
             to={to}
             end={to === '/'}
             className={({ isActive }) =>
-              `relative flex flex-col items-center justify-center gap-1 py-2.5 min-h-[56px] text-[11px] font-athletic uppercase tracking-wider transition-colors ${
+              `relative flex flex-col items-center justify-center gap-1 py-2 min-h-[54px] text-[11px] font-sans font-bold tracking-tight transition-all active:scale-95 touch-manipulation cursor-pointer ${
                 isActive
-                  ? 'text-[#B87333] bg-[#B87333]/15 font-bold'
-                  : 'text-[#9E8F82] active:bg-white/5'
+                  ? 'text-[#DFC15E] bg-[#DFC15E]/15 font-black'
+                  : 'text-[#B5A99D] active:bg-white/5'
               }`
             }
           >
-            <Icon className="h-5 w-5" />
-            <span>{label}</span>
+            <Icon className="h-5 w-5 shrink-0" />
+            <span className="leading-tight truncate max-w-full px-0.5">{label}</span>
             {typeof badge === 'number' && badge > 0 && (
-              <span className="absolute top-1.5 right-5 rounded-full bg-[#C86D51] px-1.5 text-[9px] font-bold text-[#121212]">
+              <span className="absolute top-1.5 right-3 rounded-full bg-[#C86D51] px-1.5 text-[9px] font-sans font-black text-[#121212]">
                 {badge}
               </span>
             )}

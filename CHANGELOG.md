@@ -2,6 +2,22 @@
 
 All notable changes to the **Copper Athletic Club — Ring of Honor** web application are documented in this file.
 
+## [1.6.14] - 2026-10-18
+
+### Added & Enhanced
+- **Apple iOS Safe-Zone Padding for Sticky Header (`src/components/Navbar.tsx`)**:
+  - Added CSS environment safe-area-inset padding to the sticky header container (`pt-[env(safe-area-inset-top,0px)] pr-[env(safe-area-inset-right,0px)] pl-[env(safe-area-inset-left,0px)]`).
+  - Completely prevents the upper login button and action bar from colliding with the iPhone notch, Dynamic Island, status bar clock, and battery icons.
+  - Eliminates accidental triggers of the iOS Safari "tap status bar to scroll to top" gesture when trying to tap the login button.
+- **Apple HIG 44x44pt Minimum Touch Target & Instant Feedback (`src/components/Navbar.tsx`, `src/components/ClaimProfileModal.tsx`)**:
+  - Expanded the upper login button to full Apple Human Interface Guidelines tap target standards (`min-h-[44px]`, `px-3.5 sm:px-4 py-2`).
+  - Added `touch-manipulation` to disable the 300ms mobile browser tap delay and added `active:scale-95` tactile depression feedback.
+  - Upgraded header `[Share QR]` button, mobile bottom navigation bar (`min-h-[54px]`, safe-area bottom padding `pb-[env(safe-area-inset-bottom,0px)]`), modal close button (`min-h-[44px] min-w-[44px]`), modal mode toggle tabs (`min-h-[44px]`), and submit buttons (`min-h-[48px]`).
+- **Font Legibility & Recognition Overhaul (`src/index.css`, `src/components/Navbar.tsx`, `src/components/ClaimProfileModal.tsx`)**:
+  - Replaced narrow/condensed uppercase typography (`font-athletic` / `Oswald` / `Bebas Neue`) on critical interactive buttons with high-legibility Apple system & Inter sans-serif typography (`font-sans font-black text-xs sm:text-sm tracking-tight`).
+  - Enhanced contrast with high-visibility gold gradient pill styling (`bg-gradient-to-r from-[#DFC15E] via-[#E8B888] to-[#DFC15E] text-[#121212]`) when signed out, and emerald badge + member name when signed in.
+  - Configured system font stack (`'Inter', -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'SF Pro Display', system-ui, sans-serif`) with antialiasing and `-webkit-tap-highlight-color: transparent` in `src/index.css`.
+
 ## [1.6.13] - 2026-10-18
 
 ### Changed & Streamlined

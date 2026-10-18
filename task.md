@@ -1,6 +1,16 @@
 # Task Tracker — Copper Demerits (`copperdemerits.com`)
 
-## Active Sprint — v1.6.13 (Header Share QR Prominence & Cloudflare Copy Purge)
+## Active Sprint — v1.6.14 (iPhone Safe-Zone Header Login Button & Font Legibility Overhaul)
+- [x] Add CSS environment safe-area-inset padding to header (`pt-[env(safe-area-inset-top,0px)] pr-[env(safe-area-inset-right,0px)] pl-[env(safe-area-inset-left,0px)]`)
+- [x] Expand upper login button to Apple HIG 44x44pt touch target (`min-h-[44px] px-3.5 py-2`)
+- [x] Add `touch-manipulation` to eliminate mobile 300ms tap delay and `active:scale-95` tactile depression feedback
+- [x] Replace condensed headline fonts (`font-athletic`) with highly recognizable Apple system / Inter typography (`font-sans font-black text-xs sm:text-sm tracking-tight`)
+- [x] Upgrade contrast with high-visibility gold gradient pill styling for signed-out state and emerald badge for signed-in state
+- [x] Apply safe area insets and 44pt touch targets to `ClaimProfileModal.tsx` and mobile bottom bar
+- [x] Honor user directive: Do NOT publish to Netlify production
+
+## Completed Sprints
+### v1.6.13 (Header Share QR Prominence & Cloudflare Copy Purge)
 - [x] Replace header action install button with prominent glowing `[Share QR]` button
 - [x] Rely on dismissible backbar banner below header for PWA installation onboarding
 - [x] Streamline desktop navigation (4 items) and retain 5-item mobile bottom nav

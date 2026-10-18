@@ -13,7 +13,10 @@
   body {
     background-color: #121212;
     color: #F5F2EB;
-    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'SF Pro Display', system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    -webkit-tap-highlight-color: transparent;
     background-image: 
       radial-gradient(circle at 50% 0%, rgba(184, 115, 51, 0.18) 0%, transparent 55%),
       radial-gradient(circle at 90% 90%, rgba(200, 109, 81, 0.12) 0%, transparent 45%);

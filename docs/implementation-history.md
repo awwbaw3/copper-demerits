@@ -2,6 +2,20 @@
 
 Chronological log of architectural decisions, database migrations, and infrastructure deployments.
 
+## 2026-10-18 — v1.6.14 iPhone Safe-Zone Header Login Button & Font Legibility Overhaul
+- **iOS Safe-Zone Padding on Sticky Header (`src/components/Navbar.tsx`)**:
+  - Implemented `pt-[env(safe-area-inset-top,0px)] pr-[env(safe-area-inset-right,0px)] pl-[env(safe-area-inset-left,0px)]` on the sticky top header.
+  - Fixes iOS Safari collision where taps near the top right collided with the iPhone status bar or Dynamic Island, triggering Safari's "tap status bar to scroll to top" instead of opening the profile modal.
+- **Apple Human Interface Guideline (HIG) 44x44pt Touch Targets (`src/components/Navbar.tsx`, `src/components/ClaimProfileModal.tsx`)**:
+  - Upgraded upper login button to `min-h-[44px]` with `px-3.5 sm:px-4 py-2`, `touch-manipulation` (zero tap lag), and `active:scale-95` tactile depression.
+  - Added safe area padding to bottom navigation bar (`pb-[env(safe-area-inset-bottom,0px)]`), modal backdrop (`pt-[env(safe-area-inset-top,12px)] pb-[env(safe-area-inset-bottom,12px)]`), and expanded touch targets on modal close (`min-h-[44px] min-w-[44px]`), mode tabs (`min-h-[44px]`), and submit buttons (`min-h-[48px]`).
+- **Font Recognition & Contrast Enhancement (`src/index.css`, `src/components/Navbar.tsx`, `src/components/ClaimProfileModal.tsx`)**:
+  - Replaced narrow condensed headline fonts (`font-athletic` / `Oswald`) on compact action buttons with Apple system / Inter sans-serif typography (`font-sans font-black text-xs sm:text-sm tracking-tight`).
+  - Added ultra-legible gold gradient styling (`bg-gradient-to-r from-[#DFC15E] via-[#E8B888] to-[#DFC15E] text-[#121212]`) when signed out, and clean emerald badge when signed in.
+  - Configured system font smoothing (`-webkit-font-smoothing: antialiased`) and disabled tap highlight flicker (`-webkit-tap-highlight-color: transparent`) in global CSS.
+
+---
+
 ## 2026-10-18 — v1.6.13 Header Share QR Prominence & Page Copy Cloudflare Purge
 - **Header Action Share QR Placement (`src/components/Navbar.tsx`)**:
   - Replaced the redundant install button in the top action row with the prominent glowing `[Share QR]` button, keeping the dismissible backbar banner below as the primary install onboarding mechanism.

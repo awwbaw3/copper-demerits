@@ -82,5 +82,11 @@
 - [x] Streamlined desktop header navigation and maintained 5-button mobile bottom bar.
 - [x] Completely eliminated Cloudflare references from all public and admin-facing copy.
 
+## Phase 15: iPhone Safe-Zone Header Login Button & Font Legibility Overhaul (Completed — v1.6.14)
+- [x] Added CSS safe-area insets (`env(safe-area-inset-top)`, `env(safe-area-inset-right)`, `env(safe-area-inset-left)`) to header container to protect against iPhone notch, Dynamic Island, and status bar touch collision.
+- [x] Expanded upper login button and header buttons to Apple HIG 44x44pt minimum touch target standards with `touch-manipulation` and tactile active feedback.
+- [x] Replaced narrow condensed headline typography with high-contrast, universally recognizable Apple system / Inter sans-serif typography (`font-sans font-black text-xs sm:text-sm`).
+- [x] Enhanced `ClaimProfileModal.tsx` and mobile bottom bar with safe-area bottom padding and 44pt+ touch targets.
+
 
 

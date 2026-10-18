@@ -509,7 +509,7 @@ export const ClaimProfileModal: React.FC = () => {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-3 sm:p-4 backdrop-blur-md"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-3 sm:p-4 backdrop-blur-md pt-[env(safe-area-inset-top,12px)] pb-[env(safe-area-inset-bottom,12px)] pr-[env(safe-area-inset-right,12px)] pl-[env(safe-area-inset-left,12px)]"
       role="dialog"
       aria-modal="true"
       aria-label="Bar Locker Profile & Sign In"
@@ -545,7 +545,8 @@ export const ClaimProfileModal: React.FC = () => {
           <button
             type="button"
             onClick={() => setIsProfileModalOpen(false)}
-            className="rounded-xl border border-white/15 bg-white/5 p-2 text-[#B5A99D] hover:border-[#B87333] hover:text-white cursor-pointer"
+            aria-label="Close modal"
+            className="flex items-center justify-center min-h-[44px] min-w-[44px] rounded-xl border border-white/15 bg-white/5 p-2 text-[#B5A99D] hover:border-[#B87333] hover:text-white cursor-pointer touch-manipulation active:scale-95"
           >
             <X className="h-5 w-5" />
           </button>
@@ -595,7 +596,7 @@ export const ClaimProfileModal: React.FC = () => {
                 setPin('');
                 setSuccessMsg(null);
               }}
-              className="inline-flex items-center gap-1.5 rounded-xl border border-rose-500/40 bg-rose-500/15 px-3 py-1.5 font-mono-docket text-xs font-bold text-rose-300 hover:bg-rose-500/25 cursor-pointer"
+              className="inline-flex items-center gap-1.5 rounded-xl border border-rose-500/40 bg-rose-500/15 px-3 py-2 min-h-[44px] touch-manipulation active:scale-95 font-sans font-bold text-xs text-rose-300 hover:bg-rose-500/25 cursor-pointer"
             >
               <LogOut className="h-3.5 w-3.5" />
               <span>Sign Out</span>
@@ -616,13 +617,13 @@ export const ClaimProfileModal: React.FC = () => {
                 setMode('my-locker');
                 setErrorMsg(null);
               }}
-              className={`flex items-center justify-center gap-1.5 rounded-xl py-2.5 font-athletic text-xs sm:text-sm font-bold uppercase tracking-wider transition cursor-pointer ${
+              className={`flex items-center justify-center gap-1.5 rounded-xl px-2 py-2.5 min-h-[44px] touch-manipulation active:scale-95 font-sans text-xs sm:text-sm font-extrabold uppercase tracking-tight transition cursor-pointer ${
                 mode === 'my-locker'
                   ? 'bg-[#B87333] text-[#121212] shadow-md'
                   : 'text-[#B5A99D] hover:text-white'
               }`}
             >
-              <Settings className="h-4 w-4" />
+              <Settings className="h-4 w-4 shrink-0" />
               <span>Edit My Profile</span>
             </button>
           )}
@@ -634,13 +635,13 @@ export const ClaimProfileModal: React.FC = () => {
               setErrorMsg(null);
               setSuccessMsg(null);
             }}
-            className={`flex items-center justify-center gap-1.5 rounded-xl py-2.5 font-athletic text-xs sm:text-sm font-bold uppercase tracking-wider transition cursor-pointer ${
+            className={`flex items-center justify-center gap-1.5 rounded-xl px-2 py-2.5 min-h-[44px] touch-manipulation active:scale-95 font-sans text-xs sm:text-sm font-extrabold uppercase tracking-tight transition cursor-pointer ${
               mode === 'login'
                 ? 'bg-[#B87333] text-[#121212] shadow-md'
                 : 'text-[#B5A99D] hover:text-white'
             }`}
           >
-            <KeyRound className="h-4 w-4" />
+            <KeyRound className="h-4 w-4 shrink-0" />
             <span>{currentMember ? 'Switch Account' : 'Sign In'}</span>
           </button>
 
@@ -651,13 +652,13 @@ export const ClaimProfileModal: React.FC = () => {
               setErrorMsg(null);
               setSuccessMsg(null);
             }}
-            className={`flex items-center justify-center gap-1.5 rounded-xl py-2.5 font-athletic text-xs sm:text-sm font-bold uppercase tracking-wider transition cursor-pointer ${
+            className={`flex items-center justify-center gap-1.5 rounded-xl px-2 py-2.5 min-h-[44px] touch-manipulation active:scale-95 font-sans text-xs sm:text-sm font-extrabold uppercase tracking-tight transition cursor-pointer ${
               mode === 'claim'
                 ? 'bg-[#B87333] text-[#121212] shadow-md'
                 : 'text-[#B5A99D] hover:text-white'
             }`}
           >
-            <UserCheck className="h-4 w-4" />
+            <UserCheck className="h-4 w-4 shrink-0" />
             <span>Claim Name ({unclaimedMembers.length})</span>
           </button>
 
@@ -670,13 +671,13 @@ export const ClaimProfileModal: React.FC = () => {
               setErrorMsg(null);
               setSuccessMsg(null);
             }}
-            className={`flex items-center justify-center gap-1.5 rounded-xl py-2.5 font-athletic text-xs sm:text-sm font-bold uppercase tracking-wider transition cursor-pointer ${
+            className={`flex items-center justify-center gap-1.5 rounded-xl px-2 py-2.5 min-h-[44px] touch-manipulation active:scale-95 font-sans text-xs sm:text-sm font-extrabold uppercase tracking-tight transition cursor-pointer ${
               mode === 'new'
                 ? 'bg-[#B87333] text-[#121212] shadow-md'
                 : 'text-[#B5A99D] hover:text-white'
             }`}
           >
-            <Plus className="h-4 w-4" />
+            <Plus className="h-4 w-4 shrink-0" />
             <span>New Profile</span>
           </button>
         </div>
@@ -1111,7 +1112,7 @@ export const ClaimProfileModal: React.FC = () => {
             <button
               type="submit"
               disabled={submitting}
-              className="flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-[#B87333] to-[#C86D51] px-5 py-3.5 font-athletic text-lg font-black uppercase tracking-wider text-[#121212] shadow-[0_0_25px_rgba(184,115,51,0.45)] transition hover:brightness-110 disabled:opacity-50 cursor-pointer"
+              className="flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-[#B87333] to-[#C86D51] px-5 py-3.5 min-h-[48px] touch-manipulation active:scale-[0.98] font-sans text-sm sm:text-base font-black uppercase tracking-tight text-[#121212] shadow-[0_0_25px_rgba(184,115,51,0.45)] transition hover:brightness-110 disabled:opacity-50 cursor-pointer"
             >
               <ShieldCheck className="h-5 w-5" />
               <span>{submitting ? 'Saving Changes...' : 'Save My Profile & Preferences'}</span>
@@ -1184,7 +1185,7 @@ export const ClaimProfileModal: React.FC = () => {
             <button
               type="submit"
               disabled={submitting}
-              className="flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-[#B87333] to-[#C86D51] px-5 py-3.5 font-athletic text-lg font-black uppercase tracking-wider text-[#121212] shadow-[0_0_25px_rgba(184,115,51,0.45)] transition hover:brightness-110 disabled:opacity-50 cursor-pointer"
+              className="flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-[#B87333] to-[#C86D51] px-5 py-3.5 min-h-[48px] touch-manipulation active:scale-[0.98] font-sans text-sm sm:text-base font-black uppercase tracking-tight text-[#121212] shadow-[0_0_25px_rgba(184,115,51,0.45)] transition hover:brightness-110 disabled:opacity-50 cursor-pointer"
             >
               <ShieldCheck className="h-5 w-5" />
               <span>{submitting ? 'Signing In...' : 'Sign In to My Locker'}</span>
@@ -1457,7 +1458,7 @@ export const ClaimProfileModal: React.FC = () => {
             <button
               type="submit"
               disabled={submitting || (mode === 'claim' && !selectedMember)}
-              className="flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-[#B87333] to-[#C86D51] px-5 py-3.5 font-athletic text-lg font-black uppercase tracking-wider text-[#121212] shadow-[0_0_25px_rgba(184,115,51,0.45)] transition hover:brightness-110 disabled:opacity-50 cursor-pointer"
+              className="flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-[#B87333] to-[#C86D51] px-5 py-3.5 min-h-[48px] touch-manipulation active:scale-[0.98] font-sans text-sm sm:text-base font-black uppercase tracking-tight text-[#121212] shadow-[0_0_25px_rgba(184,115,51,0.45)] transition hover:brightness-110 disabled:opacity-50 cursor-pointer"
             >
               <ShieldCheck className="h-5 w-5" />
               <span>
