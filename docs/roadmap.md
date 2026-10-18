@@ -20,7 +20,8 @@
 - [x] Accounted for the **3 physical slips** in `docs/20261017_211324.jpg` (`8:50 PM` Burtis +1, `8:56 PM` Burtis +2, `9:09 PM` Rick +3) and **1 physical slip scan** in `docs/Scan_20261017_212309.jpg` (`9:09 PM` Rick +3).
 - [x] Implemented 3-layer deduplication (SHA-256 + Rotation-Aware 64-bit Perceptual dHash + Citation Timestamp/Content Match).
 
-## Phase 6: Isolated `copper_demerits` Schema & Itemized Demerit Type / Period Leaderboard Engine (Completed — v1.3.0)
+## Phase 6: Isolated `copper_demerits` Schema & Itemized Demerit Type / Period Leaderboard Engine (Completed — v1.3.1)
 - [x] Isolated all Copper Demerits tables (`members`, `staff_aliases`, `demerits`, `normalize_demerit_slip()`) inside the `copper_demerits` PostgreSQL schema on `Supabase5` (`iqbpnkttwtugxkospdqt`), leaving `public` 100% clean for its Fantasy Sports Sync tables.
 - [x] Added itemized `demerit_items` (`type`, `description`, `points`) to track the exact number and category of demerits on each slip.
+- [x] Added `docs/28318.jpg` (`David Lee`, `6:27 PM`, `1 - so far` demerit for `"back talk, insubordinate"`, signed `"The Boss Lady"` → `Sarah`) as the 4th verified slip in `copper_demerits`.
 - [x] Upgraded the Leaderboard (`/`) to calculate demerit leaders across selectable time periods (`All-Time`, `This Month`, `This Week`, `Oct 17 Session`, `Custom Date Range`) and by **Demerit Type**.

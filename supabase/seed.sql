@@ -1,6 +1,6 @@
 -- ============================================================================
 -- COPPER DEMERITS — RING OF HONOR
--- Seed Script: Authentic Roster, Staff Signature Aliases, and 3 Verified Slips
+-- Seed Script: Authentic Roster, Staff Signature Aliases, and 4 Verified Slips
 -- Isolated inside schema `copper_demerits`
 -- ============================================================================
 
@@ -9,13 +9,14 @@ delete from copper_demerits.demerits;
 delete from copper_demerits.staff_aliases;
 delete from copper_demerits.members;
 
--- 1. Seed Core Roster (Rick, Burtis, Sarah, Matt Barnes)
+-- 1. Seed Core Roster (Rick, Burtis, Sarah, Matt Barnes, David Lee)
 insert into copper_demerits.members (id, display_name, is_staff, is_patron, created_at)
 values
-  ('11111111-1111-4111-8111-111111111101', 'Rick', false, true, '2026-10-17T20:00:00Z'),
-  ('11111111-1111-4111-8111-111111111102', 'Burtis', true, true, '2026-10-17T20:00:00Z'),
-  ('11111111-1111-4111-8111-111111111103', 'Sarah', true, false, '2026-10-17T20:00:00Z'),
-  ('11111111-1111-4111-8111-111111111104', 'Matt Barnes', true, false, '2026-10-17T20:00:00Z')
+  ('11111111-1111-4111-8111-111111111111', 'Rick', false, true, '2026-10-17T20:00:00Z'),
+  ('22222222-2222-4222-8222-222222222222', 'Burtis', true, true, '2026-10-17T20:00:00Z'),
+  ('33333333-3333-4333-8333-333333333333', 'Sarah', true, false, '2026-10-17T20:00:00Z'),
+  ('44444444-4444-4444-8444-444444444444', 'Matt Barnes', true, false, '2026-10-17T20:00:00Z'),
+  ('55555555-5555-4555-8555-555555555555', 'David Lee', false, true, '2026-10-17T18:27:00Z')
 on conflict (id) do update
 set display_name = excluded.display_name,
     is_staff = excluded.is_staff,
@@ -25,24 +26,26 @@ set display_name = excluded.display_name,
 insert into copper_demerits.staff_aliases (id, alias, member_id)
 values
   -- Sarah aliases
-  ('22222222-2222-4222-8222-222222222201', 'the boss', '11111111-1111-4111-8111-111111111103'),
-  ('22222222-2222-4222-8222-222222222202', 'the boss - aka sarah', '11111111-1111-4111-8111-111111111103'),
-  ('22222222-2222-4222-8222-222222222203', 'aka sarah', '11111111-1111-4111-8111-111111111103'),
-  ('22222222-2222-4222-8222-222222222204', 'sarah', '11111111-1111-4111-8111-111111111103'),
-  ('22222222-2222-4222-8222-222222222208', 'your boss!', '11111111-1111-4111-8111-111111111103'),
-  ('22222222-2222-4222-8222-222222222209', 'your boss', '11111111-1111-4111-8111-111111111103'),
+  ('33333333-3333-4333-8333-333333333301', 'the boss', '33333333-3333-4333-8333-333333333333'),
+  ('33333333-3333-4333-8333-333333333302', 'the boss - aka sarah', '33333333-3333-4333-8333-333333333333'),
+  ('33333333-3333-4333-8333-333333333303', 'aka sarah', '33333333-3333-4333-8333-333333333333'),
+  ('33333333-3333-4333-8333-333333333304', 'sarah', '33333333-3333-4333-8333-333333333333'),
+  ('33333333-3333-4333-8333-333333333308', 'your boss!', '33333333-3333-4333-8333-333333333333'),
+  ('33333333-3333-4333-8333-333333333309', 'your boss', '33333333-3333-4333-8333-333333333333'),
+  ('b1111111-1111-4111-8111-111111111111', 'the boss lady', '33333333-3333-4333-8333-333333333333'),
   -- Matt Barnes aliases
-  ('22222222-2222-4222-8222-222222222205', 'the douche', '11111111-1111-4111-8111-111111111104'),
-  ('22222222-2222-4222-8222-222222222206', 'matt barnes', '11111111-1111-4111-8111-111111111104'),
-  ('22222222-2222-4222-8222-222222222210', 'matt barnes (signature)', '11111111-1111-4111-8111-111111111104'),
+  ('33333333-3333-4333-8333-333333333305', 'the douche', '44444444-4444-4444-8444-444444444444'),
+  ('33333333-3333-4333-8333-333333333306', 'matt barnes', '44444444-4444-4444-8444-444444444444'),
+  ('33333333-3333-4333-8333-333333333310', 'matt barnes (signature)', '44444444-4444-4444-8444-444444444444'),
   -- Burtis alias
-  ('22222222-2222-4222-8222-222222222207', 'burtis', '11111111-1111-4111-8111-111111111102')
+  ('33333333-3333-4333-8333-333333333307', 'burtis', '22222222-2222-4222-8222-222222222222')
 on conflict (alias) do update
 set member_id = excluded.member_id;
 
--- 3. Seed Authentic Demerit Slips (3 Unique Slips Transcribed from the 2 Uploaded Photos)
--- Photo 1 (/slips/20261017_211324.jpg) contains all 3 slips side-by-side (8:50 PM, 8:56 PM, 9:09 PM).
--- Photo 2 (/slips/Scan_20261017_212309.jpg) is an individual scan of Rick's 9:09 PM slip (deduplicated).
+-- 3. Seed Authentic Demerit Slips (4 Unique Slips Transcribed from 3 Uploaded Photos)
+-- Photo 1 (/slips/28318.jpg) contains David Lee's 6:27 PM slip.
+-- Photo 2 (/slips/20261017_211324.jpg) contains 3 slips side-by-side (8:50 PM Burtis, 8:56 PM Burtis, 9:09 PM Rick).
+-- Photo 3 (/slips/Scan_20261017_212309.jpg) is an individual scan of Rick's 9:09 PM slip (deduplicated).
 insert into copper_demerits.demerits (
   id,
   patron_id,
@@ -56,18 +59,41 @@ insert into copper_demerits.demerits (
   infractions,
   demerit_items,
   image_url,
-  image_hash,
-  slip_fingerprint,
-  source_upload_note,
+  source_image_url,
+  secondary_image_url,
+  image_sha256,
+  image_dhash,
+  capture_note,
   status,
   created_at
 )
 values
   (
-    '33333333-3333-4333-8333-333333333301',
-    '11111111-1111-4111-8111-111111111102', -- Burtis
+    'a4444444-4444-4444-8444-444444444444',
+    '55555555-5555-4555-8555-555555555555', -- David Lee
+    'David Lee',
+    '33333333-3333-4333-8333-333333333333', -- Sarah
+    'The Boss Lady',
+    1,
+    '2026-10-17',
+    '18:27:00',
+    'Copper AC',
+    '["Back talk, insubordinate (1 - so far)"]'::jsonb,
+    '[{"type": "Insubordination / Defiance", "points": 1, "description": "Back talk, insubordinate (1 - so far)"}]'::jsonb,
+    'https://iqbpnkttwtugxkospdqt.supabase.co/storage/v1/object/public/slips/28318_david_lee_1827.jpg',
+    'https://iqbpnkttwtugxkospdqt.supabase.co/storage/v1/object/public/slips/28318.jpg',
+    null,
+    '40d781dbf9604e6a5a156d79c3387eac15c84ffdfbd7b3ac3e2e65a34c8ee6ee',
+    '6d6b692b3329096d',
+    'Single slip photo 28318.jpg (logged 6:27 PM, Oct 17, 2026 — Number of Demerits: 1 - so far)',
+    'approved',
+    '2026-10-17T22:27:00Z'
+  ),
+  (
+    'a1111111-1111-4111-8111-111111111111',
+    '22222222-2222-4222-8222-222222222222', -- Burtis
     'Burtis',
-    '11111111-1111-4111-8111-111111111103', -- Sarah
+    '33333333-3333-4333-8333-333333333333', -- Sarah
     'YOUR BOSS!',
     1,
     '2026-10-17',
@@ -75,18 +101,20 @@ values
     'Copper Bar',
     '["No call / no show to see the Red Wings"]'::jsonb,
     '[{"type": "Attendance / No-Show", "description": "No call / no show to see the Red Wings", "points": 1}]'::jsonb,
-    '/slips/20261017_211324.jpg',
-    'd0fd8fd6e86803e06ee66fb95b8e3078916ba7b4870160bb0466df529886fb08',
-    'burtis|2026-10-17|20:50|1|no call / no show to see the red wings',
-    'Left slip in 20261017_211324.jpg (3-slip bar photo)',
+    'https://iqbpnkttwtugxkospdqt.supabase.co/storage/v1/object/public/slips/20261017_211324_burtis_2050.jpg',
+    'https://iqbpnkttwtugxkospdqt.supabase.co/storage/v1/object/public/slips/20261017_211324.jpg',
+    null,
+    'a88e9b61232ff9d47abda74d8db70de8aa80ffa4037115d25ea5beacd8f3347d',
+    '6c6a6b7333290b6d',
+    'Slip 1 of 3 extracted from 20261017_211324.jpg (Top-Right slip, logged 8:50 PM)',
     'approved',
-    '2026-10-17T20:50:00Z'
+    '2026-10-18T00:50:00Z'
   ),
   (
-    '33333333-3333-4333-8333-333333333302',
-    '11111111-1111-4111-8111-111111111102', -- Burtis
+    'a2222222-2222-4222-8222-222222222222',
+    '22222222-2222-4222-8222-222222222222', -- Burtis
     'Burtis',
-    '11111111-1111-4111-8111-111111111104', -- Matt Barnes
+    '44444444-4444-4444-8444-444444444444', -- Matt Barnes
     'Matt Barnes (Signature)',
     2,
     '2026-10-17',
@@ -94,18 +122,20 @@ values
     'Copper',
     '["NOT CARING ABOUT THE FIRST DEMERIT"]'::jsonb,
     '[{"type": "Insubordination / Defiance", "description": "NOT CARING ABOUT THE FIRST DEMERIT", "points": 2}]'::jsonb,
-    '/slips/20261017_211324.jpg',
-    'd0fd8fd6e86803e06ee66fb95b8e3078916ba7b4870160bb0466df529886fb08',
-    'burtis|2026-10-17|20:56|2|not caring about the first demerit',
-    'Middle slip in 20261017_211324.jpg (3-slip bar photo)',
+    'https://iqbpnkttwtugxkospdqt.supabase.co/storage/v1/object/public/slips/20261017_211324_burtis_2056.jpg',
+    'https://iqbpnkttwtugxkospdqt.supabase.co/storage/v1/object/public/slips/20261017_211324.jpg',
+    null,
+    'de5d75f906950591314f38f2ad6fe4fde09545759ee5fba74c42905150c96ef8',
+    '4c6e69713131636d',
+    'Slip 2 of 3 extracted from 20261017_211324.jpg (Bottom-Right slip, logged 8:56 PM, +6 mins after first slip)',
     'approved',
-    '2026-10-17T20:56:00Z'
+    '2026-10-18T00:56:00Z'
   ),
   (
-    '33333333-3333-4333-8333-333333333303',
-    '11111111-1111-4111-8111-111111111101', -- Rick
+    'a3333333-3333-4333-8333-333333333333',
+    '11111111-1111-4111-8111-111111111111', -- Rick
     'Rick',
-    '11111111-1111-4111-8111-111111111103', -- Sarah
+    '33333333-3333-4333-8333-333333333333', -- Sarah
     'The Boss - AKA Sarah',
     3,
     '2026-10-17',
@@ -113,12 +143,14 @@ values
     'Copper A.C.',
     '["Too many seat moves", "Try to order Gin & Diet Coke", "The headband :) <3"]'::jsonb,
     '[{"type": "Bar Etiquette / Seating", "description": "Too many seat moves", "points": 1}, {"type": "Drink Crime / Order Foul", "description": "Try to order Gin & Diet Coke", "points": 1}, {"type": "Attire / Headgear Foul", "description": "The headband :) <3", "points": 1}]'::jsonb,
-    '/slips/Scan_20261017_212309.jpg',
-    'ed56e208fd8deef4d52b6959dc7d8beacfd8706da6c8ac1a0637f571d371e3bf',
-    'rick|2026-10-17|21:09|3|the headband :) <3|too many seat moves|try to order gin & diet coke',
-    'Appears as right slip in 20261017_211324.jpg AND single scan in Scan_20261017_212309.jpg (deduplicated)',
+    'https://iqbpnkttwtugxkospdqt.supabase.co/storage/v1/object/public/slips/Scan_20261017_212309.jpg',
+    'https://iqbpnkttwtugxkospdqt.supabase.co/storage/v1/object/public/slips/20261017_211324.jpg',
+    'https://iqbpnkttwtugxkospdqt.supabase.co/storage/v1/object/public/slips/20261017_211324_rick_2109.jpg',
+    '3c1b69a7e7b05253560753de5c6a3a2eda800f760814fb15f963f08ca106384b',
+    '7369292b29236b69',
+    'Deduplicated across 2 uploads: Slip 3 of 3 in 20261017_211324.jpg (Bottom-Left, 9:13 PM) + Single Scan in Scan_20261017_212309.jpg (9:23 PM)',
     'approved',
-    '2026-10-17T21:09:00Z'
+    '2026-10-18T01:09:00Z'
   )
 on conflict (id) do update
 set patron_id = excluded.patron_id,
@@ -132,7 +164,9 @@ set patron_id = excluded.patron_id,
     infractions = excluded.infractions,
     demerit_items = excluded.demerit_items,
     image_url = excluded.image_url,
-    image_hash = excluded.image_hash,
-    slip_fingerprint = excluded.slip_fingerprint,
-    source_upload_note = excluded.source_upload_note,
+    source_image_url = excluded.source_image_url,
+    secondary_image_url = excluded.secondary_image_url,
+    image_sha256 = excluded.image_sha256,
+    image_dhash = excluded.image_dhash,
+    capture_note = excluded.capture_note,
     status = excluded.status;

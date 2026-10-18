@@ -11,6 +11,7 @@ export const MEMBER_IDS = {
   BURTIS: '22222222-2222-4222-8222-222222222222',
   SARAH: '33333333-3333-4333-8333-333333333333',
   MATT_BARNES: '44444444-4444-4444-8444-444444444444',
+  DAVID_LEE: '55555555-5555-4555-8555-555555555555',
 } as const;
 
 export const DEMERIT_CATEGORIES = [
@@ -32,7 +33,13 @@ export function inferDemeritTypeFromDescription(desc: string): string {
   if (lower.includes('no call') || lower.includes('no show') || lower.includes('red wings')) {
     return 'Attendance / No-Show';
   }
-  if (lower.includes('not caring') || lower.includes('first demerit') || lower.includes('defian')) {
+  if (
+    lower.includes('not caring') ||
+    lower.includes('first demerit') ||
+    lower.includes('defian') ||
+    lower.includes('back talk') ||
+    lower.includes('insubordinat')
+  ) {
     return 'Insubordination / Defiance';
   }
   if (lower.includes('seat') || lower.includes('chair') || lower.includes('stool')) {
@@ -113,6 +120,13 @@ export const DEFAULT_MEMBERS: Member[] = [
     is_patron: false,
     created_at: '2026-10-17T20:00:00Z',
   },
+  {
+    id: MEMBER_IDS.DAVID_LEE,
+    display_name: 'David Lee',
+    is_staff: false,
+    is_patron: true,
+    created_at: '2026-10-17T18:27:00Z',
+  },
 ];
 
 export const DEFAULT_STAFF_ALIASES: StaffAlias[] = [
@@ -147,6 +161,11 @@ export const DEFAULT_STAFF_ALIASES: StaffAlias[] = [
     member_id: MEMBER_IDS.SARAH,
   },
   {
+    id: 'b1111111-1111-4111-8111-111111111111',
+    alias: 'the boss lady',
+    member_id: MEMBER_IDS.SARAH,
+  },
+  {
     id: '33333333-3333-4333-8333-333333333305',
     alias: 'the douche',
     member_id: MEMBER_IDS.MATT_BARNES,
@@ -172,6 +191,14 @@ export const KNOWN_UPLOADED_FILE_HASHES: Record<
   string,
   { slipId: string; description: string }
 > = {
+  '40d781dbf9604e6a5a156d79c3387eac15c84ffdfbd7b3ac3e2e65a34c8ee6ee': {
+    slipId: 'a4444444-4444-4444-8444-444444444444',
+    description: '28318.jpg (Single-Slip Photo: David Lee 6:27 PM — "Back talk, insubordinate")',
+  },
+  '6738d10aaaf8d8044454d9b17279ac1fa2f02733c0eba99cd5065714e2c57e04': {
+    slipId: 'a4444444-4444-4444-8444-444444444444',
+    description: '28318_david_lee_1827.jpg (David Lee 6:27 PM Slip Crop)',
+  },
   ecc1ca1e8a95d0cf62f82a5949e40a6044ea7bb335a2f5991cc500c4557feb36: {
     slipId: 'a3333333-3333-4333-8333-333333333333',
     description: '20261017_211324.jpg (Multi-Slip Bar Photo: Burtis 8:50 PM, Burtis 8:56 PM, Rick 9:09 PM)',
@@ -200,6 +227,27 @@ export const KNOWN_UPLOADED_FILE_HASHES: Record<
 
 export const UPLOADED_SOURCE_FILES: UploadedSourceFile[] = [
   {
+    id: 'upload-0-david-lee-photo',
+    filename: '28318.jpg',
+    capturedAt: '2026-10-17 18:27:00 (6:27 PM)',
+    slipCountInImage: 1,
+    imageUrl: '/slips/28318.jpg',
+    sha256: '40d781dbf9604e6a5a156d79c3387eac15c84ffdfbd7b3ac3e2e65a34c8ee6ee',
+    description:
+      'Single-slip bar table photo of David Lee’s 6:27 PM citation ("1 - so far" demerit for "back talk, insubordinate"), signed by The Boss Lady (Sarah).',
+    extractedSlips: [
+      {
+        label: 'Single Slip (#1 Chronological on Oct 17 — 6:27 PM)',
+        slipId: 'a4444444-4444-4444-8444-444444444444',
+        student: 'David Lee',
+        time: '6:27 PM (18:27)',
+        demerits: 1,
+        room: 'Copper AC',
+        cropUrl: '/slips/28318_david_lee_1827.jpg',
+      },
+    ],
+  },
+  {
     id: 'upload-1-multi-slip-bar-photo',
     filename: '20261017_211324.jpg',
     capturedAt: '2026-10-17 21:13:24 (9:13 PM)',
@@ -210,7 +258,7 @@ export const UPLOADED_SOURCE_FILES: UploadedSourceFile[] = [
       'Multi-slip bar table photo containing 3 physical slips written between 8:50 PM and 9:09 PM.',
     extractedSlips: [
       {
-        label: 'Top-Right Slip (#1 Chronological)',
+        label: 'Top-Right Slip (#2 Chronological)',
         slipId: 'a1111111-1111-4111-8111-111111111111',
         student: 'Burtis',
         time: '8:50 PM (20:50)',
@@ -219,7 +267,7 @@ export const UPLOADED_SOURCE_FILES: UploadedSourceFile[] = [
         cropUrl: '/slips/20261017_211324_burtis_2050.jpg',
       },
       {
-        label: 'Bottom-Right Slip (#2 Chronological, +6 mins later)',
+        label: 'Bottom-Right Slip (#3 Chronological, +6 mins later)',
         slipId: 'a2222222-2222-4222-8222-222222222222',
         student: 'Burtis',
         time: '8:56 PM (20:56)',
@@ -228,7 +276,7 @@ export const UPLOADED_SOURCE_FILES: UploadedSourceFile[] = [
         cropUrl: '/slips/20261017_211324_burtis_2056.jpg',
       },
       {
-        label: 'Bottom-Left Slip (#3 Chronological)',
+        label: 'Bottom-Left Slip (#4 Chronological)',
         slipId: 'a3333333-3333-4333-8333-333333333333',
         student: 'Rick',
         time: '9:09 PM (21:09)',
@@ -247,7 +295,7 @@ export const UPLOADED_SOURCE_FILES: UploadedSourceFile[] = [
     sha256: 'c03f872eb440b12c9835d1b84407278c39eb106df64c446c35eb06eb382def9e',
     altSha256: '3c1b69a7e7e05253560753de5c6a3a2eda800f760814fb15f963f08ca106384b',
     description:
-      'High-contrast single-slip scan of Rick’s 9:09 PM slip (taken 10 mins after the bar photo). Automatically deduplicated & merged with Slip #3 so Rick is not double-counted.',
+      'High-contrast single-slip scan of Rick’s 9:09 PM slip (taken 10 mins after the bar photo). Automatically deduplicated & merged with Slip #4 so Rick is not double-counted.',
     extractedSlips: [
       {
         label: 'Single-Slip Scan (Deduplicated Match -> 9:09 PM Rick)',
@@ -264,6 +312,34 @@ export const UPLOADED_SOURCE_FILES: UploadedSourceFile[] = [
 ];
 
 export const DEFAULT_DEMERITS: DemeritSlip[] = [
+  {
+    id: 'a4444444-4444-4444-8444-444444444444',
+    patron_id: MEMBER_IDS.DAVID_LEE,
+    raw_student: 'David Lee',
+    issuer_id: MEMBER_IDS.SARAH,
+    raw_signature: 'The Boss Lady',
+    demerit_count: 1,
+    incident_date: '2026-10-17',
+    incident_time: '18:27',
+    location_area: 'Copper AC',
+    infractions: ['Back talk, insubordinate (1 - so far)'],
+    demerit_items: [
+      {
+        type: 'Insubordination / Defiance',
+        description: 'Back talk, insubordinate (1 - so far)',
+        points: 1,
+      },
+    ],
+    image_url: '/slips/28318_david_lee_1827.jpg',
+    source_image_url: '/slips/28318.jpg',
+    secondary_image_url: null,
+    image_sha256: '40d781dbf9604e6a5a156d79c3387eac15c84ffdfbd7b3ac3e2e65a34c8ee6ee',
+    image_dhash: '6d6b692b3329096d',
+    capture_note:
+      'Single slip photo 28318.jpg (logged 6:27 PM, Oct 17, 2026 — Number of Demerits: 1 - so far)',
+    status: 'approved',
+    created_at: '2026-10-17T18:27:00-04:00',
+  },
   {
     id: 'a1111111-1111-4111-8111-111111111111',
     patron_id: MEMBER_IDS.BURTIS,
