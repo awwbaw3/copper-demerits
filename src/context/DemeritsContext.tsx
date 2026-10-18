@@ -5,11 +5,21 @@ import {
   DemeritSlip,
   EnrichedDemeritSlip,
   PatronStanding,
-  StaffEnforcerStanding,
   SlipStatus,
 } from '../types/demerits';
-import { DEFAULT_MEMBERS, DEFAULT_STAFF_ALIASES, DEFAULT_DEMERITS } from '../lib/defaultData';
-import { supabase, isSupabaseConfigured } from '../lib/supabase';
+import {
+  DEFAULT_MEMBERS,
+  DEFAULT_STAFF_ALIASES,
+  FABRICATED_SEED_SLIP_IDS,
+  MAX_OFFICIAL_SLIPS,
+} from '../lib/defaultData';
+import { supabase, isSupabaseConfigured, uploadDataUrlToSupabaseBucket } from '../lib/supabase';
+import {
+  checkDuplicateSlipImage,
+  DuplicateCheckResult,
+  fingerprintImageUrl,
+  ImageFingerprint,
+} from '../lib/imageDedup';
 
 const STORAGE_KEYS = {
   MEMBERS: 'cac_demerits_members_v1',
@@ -26,7 +36,9 @@ export interface NewSlipPayload {
   incident_time: string | null;
   location_area: string;
   infractions: string[];
-  image_url: string | null;
+  image_url: string;
+  image_sha256?: string | null;
+  image_dhash?: string | null;
   createPatronIfNew?: boolean;
 }
 
@@ -40,10 +52,10 @@ interface DemeritsContextValue {
   setAutoApproveSubmissions: (val: boolean) => void;
   resolveStaffSignature: (rawSignature: string) => { member: Member | null; matchedAlias: string | null };
   resolvePatronName: (rawStudent: string) => Member | null;
+  checkImageDuplicate: (fingerprint: Pick<ImageFingerprint, 'sha256' | 'dhash'>) => DuplicateCheckResult;
   computeStandings: (monthPrefix?: string | null) => {
     patronStandings: PatronStanding[];
     anonymousStanding: PatronStanding | null;
-    enforcerStandings: StaffEnforcerStanding[];
   };
   submitDemeritSlip: (payload: NewSlipPayload) => Promise<EnrichedDemeritSlip>;
   updateSlipStatus: (id: string, status: SlipStatus) => Promise<void>;
@@ -53,7 +65,7 @@ interface DemeritsContextValue {
   deleteStaffAlias: (id: string) => Promise<void>;
   rerunAliasNormalization: () => Promise<number>;
   addOrUpdateMember: (displayName: string, isPatron: boolean, isStaff: boolean) => Promise<Member>;
-  resetToSeedData: () => void;
+  deduplicateExistingSlips: () => Promise<number>;
 }
 
 const DemeritsContext = createContext<DemeritsContextValue | undefined>(undefined);
@@ -68,6 +80,35 @@ function loadFromStorage<T>(key: string, fallback: T): T {
   }
 }
 
+/**
+ * Purges any fabricated seed slip (no uploaded photo or matching hardcoded seed UUIDs).
+ */
+function sanitizeRealUploadedSlipsOnly(slips: DemeritSlip[]): DemeritSlip[] {
+  const valid = slips.filter(
+    (s) =>
+      s &&
+      !FABRICATED_SEED_SLIP_IDS.has(s.id) &&
+      typeof s.image_url === 'string' &&
+      s.image_url.trim().length > 0
+  );
+
+  // Deduplicate by exact image_url or image_sha256
+  const seenUrls = new Set<string>();
+  const seenSha = new Set<string>();
+  const deduped: DemeritSlip[] = [];
+
+  for (const s of valid) {
+    const urlKey = s.image_url!.trim();
+    if (seenUrls.has(urlKey)) continue;
+    if (s.image_sha256 && seenSha.has(s.image_sha256)) continue;
+    seenUrls.add(urlKey);
+    if (s.image_sha256) seenSha.add(s.image_sha256);
+    deduped.push(s);
+  }
+
+  return deduped.slice(0, MAX_OFFICIAL_SLIPS);
+}
+
 export const DemeritsProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [members, setMembers] = useState<Member[]>(() =>
     loadFromStorage(STORAGE_KEYS.MEMBERS, DEFAULT_MEMBERS)
@@ -76,7 +117,7 @@ export const DemeritsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     loadFromStorage(STORAGE_KEYS.ALIASES, DEFAULT_STAFF_ALIASES)
   );
   const [rawSlips, setRawSlips] = useState<DemeritSlip[]>(() =>
-    loadFromStorage(STORAGE_KEYS.SLIPS, DEFAULT_DEMERITS)
+    sanitizeRealUploadedSlipsOnly(loadFromStorage(STORAGE_KEYS.SLIPS, []))
   );
   const [autoApproveSubmissions, setAutoApproveState] = useState<boolean>(() =>
     loadFromStorage(STORAGE_KEYS.AUTO_APPROVE, true)
@@ -84,12 +125,12 @@ export const DemeritsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const [loading, setLoading] = useState<boolean>(false);
   const [isSupabaseConnected, setIsSupabaseConnected] = useState<boolean>(false);
 
-  // Persist to localStorage
+  // Persist sanitized slips to localStorage
   useEffect(() => {
     try {
       localStorage.setItem(STORAGE_KEYS.MEMBERS, JSON.stringify(members));
     } catch {
-      // Ignore quota errors
+      // Ignore
     }
   }, [members]);
 
@@ -118,45 +159,105 @@ export const DemeritsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     }
   }, []);
 
-  // Sync with Supabase if configured
+  // Sync with live Supabase and auto-migrate any local real uploaded images
   useEffect(() => {
-    if (!isSupabaseConfigured || !supabase) return;
+    if (!isSupabaseConfigured) return;
 
     let cancelled = false;
-    async function fetchSupabaseData() {
+    async function syncSupabaseAndMigrateLocalUploads() {
       setLoading(true);
       try {
+        // Delete any fabricated seed IDs if they ever existed in Supabase
+        await supabase
+          .from('demerits')
+          .delete()
+          .in('id', Array.from(FABRICATED_SEED_SLIP_IDS));
+
         const [membersRes, aliasesRes, slipsRes] = await Promise.all([
-          supabase!.from('members').select('*').order('display_name'),
-          supabase!.from('staff_aliases').select('*').order('alias'),
-          supabase!.from('demerits').select('*').order('incident_date', { ascending: false }),
+          supabase.from('members').select('*').order('display_name'),
+          supabase.from('staff_aliases').select('*').order('alias'),
+          supabase.from('demerits').select('*').order('incident_date', { ascending: false }),
         ]);
 
-        if (!cancelled && !membersRes.error && !aliasesRes.error && !slipsRes.error) {
-          if (membersRes.data && membersRes.data.length > 0) {
-            setMembers(membersRes.data as Member[]);
-          }
-          if (aliasesRes.data && aliasesRes.data.length > 0) {
-            setAliases(aliasesRes.data as StaffAlias[]);
-          }
-          if (slipsRes.data && slipsRes.data.length > 0) {
-            const parsedSlips = (slipsRes.data as DemeritSlip[]).map((s) => ({
-              ...s,
-              infractions: Array.isArray(s.infractions) ? s.infractions : [],
-              incident_time: s.incident_time ? s.incident_time.slice(0, 5) : null,
-            }));
-            setRawSlips(parsedSlips);
-          }
+        if (cancelled) return;
+
+        if (!membersRes.error && membersRes.data && membersRes.data.length > 0) {
+          setMembers(membersRes.data as Member[]);
+        }
+        if (!aliasesRes.error && aliasesRes.data && aliasesRes.data.length > 0) {
+          setAliases(aliasesRes.data as StaffAlias[]);
+        }
+
+        const remoteSlips = sanitizeRealUploadedSlipsOnly(
+          ((slipsRes.data || []) as DemeritSlip[]).map((s) => ({
+            ...s,
+            infractions: Array.isArray(s.infractions) ? s.infractions : [],
+            incident_time: s.incident_time ? s.incident_time.slice(0, 5) : null,
+          }))
+        );
+
+        // Check if this browser has local uploaded slips that aren't in Supabase yet
+        const localSaved = sanitizeRealUploadedSlipsOnly(
+          loadFromStorage<DemeritSlip[]>(STORAGE_KEYS.SLIPS, [])
+        );
+
+        const mergedSlips = [...remoteSlips];
+
+        for (const localSlip of localSaved) {
+          if (mergedSlips.length >= MAX_OFFICIAL_SLIPS) break;
+          if (!localSlip.image_url) continue;
+
+          const fp =
+            localSlip.image_sha256 && localSlip.image_dhash
+              ? { sha256: localSlip.image_sha256, dhash: localSlip.image_dhash }
+              : await fingerprintImageUrl(localSlip.image_url);
+
+          const dup = checkDuplicateSlipImage(fp, mergedSlips);
+          if (dup.isDuplicate) continue;
+
+          const publicUrl = await uploadDataUrlToSupabaseBucket(localSlip.image_url, fp.sha256);
+
+          const { data: inserted } = await supabase
+            .from('demerits')
+            .insert({
+              patron_id: localSlip.patron_id,
+              raw_student: localSlip.raw_student,
+              issuer_id: localSlip.issuer_id,
+              raw_signature: localSlip.raw_signature,
+              demerit_count: localSlip.demerit_count,
+              incident_date: localSlip.incident_date,
+              incident_time: localSlip.incident_time ? `${localSlip.incident_time}:00` : null,
+              location_area: localSlip.location_area || 'Copper Athletic Club',
+              infractions: localSlip.infractions,
+              image_url: publicUrl,
+              image_sha256: fp.sha256,
+              image_dhash: fp.dhash,
+              status: 'approved',
+            })
+            .select()
+            .single();
+
+          mergedSlips.push({
+            ...localSlip,
+            id: inserted?.id || localSlip.id,
+            image_url: publicUrl,
+            image_sha256: fp.sha256,
+            image_dhash: fp.dhash,
+          });
+        }
+
+        if (!cancelled) {
+          setRawSlips(mergedSlips.slice(0, MAX_OFFICIAL_SLIPS));
           setIsSupabaseConnected(true);
         }
       } catch {
-        // Fallback to local state silently
+        // Keep local sanitized state
       } finally {
         if (!cancelled) setLoading(false);
       }
     }
 
-    fetchSupabaseData();
+    syncSupabaseAndMigrateLocalUploads();
     return () => {
       cancelled = true;
     };
@@ -167,14 +268,12 @@ export const DemeritsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       const normalized = rawSignature.trim().toLowerCase();
       if (!normalized) return { member: null, matchedAlias: null };
 
-      // 1. Exact match in staff_aliases
       const exactAlias = aliases.find((a) => a.alias.toLowerCase() === normalized);
       if (exactAlias) {
         const staffMember = members.find((m) => m.id === exactAlias.member_id) || null;
         return { member: staffMember, matchedAlias: exactAlias.alias };
       }
 
-      // 2. Direct match on staff display_name
       const directStaff = members.find(
         (m) => m.is_staff && m.display_name.trim().toLowerCase() === normalized
       );
@@ -182,7 +281,6 @@ export const DemeritsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         return { member: directStaff, matchedAlias: directStaff.display_name.toLowerCase() };
       }
 
-      // 3. Substring alias match (e.g. if signature includes "aka sarah" or "the boss")
       const sortedAliases = [...aliases].sort((a, b) => b.alias.length - a.alias.length);
       for (const candidate of sortedAliases) {
         if (normalized.includes(candidate.alias.toLowerCase())) {
@@ -219,14 +317,25 @@ export const DemeritsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     [members]
   );
 
+  const checkImageDuplicate = useCallback(
+    (fingerprint: Pick<ImageFingerprint, 'sha256' | 'dhash'>): DuplicateCheckResult => {
+      return checkDuplicateSlipImage(fingerprint, rawSlips);
+    },
+    [rawSlips]
+  );
+
   const demerits: EnrichedDemeritSlip[] = useMemo(() => {
-    const sorted = [...rawSlips].sort((a, b) => {
+    const validUploadedOnly = rawSlips.filter(
+      (s) => !FABRICATED_SEED_SLIP_IDS.has(s.id) && Boolean(s.image_url)
+    );
+
+    const sorted = [...validUploadedOnly].sort((a, b) => {
       const dateCmp = b.incident_date.localeCompare(a.incident_date);
       if (dateCmp !== 0) return dateCmp;
-      return (b.incident_time || '00:00').localeCompare(a.incident_time || '00:00');
+      return (b.incident_time || '').localeCompare(a.incident_time || '');
     });
 
-    return sorted.map((slip) => {
+    return sorted.slice(0, MAX_OFFICIAL_SLIPS).map((slip) => {
       const patron = slip.patron_id
         ? members.find((m) => m.id === slip.patron_id) || null
         : resolvePatronName(slip.raw_student);
@@ -241,7 +350,7 @@ export const DemeritsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         patron,
         issuer,
         patronDisplayName: patron ? patron.display_name : slip.raw_student || 'Anonymous Patron',
-        issuerDisplayName: issuer ? issuer.display_name : slip.raw_signature || 'Unverified Staff',
+        issuerDisplayName: issuer ? issuer.display_name : slip.raw_signature || 'Staff',
         matchedAlias: resolvedSig.matchedAlias,
       };
     });
@@ -251,42 +360,39 @@ export const DemeritsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     (monthPrefix?: string | null) => {
       const approvedSlips = demerits.filter((s) => {
         if (s.status !== 'approved') return false;
+        if (!s.image_url) return false;
         if (monthPrefix && monthPrefix !== 'all-time') {
           return s.incident_date.startsWith(monthPrefix);
         }
         return true;
       });
 
-      // Build Patron Standings for all members where is_patron = true
       const patronMap = new Map<string, PatronStanding>();
-
-      for (const m of members.filter((mem) => mem.is_patron)) {
-        patronMap.set(m.id, {
-          memberId: m.id,
-          displayName: m.display_name,
-          isStaff: m.is_staff,
-          isPatron: m.is_patron,
-          isAnonymous: false,
-          totalDemerits: 0,
-          slipCount: 0,
-          issuedDemerits: 0,
-          issuedSlipCount: 0,
-          netScore: 0,
-          latestIncidentDate: null,
-          recentInfractions: [],
-          slips: [],
-        });
-      }
-
       let anonymousStanding: PatronStanding | null = null;
 
       for (const slip of approvedSlips) {
-        // Count demerits received
         const pId = slip.patron?.id || slip.patron_id;
-        if (pId && patronMap.has(pId)) {
+        if (pId) {
+          if (!patronMap.has(pId)) {
+            const m = members.find((mem) => mem.id === pId);
+            patronMap.set(pId, {
+              memberId: pId,
+              displayName: m?.display_name || slip.patronDisplayName,
+              isStaff: Boolean(m?.is_staff),
+              isPatron: true,
+              isAnonymous: false,
+              totalDemerits: 0,
+              slipCount: 0,
+              netScore: 0,
+              latestIncidentDate: null,
+              recentInfractions: [],
+              slips: [],
+            });
+          }
           const entry = patronMap.get(pId)!;
           entry.totalDemerits += slip.demerit_count;
           entry.slipCount += 1;
+          entry.netScore = entry.totalDemerits;
           entry.slips.push(slip);
           if (!entry.latestIncidentDate || slip.incident_date > entry.latestIncidentDate) {
             entry.latestIncidentDate = slip.incident_date;
@@ -297,18 +403,15 @@ export const DemeritsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
             }
           }
         } else {
-          // Anonymous or unlinked patron
           if (!anonymousStanding) {
             anonymousStanding = {
               memberId: null,
-              displayName: 'Anonymous Patron',
+              displayName: slip.patronDisplayName || 'Anonymous Patron',
               isStaff: false,
               isPatron: true,
               isAnonymous: true,
               totalDemerits: 0,
               slipCount: 0,
-              issuedDemerits: 0,
-              issuedSlipCount: 0,
               netScore: 0,
               latestIncidentDate: null,
               recentInfractions: [],
@@ -317,6 +420,7 @@ export const DemeritsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           }
           anonymousStanding.totalDemerits += slip.demerit_count;
           anonymousStanding.slipCount += 1;
+          anonymousStanding.netScore = anonymousStanding.totalDemerits;
           anonymousStanding.slips.push(slip);
           if (
             !anonymousStanding.latestIncidentDate ||
@@ -330,63 +434,16 @@ export const DemeritsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
             }
           }
         }
-
-        // Count demerits issued if the issuer is also a patron (e.g. Burtis!)
-        const iId = slip.issuer?.id || slip.issuer_id;
-        if (iId && patronMap.has(iId)) {
-          const issuerEntry = patronMap.get(iId)!;
-          issuerEntry.issuedDemerits += slip.demerit_count;
-          issuerEntry.issuedSlipCount += 1;
-        }
       }
 
-      const patronStandings = Array.from(patronMap.values()).map((entry) => ({
-        ...entry,
-        netScore: entry.totalDemerits - entry.issuedDemerits,
-      }));
-
-      patronStandings.sort((a, b) => {
+      const patronStandings = Array.from(patronMap.values()).sort((a, b) => {
         if (b.totalDemerits !== a.totalDemerits) return b.totalDemerits - a.totalDemerits;
-        if (b.netScore !== a.netScore) return b.netScore - a.netScore;
         return a.displayName.localeCompare(b.displayName);
       });
 
-      if (anonymousStanding) {
-        anonymousStanding.netScore = anonymousStanding.totalDemerits;
-      }
-
-      // Build Staff Enforcer Standings
-      const enforcerStandings: StaffEnforcerStanding[] = members
-        .filter((m) => m.is_staff)
-        .map((staff) => {
-          const staffAliases = aliases
-            .filter((a) => a.member_id === staff.id)
-            .map((a) => a.alias);
-          const issuedSlips = approvedSlips.filter(
-            (s) => (s.issuer?.id || s.issuer_id) === staff.id
-          );
-          const issuedDemerits = issuedSlips.reduce((sum, s) => sum + s.demerit_count, 0);
-          const latestIssuedDate =
-            issuedSlips.length > 0
-              ? issuedSlips.reduce(
-                  (max, s) => (s.incident_date > max ? s.incident_date : max),
-                  issuedSlips[0].incident_date
-                )
-              : null;
-
-          return {
-            member: staff,
-            aliases: staffAliases,
-            issuedDemerits,
-            issuedSlipCount: issuedSlips.length,
-            latestIssuedDate,
-          };
-        })
-        .sort((a, b) => b.issuedDemerits - a.issuedDemerits);
-
-      return { patronStandings, anonymousStanding, enforcerStandings };
+      return { patronStandings, anonymousStanding };
     },
-    [demerits, members, aliases]
+    [demerits, members]
   );
 
   const addOrUpdateMember = useCallback(
@@ -404,7 +461,7 @@ export const DemeritsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           is_staff: isStaff,
         };
         setMembers((prev) => prev.map((m) => (m.id === existing.id ? updated : m)));
-        if (supabase && isSupabaseConnected) {
+        if (isSupabaseConnected) {
           await supabase
             .from('members')
             .update({ is_patron: isPatron, is_staff: isStaff })
@@ -421,7 +478,7 @@ export const DemeritsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         created_at: new Date().toISOString(),
       };
 
-      if (supabase && isSupabaseConnected) {
+      if (isSupabaseConnected) {
         const { data } = await supabase
           .from('members')
           .insert({
@@ -444,8 +501,30 @@ export const DemeritsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
   const submitDemeritSlip = useCallback(
     async (payload: NewSlipPayload): Promise<EnrichedDemeritSlip> => {
+      if (!payload.image_url) {
+        throw new Error('An uploaded slip photo is required.');
+      }
+
+      // Enforce duplicate check before saving
+      if (payload.image_sha256 || payload.image_dhash) {
+        const dup = checkDuplicateSlipImage(
+          {
+            sha256: payload.image_sha256 || '',
+            dhash: payload.image_dhash || '',
+          },
+          rawSlips
+        );
+        if (dup.isDuplicate) {
+          throw new Error(
+            `Duplicate slip photo detected (${dup.similarityPercent ?? 100}% match with an already uploaded slip for ${
+              dup.matchedSlip?.raw_student || 'a patron'
+            }).`
+          );
+        }
+      }
+
       const studentTrimmed = payload.raw_student.trim() || 'Anonymous Patron';
-      const sigTrimmed = payload.raw_signature.trim() || 'Unverified Staff';
+      const sigTrimmed = payload.raw_signature.trim() || 'Staff';
 
       let patron = resolvePatronName(studentTrimmed);
       if (
@@ -467,16 +546,18 @@ export const DemeritsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         raw_signature: sigTrimmed,
         demerit_count: Math.max(1, Number(payload.demerit_count) || 1),
         incident_date: payload.incident_date || new Date().toISOString().slice(0, 10),
-        incident_time: payload.incident_time || null,
+        incident_time: payload.incident_time ? payload.incident_time.slice(0, 5) : null,
         location_area: payload.location_area.trim() || 'Copper Athletic Club',
         infractions: payload.infractions.map((i) => i.trim()).filter(Boolean),
         image_url: payload.image_url,
+        image_sha256: payload.image_sha256 || null,
+        image_dhash: payload.image_dhash || null,
         status: initialStatus,
         created_at: new Date().toISOString(),
       };
 
-      if (supabase && isSupabaseConnected) {
-        const { data } = await supabase
+      if (isSupabaseConnected) {
+        const { data, error } = await supabase
           .from('demerits')
           .insert({
             patron_id: newSlip.patron_id,
@@ -489,17 +570,22 @@ export const DemeritsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
             location_area: newSlip.location_area,
             infractions: newSlip.infractions,
             image_url: newSlip.image_url,
+            image_sha256: newSlip.image_sha256,
+            image_dhash: newSlip.image_dhash,
             status: newSlip.status,
           })
           .select()
           .single();
 
+        if (error && error.code === '23505') {
+          throw new Error('Duplicate slip photo: this exact image has already been uploaded.');
+        }
         if (data) {
           newSlip.id = data.id;
         }
       }
 
-      setRawSlips((prev) => [newSlip, ...prev]);
+      setRawSlips((prev) => [newSlip, ...prev].slice(0, MAX_OFFICIAL_SLIPS));
 
       return {
         ...newSlip,
@@ -510,13 +596,20 @@ export const DemeritsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         matchedAlias,
       };
     },
-    [resolvePatronName, resolveStaffSignature, addOrUpdateMember, autoApproveSubmissions, isSupabaseConnected]
+    [
+      rawSlips,
+      resolvePatronName,
+      resolveStaffSignature,
+      addOrUpdateMember,
+      autoApproveSubmissions,
+      isSupabaseConnected,
+    ]
   );
 
   const updateSlipStatus = useCallback(
     async (id: string, status: SlipStatus) => {
       setRawSlips((prev) => prev.map((s) => (s.id === id ? { ...s, status } : s)));
-      if (supabase && isSupabaseConnected) {
+      if (isSupabaseConnected) {
         await supabase.from('demerits').update({ status }).eq('id', id);
       }
     },
@@ -526,7 +619,7 @@ export const DemeritsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const deleteSlip = useCallback(
     async (id: string) => {
       setRawSlips((prev) => prev.filter((s) => s.id !== id));
-      if (supabase && isSupabaseConnected) {
+      if (isSupabaseConnected) {
         await supabase.from('demerits').delete().eq('id', id);
       }
     },
@@ -540,7 +633,7 @@ export const DemeritsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           s.id === id ? { ...s, patron_id: patronId, issuer_id: issuerId } : s
         )
       );
-      if (supabase && isSupabaseConnected) {
+      if (isSupabaseConnected) {
         await supabase
           .from('demerits')
           .update({ patron_id: patronId, issuer_id: issuerId })
@@ -573,7 +666,7 @@ export const DemeritsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         created_at: new Date().toISOString(),
       };
 
-      if (supabase && isSupabaseConnected) {
+      if (isSupabaseConnected) {
         const { data, error } = await supabase
           .from('staff_aliases')
           .insert({ alias: normalized, member_id: memberId })
@@ -589,7 +682,6 @@ export const DemeritsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
       setAliases((prev) => [...prev, newAlias]);
 
-      // Automatically link any existing slips that match this new alias
       setRawSlips((prev) =>
         prev.map((s) => {
           if (s.raw_signature.trim().toLowerCase() === normalized) {
@@ -607,7 +699,7 @@ export const DemeritsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const deleteStaffAlias = useCallback(
     async (id: string) => {
       setAliases((prev) => prev.filter((a) => a.id !== id));
-      if (supabase && isSupabaseConnected) {
+      if (isSupabaseConnected) {
         await supabase.from('staff_aliases').delete().eq('id', id);
       }
     },
@@ -637,14 +729,39 @@ export const DemeritsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     return updatedCount;
   }, [resolveStaffSignature, resolvePatronName]);
 
-  const resetToSeedData = useCallback(() => {
-    setMembers(DEFAULT_MEMBERS);
-    setAliases(DEFAULT_STAFF_ALIASES);
-    setRawSlips(DEFAULT_DEMERITS);
-    localStorage.setItem(STORAGE_KEYS.MEMBERS, JSON.stringify(DEFAULT_MEMBERS));
-    localStorage.setItem(STORAGE_KEYS.ALIASES, JSON.stringify(DEFAULT_STAFF_ALIASES));
-    localStorage.setItem(STORAGE_KEYS.SLIPS, JSON.stringify(DEFAULT_DEMERITS));
-  }, []);
+  const deduplicateExistingSlips = useCallback(async (): Promise<number> => {
+    const kept: DemeritSlip[] = [];
+    const removedIds: string[] = [];
+
+    for (const slip of rawSlips) {
+      if (!slip.image_url || FABRICATED_SEED_SLIP_IDS.has(slip.id)) {
+        removedIds.push(slip.id);
+        continue;
+      }
+
+      const fp =
+        slip.image_sha256 && slip.image_dhash
+          ? { sha256: slip.image_sha256, dhash: slip.image_dhash }
+          : await fingerprintImageUrl(slip.image_url);
+
+      const dup = checkDuplicateSlipImage(fp, kept);
+      if (dup.isDuplicate || kept.length >= MAX_OFFICIAL_SLIPS) {
+        removedIds.push(slip.id);
+      } else {
+        kept.push({
+          ...slip,
+          image_sha256: fp.sha256,
+          image_dhash: fp.dhash,
+        });
+      }
+    }
+
+    setRawSlips(kept);
+    if (isSupabaseConnected && removedIds.length > 0) {
+      await supabase.from('demerits').delete().in('id', removedIds);
+    }
+    return removedIds.length;
+  }, [rawSlips, isSupabaseConnected]);
 
   return (
     <DemeritsContext.Provider
@@ -658,6 +775,7 @@ export const DemeritsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         setAutoApproveSubmissions,
         resolveStaffSignature,
         resolvePatronName,
+        checkImageDuplicate,
         computeStandings,
         submitDemeritSlip,
         updateSlipStatus,
@@ -667,7 +785,7 @@ export const DemeritsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         deleteStaffAlias,
         rerunAliasNormalization,
         addOrUpdateMember,
-        resetToSeedData,
+        deduplicateExistingSlips,
       }}
     >
       {children}

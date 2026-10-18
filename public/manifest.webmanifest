@@ -1,0 +1,26 @@
+{
+  "name": "Copper Demerits — Ring of Honor",
+  "short_name": "Copper Demerits",
+  "description": "Official Ring of Honor Bar Demerit Leaderboard & Docket for Copper Athletic Club.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#121212",
+  "theme_color": "#B87333",
+  "categories": ["entertainment", "sports", "lifestyle"],
+  "icons": [
+    {
+      "src": "/icon-192.svg",
+      "sizes": "192x192",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-512.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

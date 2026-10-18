@@ -23,10 +23,12 @@ export interface DemeritSlip {
   raw_signature: string;
   demerit_count: number;
   incident_date: string; // YYYY-MM-DD
-  incident_time: string | null; // HH:MM or HH:MM:SS
+  incident_time: string | null; // HH:MM
   location_area: string;
   infractions: string[];
   image_url: string | null;
+  image_sha256?: string | null;
+  image_dhash?: string | null;
   status: SlipStatus;
   created_at?: string;
 }
@@ -45,22 +47,12 @@ export interface PatronStanding {
   isStaff: boolean;
   isPatron: boolean;
   isAnonymous: boolean;
-  totalDemerits: number; // Total demerit points received
-  slipCount: number; // Number of slips received
-  issuedDemerits: number; // Total demerit points issued as staff
-  issuedSlipCount: number; // Number of slips issued as staff
-  netScore: number; // totalDemerits - issuedDemerits
+  totalDemerits: number; // Strictly sum of demerit_count from uploaded slip photos
+  slipCount: number; // Strictly count of uploaded slip photos
+  netScore: number; // Net demerit score from uploaded slip photos
   latestIncidentDate: string | null;
   recentInfractions: string[];
   slips: EnrichedDemeritSlip[];
 }
 
-export interface StaffEnforcerStanding {
-  member: Member;
-  aliases: string[];
-  issuedDemerits: number;
-  issuedSlipCount: number;
-  latestIssuedDate: string | null;
-}
-
-export type TimeframeFilter = 'all-time' | 'current-month' | '2026-10' | '2026-09';
+export type TimeframeFilter = 'all-time' | 'current-month';

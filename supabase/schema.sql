@@ -3,7 +3,6 @@
 -- Supabase Schema Migration (supabase/schema.sql)
 -- =============================================================================
 
--- Enable UUID generation
 create extension if not exists "pgcrypto";
 
 -- -----------------------------------------------------------------------------
@@ -16,8 +15,6 @@ create table if not exists public.members (
   is_patron boolean not null default true,
   created_at timestamptz not null default now()
 );
-
-comment on table public.members is 'Copper Athletic Club roster of patrons and staff enforcers. Members like Burtis can be both staff and patron.';
 
 -- -----------------------------------------------------------------------------
 -- 2. STAFF ALIASES TABLE (Signature Normalization Lookup)
@@ -32,10 +29,8 @@ create table if not exists public.staff_aliases (
 create index if not exists idx_staff_aliases_alias on public.staff_aliases (alias);
 create index if not exists idx_staff_aliases_member_id on public.staff_aliases (member_id);
 
-comment on table public.staff_aliases is 'Maps lowercase raw signatures written on physical demerit slips (e.g. "the boss - aka sarah", "the douche") to canonical staff members.';
-
 -- -----------------------------------------------------------------------------
--- 3. DEMERITS TABLE (Physical Slips & Infractions Docket)
+-- 3. DEMERITS TABLE (Uploaded Physical Slip Images & Deduplication Hashes)
 -- -----------------------------------------------------------------------------
 create table if not exists public.demerits (
   id uuid primary key default gen_random_uuid(),
@@ -48,7 +43,9 @@ create table if not exists public.demerits (
   incident_time time,
   location_area text not null default 'Copper Athletic Club',
   infractions jsonb not null default '[]'::jsonb,
-  image_url text,
+  image_url text not null,
+  image_sha256 text unique,
+  image_dhash text,
   status text not null default 'approved' check (status in ('pending', 'approved', 'rejected')),
   created_at timestamptz not null default now()
 );
@@ -56,9 +53,8 @@ create table if not exists public.demerits (
 create index if not exists idx_demerits_patron_id on public.demerits (patron_id);
 create index if not exists idx_demerits_issuer_id on public.demerits (issuer_id);
 create index if not exists idx_demerits_incident_date on public.demerits (incident_date desc);
-create index if not exists idx_demerits_status on public.demerits (status);
-
-comment on table public.demerits is 'Individual physical demerit slips logged into the Ring of Honor docket.';
+create index if not exists idx_demerits_image_sha256 on public.demerits (image_sha256);
+create index if not exists idx_demerits_image_dhash on public.demerits (image_dhash);
 
 -- -----------------------------------------------------------------------------
 -- 4. AUTOMATIC SIGNATURE & PATRON NORMALIZATION TRIGGER
@@ -74,7 +70,6 @@ declare
   v_issuer_uuid uuid;
   v_patron_uuid uuid;
 begin
-  -- Normalize issuer_id from raw_signature via staff_aliases (or direct staff display_name match)
   if new.issuer_id is null and new.raw_signature is not null then
     v_normalized_sig := lower(trim(new.raw_signature));
 
@@ -96,7 +91,6 @@ begin
     new.issuer_id := v_issuer_uuid;
   end if;
 
-  -- Normalize patron_id from raw_student if not anonymous
   if new.patron_id is null and new.raw_student is not null then
     v_normalized_student := lower(trim(new.raw_student));
 
@@ -123,81 +117,52 @@ for each row
 execute function public.normalize_demerit_slip();
 
 -- -----------------------------------------------------------------------------
--- 5. ROW LEVEL SECURITY (RLS) POLICIES
+-- 5. ROW LEVEL SECURITY (RLS) POLICIES & `slips` STORAGE BUCKET
 -- -----------------------------------------------------------------------------
 alter table public.members enable row level security;
 alter table public.staff_aliases enable row level security;
 alter table public.demerits enable row level security;
 
--- Public read access across all tables
 drop policy if exists "Allow public read access on members" on public.members;
 create policy "Allow public read access on members"
-  on public.members for select
-  to anon, authenticated
-  using (true);
+  on public.members for select to anon, authenticated using (true);
+
+drop policy if exists "Allow member creation and updates" on public.members;
+create policy "Allow member creation and updates"
+  on public.members for all to anon, authenticated using (true) with check (true);
 
 drop policy if exists "Allow public read access on staff_aliases" on public.staff_aliases;
 create policy "Allow public read access on staff_aliases"
-  on public.staff_aliases for select
-  to anon, authenticated
-  using (true);
-
-drop policy if exists "Allow public read access on demerits" on public.demerits;
-create policy "Allow public read access on demerits"
-  on public.demerits for select
-  to anon, authenticated
-  using (true);
-
--- Patron self-submissions & lightweight moderation policies
-drop policy if exists "Allow patron slip submissions on demerits" on public.demerits;
-create policy "Allow patron slip submissions on demerits"
-  on public.demerits for insert
-  to anon, authenticated
-  with check (true);
-
-drop policy if exists "Allow moderation updates on demerits" on public.demerits;
-create policy "Allow moderation updates on demerits"
-  on public.demerits for update
-  to anon, authenticated
-  using (true)
-  with check (true);
-
-drop policy if exists "Allow moderation deletes on demerits" on public.demerits;
-create policy "Allow moderation deletes on demerits"
-  on public.demerits for delete
-  to anon, authenticated
-  using (true);
-
--- Allow roster & alias management from the Admin Moderation panel
-drop policy if exists "Allow member creation and updates" on public.members;
-create policy "Allow member creation and updates"
-  on public.members for all
-  to anon, authenticated
-  using (true)
-  with check (true);
+  on public.staff_aliases for select to anon, authenticated using (true);
 
 drop policy if exists "Allow staff alias management" on public.staff_aliases;
 create policy "Allow staff alias management"
-  on public.staff_aliases for all
-  to anon, authenticated
-  using (true)
-  with check (true);
+  on public.staff_aliases for all to anon, authenticated using (true) with check (true);
 
--- -----------------------------------------------------------------------------
--- 6. SUPABASE STORAGE BUCKET (`slips`)
--- -----------------------------------------------------------------------------
+drop policy if exists "Allow public read access on demerits" on public.demerits;
+create policy "Allow public read access on demerits"
+  on public.demerits for select to anon, authenticated using (true);
+
+drop policy if exists "Allow patron slip submissions on demerits" on public.demerits;
+create policy "Allow patron slip submissions on demerits"
+  on public.demerits for insert to anon, authenticated with check (true);
+
+drop policy if exists "Allow moderation updates on demerits" on public.demerits;
+create policy "Allow moderation updates on demerits"
+  on public.demerits for update to anon, authenticated using (true) with check (true);
+
+drop policy if exists "Allow moderation deletes on demerits" on public.demerits;
+create policy "Allow moderation deletes on demerits"
+  on public.demerits for delete to anon, authenticated using (true);
+
 insert into storage.buckets (id, name, public)
 values ('slips', 'slips', true)
 on conflict (id) do nothing;
 
 drop policy if exists "Public read access for slips bucket" on storage.objects;
 create policy "Public read access for slips bucket"
-  on storage.objects for select
-  to anon, authenticated
-  using (bucket_id = 'slips');
+  on storage.objects for select to anon, authenticated using (bucket_id = 'slips');
 
 drop policy if exists "Allow patron uploads to slips bucket" on storage.objects;
 create policy "Allow patron uploads to slips bucket"
-  on storage.objects for insert
-  to anon, authenticated
-  with check (bucket_id = 'slips');
+  on storage.objects for insert to anon, authenticated with check (bucket_id = 'slips');

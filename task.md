@@ -1,6 +1,6 @@
-# Sprint Tasks — Copper Demerits v1.0.0
+# Sprint Tasks — Copper Demerits v1.1.0
 
-- [x] Step 1: Scaffold Vite + React + Tailwind CSS (TypeScript) codebase (`<a>/</a>`, `/docket`, `/submit`, `/admin`, `supabase/schema.sql`, `supabase/seed.sql`, `netlify.toml`)
-- [x] Step 2: Create GitHub repo `copper-demerits` and push `main`
-- [x] Step 3: Create Netlify site linked to `copper-demerits`, configure build settings, and attach `copperdemerits.com` & `www.copperdemerits.com`
-- [x] Step 4: Configure Cloudflare DNS CNAME `@` and `www` for `copperdemerits.com` and set SSL/TLS encryption mode to `full`
+- [x] Eliminate fabricated seed slips and synthetic statistics; enforce uploaded-images-only (`MAX_OFFICIAL_SLIPS = 4`)
+- [x] Build SHA-256 + 64-bit perceptual `dHash` image deduplication engine (`src/lib/imageDedup.ts`)
+- [x] Upgrade site to Mobile-First PWA (`manifest.webmanifest`, `sw.js`, mobile bottom tab bar, install prompt)
+- [x] Provision live Supabase schema & `slips` bucket (`iqbpnkttwtugxkospdqt`) and deploy v1.1.0 to `https://copperdemerits.com`
