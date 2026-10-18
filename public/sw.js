@@ -1,13 +1,11 @@
-const CACHE_NAME = 'copper-demerits-pwa-v1.2.0';
+const CACHE_NAME = 'copper-demerits-pwa-v1.3.0';
 const APP_SHELL = [
   '/',
   '/index.html',
   '/manifest.webmanifest',
   '/icon-192.svg',
   '/icon-512.svg',
-  '/slips/20261017_211324_burtis_2050.jpg',
-  '/slips/20261017_211324_burtis_2056.jpg',
-  '/slips/20261017_211324_rick_2109.jpg',
+  '/slips/20261017_211324.jpg',
   '/slips/Scan_20261017_212309.jpg',
 ];
 

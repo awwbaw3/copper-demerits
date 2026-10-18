@@ -2,6 +2,8 @@ import React, { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useDemerits } from '../context/DemeritsContext';
 import { processAndUploadSlipImage, SLIPS_BUCKET } from '../lib/supabase';
+import { DEMERIT_CATEGORIES } from '../lib/defaultData';
+import { DemeritLineItem } from '../types/demerits';
 import { DuplicateCheckResult } from '../lib/imageDedup';
 import {
   Camera,
@@ -16,27 +18,32 @@ import {
   ShieldAlert,
   Layers,
   Clock,
+  Tag,
 } from 'lucide-react';
 
 interface SlipDraftItem {
   rawStudent: string;
   rawSignature: string;
-  demeritCount: number;
   incidentDate: string;
   incidentTime: string;
   locationArea: string;
-  infractions: string[];
+  items: DemeritLineItem[];
 }
 
 function createDefaultDraft(time = '21:00'): SlipDraftItem {
   return {
     rawStudent: 'Rick',
     rawSignature: 'The Boss - AKA Sarah',
-    demeritCount: 1,
     incidentDate: new Date().toISOString().slice(0, 10),
     incidentTime: time,
     locationArea: 'Copper A.C.',
-    infractions: [''],
+    items: [
+      {
+        type: DEMERIT_CATEGORIES[2], // 'Bar Etiquette / Seating'
+        description: '',
+        points: 1,
+      },
+    ],
   };
 }
 
@@ -86,33 +93,49 @@ export const SubmitSlipPage: React.FC = () => {
     setSlipDrafts((prev) => prev.map((d, i) => (i === index ? { ...d, ...patch } : d)));
   };
 
-  const updateDraftInfraction = (draftIdx: number, infIdx: number, val: string) => {
+  const updateDraftLineItem = (
+    draftIdx: number,
+    itemIdx: number,
+    patch: Partial<DemeritLineItem>
+  ) => {
     setSlipDrafts((prev) =>
       prev.map((d, i) =>
         i === draftIdx
           ? {
               ...d,
-              infractions: d.infractions.map((inf, j) => (j === infIdx ? val : inf)),
+              items: d.items.map((item, j) => (j === itemIdx ? { ...item, ...patch } : item)),
             }
           : d
       )
     );
   };
 
-  const addDraftInfraction = (draftIdx: number) => {
+  const addDraftLineItem = (draftIdx: number) => {
     setSlipDrafts((prev) =>
       prev.map((d, i) =>
-        i === draftIdx ? { ...d, infractions: [...d.infractions, ''] } : d
+        i === draftIdx
+          ? {
+              ...d,
+              items: [
+                ...d.items,
+                {
+                  type: DEMERIT_CATEGORIES[0],
+                  description: '',
+                  points: 1,
+                },
+              ],
+            }
+          : d
       )
     );
   };
 
-  const removeDraftInfraction = (draftIdx: number, infIdx: number) => {
+  const removeDraftLineItem = (draftIdx: number, itemIdx: number) => {
     setSlipDrafts((prev) =>
       prev.map((d, i) => {
         if (i !== draftIdx) return d;
-        if (d.infractions.length <= 1) return { ...d, infractions: [''] };
-        return { ...d, infractions: d.infractions.filter((_, j) => j !== infIdx) };
+        if (d.items.length <= 1) return d;
+        return { ...d, items: d.items.filter((_, j) => j !== itemIdx) };
       })
     );
   };
@@ -171,16 +194,26 @@ export const SubmitSlipPage: React.FC = () => {
 
       for (let i = 0; i < slipDrafts.length; i++) {
         const d = slipDrafts[i];
-        const cleanedInfractions = d.infractions.map((inf) => inf.trim()).filter(Boolean);
+        const validItems = d.items
+          .map((item) => ({
+            type: item.type,
+            description: item.description.trim() || item.type,
+            points: Math.max(1, Number(item.points) || 1),
+          }))
+          .filter(Boolean);
+
+        const totalDemeritCount = validItems.reduce((sum, item) => sum + item.points, 0);
+        const cleanedInfractions = validItems.map((item) => item.description);
 
         const res = await submitDemeritSlip({
           raw_student: d.rawStudent,
           raw_signature: d.rawSignature,
-          demerit_count: d.demeritCount,
+          demerit_count: totalDemeritCount,
           incident_date: d.incidentDate,
           incident_time: d.incidentTime || null,
           location_area: d.locationArea,
           infractions: cleanedInfractions,
+          demerit_items: validItems,
           image_url: imageUrl,
           source_image_url: isMultiSlip ? imageUrl : null,
           image_sha256: i === 0 ? imageSha256 : null,
@@ -219,15 +252,15 @@ export const SubmitSlipPage: React.FC = () => {
       <div className="border-b border-[#B87333]/30 pb-5">
         <div className="inline-flex items-center gap-2 rounded-full border border-[#B87333]/40 bg-[#B87333]/10 px-3 py-1 text-[11px] font-mono-docket uppercase tracking-widest text-[#E8B888]">
           <Camera className="h-3.5 w-3.5 text-[#B87333]" />
-          <span>SINGLE OR MULTI-SLIP PHOTO LOGGER · 3-LAYER DEDUP</span>
+          <span>MULTI-SLIP &amp; DEMERIT TYPE LOGGER · ISOLATED SCHEMA</span>
         </div>
         <h1 className="mt-2 font-athletic text-3xl sm:text-5xl font-extrabold uppercase tracking-wide text-[#F5F2EB]">
           LOG <span className="text-[#B87333]">SLIP PHOTO</span>
         </h1>
         <p className="mt-1 text-xs sm:text-sm text-[#B5A99D]">
-          Supports photos with <strong>1 slip</strong> (like a single scan) or{' '}
-          <strong>multiple slips in one photo</strong> (like 3 slips on the bar table). Automatically
-          deduplicates by SHA-256, rotation-aware 64-bit dHash, and citation timestamp/content.
+          Log single-slip scans or multi-slip bar photos, specifying the exact{' '}
+          <strong>Demerit Type</strong> and <strong>Point Count</strong> for each itemized offense on
+          the slip.
         </p>
       </div>
 
@@ -324,7 +357,6 @@ export const SubmitSlipPage: React.FC = () => {
             )}
           </div>
 
-          {/* How many slips are visible in this photo? (1, 2, 3, or 4) */}
           <div className="rounded-xl border border-white/10 bg-[#121212] p-3.5 space-y-2">
             <span className="flex items-center gap-1.5 font-mono-docket text-xs font-bold uppercase text-[#E8B888]">
               <Layers className="h-3.5 w-3.5 text-[#B87333]" />
@@ -421,12 +453,16 @@ export const SubmitSlipPage: React.FC = () => {
         {/* Step 2: Individual Slip Details for Each Slip in the Image */}
         {slipDrafts.map((draft, draftIdx) => {
           const resolvedStaff = resolveStaffSignature(draft.rawSignature);
+          const totalSlipPoints = draft.items.reduce(
+            (sum, item) => sum + (Number(item.points) || 1),
+            0
+          );
           const citationDup = checkCitationDuplicate({
             raw_student: draft.rawStudent,
             incident_date: draft.incidentDate,
             incident_time: draft.incidentTime || null,
-            demerit_count: draft.demeritCount,
-            infractions: draft.infractions,
+            demerit_count: totalSlipPoints,
+            infractions: draft.items.map((i) => i.description),
           });
 
           return (
@@ -435,11 +471,17 @@ export const SubmitSlipPage: React.FC = () => {
               className="rounded-2xl border border-white/15 bg-[#1A1715] p-4 sm:p-6 space-y-4"
             >
               <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/10 pb-3">
-                <span className="font-athletic text-xl font-bold uppercase text-[#E8B888]">
-                  {slipDrafts.length > 1
-                    ? `SLIP #${draftIdx + 1} OF ${slipDrafts.length} IN PHOTO`
-                    : 'SLIP DATA & TIMESTAMP'}
-                </span>
+                <div className="flex items-center gap-2.5">
+                  <span className="font-athletic text-xl font-bold uppercase text-[#E8B888]">
+                    {slipDrafts.length > 1
+                      ? `SLIP #${draftIdx + 1} OF ${slipDrafts.length} IN PHOTO`
+                      : 'SLIP DATA, TIMESTAMP & DEMERIT TYPES'}
+                  </span>
+                  <span className="rounded-lg bg-[#C86D51]/20 border border-[#C86D51]/40 px-2.5 py-0.5 font-mono-docket text-xs font-bold text-[#E08A4E]">
+                    TOTAL: +{totalSlipPoints} {totalSlipPoints === 1 ? 'DEMERIT' : 'DEMERITS'}
+                  </span>
+                </div>
+
                 {citationDup.isDuplicate && (
                   <span className="inline-flex items-center gap-1 rounded-lg border border-amber-500/40 bg-amber-500/15 px-2.5 py-1 font-mono-docket text-[11px] text-amber-300">
                     <Fingerprint className="h-3.5 w-3.5" />
@@ -481,30 +523,8 @@ export const SubmitSlipPage: React.FC = () => {
                 </div>
               </div>
 
-              {/* Date, Time, Room, Demerit Count */}
+              {/* Date, Time, Room */}
               <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-3">
-                <div>
-                  <label className="block font-mono-docket text-xs font-bold uppercase text-[#D6C7B8]">
-                    NUMBER OF DEMERITS *
-                  </label>
-                  <div className="mt-1.5 flex items-center gap-1.5">
-                    {[1, 2, 3, 5].map((cnt) => (
-                      <button
-                        key={cnt}
-                        type="button"
-                        onClick={() => updateDraft(draftIdx, { demeritCount: cnt })}
-                        className={`flex-1 rounded-xl border py-2 font-display-tall text-2xl font-bold transition ${
-                          draft.demeritCount === cnt
-                            ? 'border-[#B87333] bg-[#B87333] text-[#121212]'
-                            : 'border-white/15 bg-[#121212] text-[#F5F2EB]'
-                        }`}
-                      >
-                        {cnt}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
                 <div>
                   <label className="block font-mono-docket text-xs font-bold uppercase text-[#D6C7B8]">
                     DATE(S) *
@@ -530,60 +550,107 @@ export const SubmitSlipPage: React.FC = () => {
                     className="mt-1.5 w-full rounded-xl border border-white/15 bg-[#121212] px-3 py-2.5 font-mono-docket text-xs text-[#F5F2EB]"
                   />
                 </div>
-              </div>
 
-              <div>
-                <label className="block font-mono-docket text-xs font-bold uppercase text-[#D6C7B8]">
-                  ROOM (AS WRITTEN ON SLIP)
-                </label>
-                <input
-                  type="text"
-                  value={draft.locationArea}
-                  onChange={(e) => updateDraft(draftIdx, { locationArea: e.target.value })}
-                  placeholder="Copper Bar, Copper, Copper A.C."
-                  className="mt-1.5 w-full rounded-xl border border-white/15 bg-[#121212] px-3.5 py-2.5 text-sm text-[#F5F2EB]"
-                />
-              </div>
-
-              {/* Infractions */}
-              <div>
-                <div className="flex items-center justify-between">
+                <div>
                   <label className="block font-mono-docket text-xs font-bold uppercase text-[#D6C7B8]">
-                    REASON FOR DEMERITS
+                    ROOM (AS WRITTEN ON SLIP)
+                  </label>
+                  <input
+                    type="text"
+                    value={draft.locationArea}
+                    onChange={(e) => updateDraft(draftIdx, { locationArea: e.target.value })}
+                    placeholder="Copper Bar, Copper, Copper A.C."
+                    className="mt-1.5 w-full rounded-xl border border-white/15 bg-[#121212] px-3.5 py-2 text-sm text-[#F5F2EB]"
+                  />
+                </div>
+              </div>
+
+              {/* Itemized Demerit Types & Points */}
+              <div className="space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <label className="flex items-center gap-1.5 font-mono-docket text-xs font-bold uppercase text-[#D6C7B8]">
+                    <Tag className="h-3.5 w-3.5 text-[#B87333]" />
+                    <span>ITEMIZED DEMERIT TYPES &amp; POINTS ON SLIP *</span>
                   </label>
                   <button
                     type="button"
-                    onClick={() => addDraftInfraction(draftIdx)}
+                    onClick={() => addDraftLineItem(draftIdx)}
                     className="inline-flex items-center gap-1 font-mono-docket text-xs font-bold text-[#E08A4E]"
                   >
                     <Plus className="h-3.5 w-3.5" />
-                    <span>Add Line</span>
+                    <span>Add Demerit Offense</span>
                   </button>
                 </div>
 
-                <div className="mt-2 space-y-2">
-                  {draft.infractions.map((inf, infIdx) => (
-                    <div key={infIdx} className="flex items-center gap-2">
-                      <span className="font-mono-docket text-xs font-bold text-[#B87333] w-6">
-                        #{infIdx + 1}
-                      </span>
+                <div className="space-y-2.5">
+                  {draft.items.map((item, itemIdx) => (
+                    <div
+                      key={itemIdx}
+                      className="rounded-xl border border-white/10 bg-[#121212] p-3 space-y-2.5"
+                    >
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div className="flex items-center gap-2 flex-1 min-w-[200px]">
+                          <span className="font-mono-docket text-xs font-bold text-[#B87333]">
+                            #{itemIdx + 1}
+                          </span>
+                          <select
+                            value={item.type}
+                            onChange={(e) =>
+                              updateDraftLineItem(draftIdx, itemIdx, { type: e.target.value })
+                            }
+                            aria-label="Demerit Type"
+                            className="flex-1 rounded-lg border border-white/15 bg-[#1A1715] px-2.5 py-1.5 font-mono-docket text-xs text-[#E8B888]"
+                          >
+                            {DEMERIT_CATEGORIES.map((cat) => (
+                              <option key={cat} value={cat}>
+                                Type: {cat}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+
+                        <div className="flex items-center gap-1.5">
+                          <span className="font-mono-docket text-[10px] text-[#9E8F82]">
+                            POINTS:
+                          </span>
+                          {[1, 2, 3].map((pts) => (
+                            <button
+                              key={pts}
+                              type="button"
+                              onClick={() =>
+                                updateDraftLineItem(draftIdx, itemIdx, { points: pts })
+                              }
+                              className={`rounded-lg border px-2.5 py-1 font-mono-docket text-xs font-bold transition ${
+                                item.points === pts
+                                  ? 'border-[#B87333] bg-[#B87333] text-[#121212]'
+                                  : 'border-white/15 bg-[#1A1715] text-[#D6C7B8]'
+                              }`}
+                            >
+                              +{pts}
+                            </button>
+                          ))}
+                          {draft.items.length > 1 && (
+                            <button
+                              type="button"
+                              onClick={() => removeDraftLineItem(draftIdx, itemIdx)}
+                              aria-label="Remove offense"
+                              className="rounded-lg border border-white/10 p-1.5 text-[#9E8F82] hover:text-rose-400"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </button>
+                          )}
+                        </div>
+                      </div>
+
                       <input
                         type="text"
-                        value={inf}
-                        onChange={(e) => updateDraftInfraction(draftIdx, infIdx, e.target.value)}
-                        placeholder="Reason written on slip..."
-                        className="flex-1 rounded-xl border border-white/15 bg-[#121212] px-3.5 py-2 text-sm text-[#F5F2EB]"
+                        value={item.description}
+                        onChange={(e) =>
+                          updateDraftLineItem(draftIdx, itemIdx, { description: e.target.value })
+                        }
+                        placeholder="Reason written on slip (e.g. Too many seat moves)..."
+                        className="w-full rounded-lg border border-white/15 bg-[#1A1715] px-3 py-2 text-sm text-[#F5F2EB]"
                       />
-                      {draft.infractions.length > 1 && (
-                        <button
-                          type="button"
-                          onClick={() => removeDraftInfraction(draftIdx, infIdx)}
-                          aria-label="Remove line"
-                          className="rounded-lg border border-white/10 p-2 text-[#9E8F82] hover:text-rose-400"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
-                      )}
                     </div>
                   ))}
                 </div>

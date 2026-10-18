@@ -12,6 +12,7 @@ import {
   CheckSquare,
   Layers,
   Image as ImageIcon,
+  Tag,
 } from 'lucide-react';
 
 interface SlipModalViewerProps {
@@ -189,19 +190,38 @@ export const SlipModalViewer: React.FC<SlipModalViewerProps> = ({ slip, onClose 
               </div>
             )}
 
-            {/* Itemized Infractions */}
-            {slip.infractions.length > 0 && (
-              <div className="rounded-xl border border-white/10 bg-[#121212] p-4">
-                <span className="block font-mono-docket text-[10px] font-bold uppercase tracking-widest text-[#B87333] mb-2">
-                  REASON FOR DEMERITS (TRANSCRIBED FROM SLIP):
-                </span>
-                <ul className="space-y-1.5">
-                  {slip.infractions.map((inf, idx) => (
-                    <li key={idx} className="flex items-start gap-2 text-sm text-[#F5F2EB]">
-                      <CheckSquare className="mt-0.5 h-4 w-4 shrink-0 text-[#C86D51]" />
-                      <span>
-                        {slip.infractions.length > 1 ? `${idx + 1}) ` : ''}
-                        {inf}
+            {/* Itemized Demerit Types & Points */}
+            {slip.resolvedItems.length > 0 && (
+              <div className="rounded-xl border border-white/10 bg-[#121212] p-4 space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <span className="font-mono-docket text-[10px] font-bold uppercase tracking-widest text-[#B87333]">
+                    ITEMIZED DEMERIT TYPES &amp; POINTS ON SLIP:
+                  </span>
+                  <span className="font-mono-docket text-[11px] font-bold text-[#E08A4E]">
+                    TOTAL: +{slip.demerit_count} {slip.demerit_count === 1 ? 'DEMERIT' : 'DEMERITS'}
+                  </span>
+                </div>
+                <ul className="space-y-2">
+                  {slip.resolvedItems.map((item, idx) => (
+                    <li
+                      key={idx}
+                      className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 rounded-lg border border-white/10 bg-[#1A1715] p-2.5"
+                    >
+                      <div className="flex items-start gap-2 text-sm text-[#F5F2EB]">
+                        <CheckSquare className="mt-0.5 h-4 w-4 shrink-0 text-[#C86D51]" />
+                        <div>
+                          <span className="inline-flex items-center gap-1 rounded bg-[#B87333]/20 border border-[#B87333]/40 px-2 py-0.5 font-mono-docket text-[10px] font-bold text-[#E8B888] mb-1">
+                            <Tag className="h-2.5 w-2.5" />
+                            {item.type}
+                          </span>
+                          <p className="text-xs sm:text-sm text-[#F5F2EB]">
+                            {slip.resolvedItems.length > 1 ? `${idx + 1}) ` : ''}
+                            {item.description}
+                          </p>
+                        </div>
+                      </div>
+                      <span className="self-end sm:self-center shrink-0 rounded-lg bg-[#C86D51]/20 border border-[#C86D51]/40 px-2.5 py-1 font-mono-docket text-xs font-bold text-[#E08A4E]">
+                        +{item.points} {item.points === 1 ? 'DEMERIT' : 'DEMERITS'}
                       </span>
                     </li>
                   ))}

@@ -1,4 +1,10 @@
-import { Member, StaffAlias, DemeritSlip, UploadedSourceFile } from '../types/demerits';
+import {
+  Member,
+  StaffAlias,
+  DemeritSlip,
+  DemeritLineItem,
+  UploadedSourceFile,
+} from '../types/demerits';
 
 export const MEMBER_IDS = {
   RICK: '11111111-1111-4111-8111-111111111111',
@@ -6,6 +12,70 @@ export const MEMBER_IDS = {
   SARAH: '33333333-3333-4333-8333-333333333333',
   MATT_BARNES: '44444444-4444-4444-8444-444444444444',
 } as const;
+
+export const DEMERIT_CATEGORIES = [
+  'Attendance / No-Show',
+  'Insubordination / Defiance',
+  'Bar Etiquette / Seating',
+  'Drink Crime / Order Foul',
+  'Attire / Headgear Foul',
+  'Sports / Fantasy Foul',
+  'Party Foul / Conduct',
+] as const;
+
+/**
+ * Infers a structured Demerit Type from raw infraction text when an older slip
+ * doesn't explicitly specify `demerit_items`.
+ */
+export function inferDemeritTypeFromDescription(desc: string): string {
+  const lower = desc.toLowerCase();
+  if (lower.includes('no call') || lower.includes('no show') || lower.includes('red wings')) {
+    return 'Attendance / No-Show';
+  }
+  if (lower.includes('not caring') || lower.includes('first demerit') || lower.includes('defian')) {
+    return 'Insubordination / Defiance';
+  }
+  if (lower.includes('seat') || lower.includes('chair') || lower.includes('stool')) {
+    return 'Bar Etiquette / Seating';
+  }
+  if (lower.includes('gin') || lower.includes('diet coke') || lower.includes('order') || lower.includes('drink')) {
+    return 'Drink Crime / Order Foul';
+  }
+  if (lower.includes('headband') || lower.includes('hat') || lower.includes('shirt') || lower.includes('attire')) {
+    return 'Attire / Headgear Foul';
+  }
+  return 'Party Foul / Conduct';
+}
+
+/**
+ * Ensures every slip has a normalized array of `DemeritLineItem`s whose points sum to `demerit_count`.
+ */
+export function normalizeSlipDemeritItems(slip: DemeritSlip): DemeritLineItem[] {
+  if (Array.isArray(slip.demerit_items) && slip.demerit_items.length > 0) {
+    return slip.demerit_items.map((item) => ({
+      type: item.type || inferDemeritTypeFromDescription(item.description || ''),
+      description: item.description || 'Bar Conduct Citation',
+      points: Math.max(1, Number(item.points) || 1),
+    }));
+  }
+
+  const infs = Array.isArray(slip.infractions) && slip.infractions.length > 0
+    ? slip.infractions
+    : ['General Bar Citation'];
+  const total = Math.max(1, Number(slip.demerit_count) || infs.length);
+  const basePts = Math.max(1, Math.floor(total / infs.length));
+  let remainder = Math.max(0, total - basePts * infs.length);
+
+  return infs.map((desc) => {
+    const extra = remainder > 0 ? 1 : 0;
+    if (remainder > 0) remainder -= 1;
+    return {
+      type: inferDemeritTypeFromDescription(desc),
+      description: desc,
+      points: basePts + extra,
+    };
+  });
+}
 
 export const FABRICATED_SEED_SLIP_IDS = new Set([
   '22222222-2222-4222-8222-222222222201',
@@ -98,51 +168,36 @@ export const DEFAULT_STAFF_ALIASES: StaffAlias[] = [
   },
 ];
 
-/**
- * Exact SHA-256 digests of the uploaded image files & extracted slip crops
- * so re-uploading either original photo (or rotated scan) is immediately caught.
- */
 export const KNOWN_UPLOADED_FILE_HASHES: Record<
   string,
   { slipId: string; description: string }
 > = {
-  // Original multi-slip bar photo (docs/20261017_211324.jpg)
   ecc1ca1e8a95d0cf62f82a5949e40a6044ea7bb335a2f5991cc500c4557feb36: {
     slipId: 'a3333333-3333-4333-8333-333333333333',
     description: '20261017_211324.jpg (Multi-Slip Bar Photo: Burtis 8:50 PM, Burtis 8:56 PM, Rick 9:09 PM)',
   },
-  // Original unrotated scan (docs/Scan_20261017_212309.jpg)
   c03f872eb440b12c9835d1b84407278c39eb106df64c446c35eb06eb382def9e: {
     slipId: 'a3333333-3333-4333-8333-333333333333',
     description: 'Scan_20261017_212309.jpg (Single-Slip Scan: Rick 9:09 PM)',
   },
-  // Upright rotated scan (public/slips/Scan_20261017_212309.jpg)
   '3c1b69a7e7b05253560753de5c6a3a2eda800f760814fb15f963f08ca106384b': {
     slipId: 'a3333333-3333-4333-8333-333333333333',
     description: 'Scan_20261017_212309.jpg (Upright Scan: Rick 9:09 PM)',
   },
-  // Cropped slip 1: Burtis 8:50 PM
   a88e9b61232ff9d47abda74d8db70de8aa80ffa4037115d25ea5beacd8f3347d: {
     slipId: 'a1111111-1111-4111-8111-111111111111',
     description: '20261017_211324_burtis_2050.jpg (Burtis 8:50 PM Slip)',
   },
-  // Cropped slip 2: Burtis 8:56 PM
   de5d75f906950591314f38f2ad6fe4fde09545759ee5fba74c42905150c96ef8: {
     slipId: 'a2222222-2222-4222-8222-222222222222',
     description: '20261017_211324_burtis_2056.jpg (Burtis 8:56 PM Slip)',
   },
-  // Cropped slip 3: Rick 9:09 PM
   d0e27033e69d8c789fdec035769ad37eca920a2ccb2a9d1208bfeb01f35c4ae8: {
     slipId: 'a3333333-3333-4333-8333-333333333333',
     description: '20261017_211324_rick_2109.jpg (Rick 9:09 PM Slip)',
   },
 };
 
-/**
- * The 2 real uploaded image files in docs/, accounting for:
- * - Image 1 (20261017_211324.jpg): 3 physical slips on the copper bar table (8:50 PM, 8:56 PM, 9:09 PM)
- * - Image 2 (Scan_20261017_212309.jpg): 1 scanned physical slip (9:09 PM Rick — deduplicated against Slip #3 in Image 1)
- */
 export const UPLOADED_SOURCE_FILES: UploadedSourceFile[] = [
   {
     id: 'upload-1-multi-slip-bar-photo',
@@ -190,7 +245,7 @@ export const UPLOADED_SOURCE_FILES: UploadedSourceFile[] = [
     slipCountInImage: 1,
     imageUrl: '/slips/Scan_20261017_212309.jpg',
     sha256: 'c03f872eb440b12c9835d1b84407278c39eb106df64c446c35eb06eb382def9e',
-    altSha256: '3c1b69a7e7b05253560753de5c6a3a2eda800f760814fb15f963f08ca106384b',
+    altSha256: '3c1b69a7e7e05253560753de5c6a3a2eda800f760814fb15f963f08ca106384b',
     description:
       'High-contrast single-slip scan of Rick’s 9:09 PM slip (taken 10 mins after the bar photo). Automatically deduplicated & merged with Slip #3 so Rick is not double-counted.',
     extractedSlips: [
@@ -208,10 +263,6 @@ export const UPLOADED_SOURCE_FILES: UploadedSourceFile[] = [
   },
 ];
 
-/**
- * Exact real citations transcribed from docs/20261017_211324.jpg (3 slips)
- * and docs/Scan_20261017_212309.jpg (1 slip, deduplicated against Rick's 9:09 PM citation).
- */
 export const DEFAULT_DEMERITS: DemeritSlip[] = [
   {
     id: 'a1111111-1111-4111-8111-111111111111',
@@ -224,6 +275,13 @@ export const DEFAULT_DEMERITS: DemeritSlip[] = [
     incident_time: '20:50',
     location_area: 'Copper Bar',
     infractions: ['No call / no show to see the Red Wings'],
+    demerit_items: [
+      {
+        type: 'Attendance / No-Show',
+        description: 'No call / no show to see the Red Wings',
+        points: 1,
+      },
+    ],
     image_url: '/slips/20261017_211324_burtis_2050.jpg',
     source_image_url: '/slips/20261017_211324.jpg',
     secondary_image_url: null,
@@ -244,6 +302,13 @@ export const DEFAULT_DEMERITS: DemeritSlip[] = [
     incident_time: '20:56',
     location_area: 'Copper',
     infractions: ['NOT CARING ABOUT THE FIRST DEMERIT'],
+    demerit_items: [
+      {
+        type: 'Insubordination / Defiance',
+        description: 'NOT CARING ABOUT THE FIRST DEMERIT',
+        points: 2,
+      },
+    ],
     image_url: '/slips/20261017_211324_burtis_2056.jpg',
     source_image_url: '/slips/20261017_211324.jpg',
     secondary_image_url: null,
@@ -267,6 +332,23 @@ export const DEFAULT_DEMERITS: DemeritSlip[] = [
       'Too many seat moves',
       'Try to order Gin & Diet Coke',
       'The headband :) <3',
+    ],
+    demerit_items: [
+      {
+        type: 'Bar Etiquette / Seating',
+        description: 'Too many seat moves',
+        points: 1,
+      },
+      {
+        type: 'Drink Crime / Order Foul',
+        description: 'Try to order Gin & Diet Coke',
+        points: 1,
+      },
+      {
+        type: 'Attire / Headgear Foul',
+        description: 'The headband :) <3',
+        points: 1,
+      },
     ],
     image_url: '/slips/Scan_20261017_212309.jpg',
     source_image_url: '/slips/20261017_211324.jpg',

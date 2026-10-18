@@ -3,8 +3,11 @@ import {
   Member,
   StaffAlias,
   DemeritSlip,
+  DemeritLineItem,
   EnrichedDemeritSlip,
   PatronStanding,
+  DemeritTypeSummary,
+  LeaderboardPeriodFilter,
   SlipStatus,
   UploadedSourceFile,
 } from '../types/demerits';
@@ -14,6 +17,7 @@ import {
   DEFAULT_DEMERITS,
   FABRICATED_SEED_SLIP_IDS,
   UPLOADED_SOURCE_FILES,
+  normalizeSlipDemeritItems,
 } from '../lib/defaultData';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import {
@@ -25,10 +29,10 @@ import {
 } from '../lib/imageDedup';
 
 const STORAGE_KEYS = {
-  MEMBERS: 'cac_demerits_members_v2',
-  ALIASES: 'cac_demerits_aliases_v2',
-  SLIPS: 'cac_demerits_slips_v2',
-  AUTO_APPROVE: 'cac_demerits_auto_approve_v2',
+  MEMBERS: 'cac_demerits_members_v3',
+  ALIASES: 'cac_demerits_aliases_v3',
+  SLIPS: 'cac_demerits_slips_v3',
+  AUTO_APPROVE: 'cac_demerits_auto_approve_v3',
 };
 
 export interface NewSlipPayload {
@@ -39,6 +43,7 @@ export interface NewSlipPayload {
   incident_time: string | null;
   location_area: string;
   infractions: string[];
+  demerit_items?: DemeritLineItem[];
   image_url: string;
   source_image_url?: string | null;
   secondary_image_url?: string | null;
@@ -71,9 +76,11 @@ interface DemeritsContextValue {
     demerit_count: number;
     infractions: string[];
   }) => DuplicateCheckResult;
-  computeStandings: (monthPrefix?: string | null) => {
+  computeStandings: (filter?: LeaderboardPeriodFilter | string | null) => {
     patronStandings: PatronStanding[];
     anonymousStanding: PatronStanding | null;
+    typeSummaries: DemeritTypeSummary[];
+    periodSlips: EnrichedDemeritSlip[];
   };
   submitDemeritSlip: (
     payload: NewSlipPayload
@@ -100,12 +107,6 @@ function loadFromStorage<T>(key: string, fallback: T): T {
   }
 }
 
-/**
- * Purges any fabricated seed slip and deduplicates slips that share the same
- * (student + incident_date + incident_time) so multiple photos of the same slip
- * (e.g. Rick 2026-10-17 21:09 in both 20261017_211324.jpg and Scan_20261017_212309.jpg)
- * are merged rather than double-counted.
- */
 function sanitizeAndDeduplicateSlips(slips: DemeritSlip[]): DemeritSlip[] {
   const valid = slips.filter(
     (s) =>
@@ -125,7 +126,6 @@ function sanitizeAndDeduplicateSlips(slips: DemeritSlip[]): DemeritSlip[] {
     const normDate = s.incident_date.trim();
     const normTime = s.incident_time ? s.incident_time.trim().slice(0, 5) : '';
 
-    // Check if an identical citation (same student + date + time) is already in deduped
     const existingIdx = deduped.findIndex((existing) => {
       const exStudent = existing.raw_student.trim().toLowerCase();
       const exDate = existing.incident_date.trim();
@@ -147,9 +147,11 @@ function sanitizeAndDeduplicateSlips(slips: DemeritSlip[]): DemeritSlip[] {
       continue;
     }
 
+    const items = normalizeSlipDemeritItems(s);
     deduped.push({
       ...s,
       incident_time: normTime || null,
+      demerit_items: items,
     });
   }
 
@@ -172,12 +174,14 @@ export const DemeritsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const [loading, setLoading] = useState<boolean>(false);
   const [isSupabaseConnected, setIsSupabaseConnected] = useState<boolean>(false);
 
-  // Clear obsolete v1 storage keys on mount
   useEffect(() => {
     try {
       localStorage.removeItem('cac_demerits_members_v1');
       localStorage.removeItem('cac_demerits_aliases_v1');
       localStorage.removeItem('cac_demerits_slips_v1');
+      localStorage.removeItem('cac_demerits_members_v2');
+      localStorage.removeItem('cac_demerits_aliases_v2');
+      localStorage.removeItem('cac_demerits_slips_v2');
     } catch {
       // Ignore
     }
@@ -216,7 +220,7 @@ export const DemeritsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     }
   }, []);
 
-  // Sync with live Supabase
+  // Sync with isolated copper_demerits schema in Supabase
   useEffect(() => {
     if (!isSupabaseConfigured) return;
 
@@ -248,13 +252,13 @@ export const DemeritsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
             (slipsRes.data as DemeritSlip[]).map((s) => ({
               ...s,
               infractions: Array.isArray(s.infractions) ? s.infractions : [],
+              demerit_items: normalizeSlipDemeritItems(s),
               incident_time: s.incident_time ? s.incident_time.slice(0, 5) : null,
             }))
           );
           setRawSlips(remoteSlips);
+          setIsSupabaseConnected(true);
         }
-
-        setIsSupabaseConnected(true);
       } catch {
         // Fallback to local state
       } finally {
@@ -365,8 +369,12 @@ export const DemeritsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         ? members.find((m) => m.id === slip.issuer_id) || resolvedSig.member
         : resolvedSig.member;
 
+      const resolvedItems = normalizeSlipDemeritItems(slip);
+
       return {
         ...slip,
+        demerit_items: resolvedItems,
+        resolvedItems,
         patron,
         issuer,
         patronDisplayName: patron ? patron.display_name : slip.raw_student || 'Anonymous Patron',
@@ -377,20 +385,109 @@ export const DemeritsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   }, [rawSlips, members, resolvePatronName, resolveStaffSignature]);
 
   const computeStandings = useCallback(
-    (monthPrefix?: string | null) => {
-      const approvedSlips = demerits.filter((s) => {
-        if (s.status !== 'approved') return false;
-        if (!s.image_url) return false;
-        if (monthPrefix && monthPrefix !== 'all-time') {
+    (filterInput?: LeaderboardPeriodFilter | string | null) => {
+      const filter: LeaderboardPeriodFilter =
+        typeof filterInput === 'string' || !filterInput
+          ? {
+              mode:
+                filterInput === 'current-month' || filterInput === 'this-month'
+                  ? 'this-month'
+                  : 'all-time',
+            }
+          : filterInput;
+
+      const nowIso = new Date().toISOString().slice(0, 10);
+      const monthPrefix = nowIso.slice(0, 7);
+
+      // 1. Filter approved slips by the selected Period
+      const periodSlips = demerits.filter((s) => {
+        if (s.status !== 'approved' || !s.image_url) return false;
+
+        if (filter.mode === 'this-month') {
           return s.incident_date.startsWith(monthPrefix);
+        }
+        if (filter.mode === 'oct-17-session') {
+          return s.incident_date === '2026-10-17';
+        }
+        if (filter.mode === 'this-week') {
+          const slipTime = new Date(`${s.incident_date}T12:00:00`).getTime();
+          const nowTime = new Date(`${nowIso}T12:00:00`).getTime();
+          const diffDays = (nowTime - slipTime) / (1000 * 60 * 60 * 24);
+          return diffDays >= -1 && diffDays <= 7;
+        }
+        if (filter.mode === 'custom') {
+          if (filter.startDate && s.incident_date < filter.startDate) return false;
+          if (filter.endDate && s.incident_date > filter.endDate) return false;
+          return true;
         }
         return true;
       });
 
+      // 2. Build DemeritTypeSummary across all periodSlips (so the type pills show full period totals)
+      const typeMap = new Map<
+        string,
+        {
+          totalPoints: number;
+          offenseCount: number;
+          byPatron: Map<string, number>;
+        }
+      >();
+
+      for (const slip of periodSlips) {
+        const patronName = slip.patronDisplayName;
+        for (const item of slip.resolvedItems) {
+          if (!typeMap.has(item.type)) {
+            typeMap.set(item.type, {
+              totalPoints: 0,
+              offenseCount: 0,
+              byPatron: new Map(),
+            });
+          }
+          const tEntry = typeMap.get(item.type)!;
+          tEntry.totalPoints += item.points;
+          tEntry.offenseCount += 1;
+          tEntry.byPatron.set(patronName, (tEntry.byPatron.get(patronName) || 0) + item.points);
+        }
+      }
+
+      const typeSummaries: DemeritTypeSummary[] = Array.from(typeMap.entries())
+        .map(([type, data]) => {
+          let leaderName = '—';
+          let leaderPoints = 0;
+          for (const [pName, pts] of data.byPatron.entries()) {
+            if (pts > leaderPoints) {
+              leaderPoints = pts;
+              leaderName = pName;
+            }
+          }
+          return {
+            type,
+            totalPoints: data.totalPoints,
+            offenseCount: data.offenseCount,
+            leaderName,
+            leaderPoints,
+          };
+        })
+        .sort((a, b) => b.totalPoints - a.totalPoints || b.offenseCount - a.offenseCount);
+
+      // 3. Calculate Patron Standings (filtered by optional demeritType)
+      const activeTypeFilter =
+        filter.demeritType && filter.demeritType !== 'all' ? filter.demeritType : null;
+
       const patronMap = new Map<string, PatronStanding>();
       let anonymousStanding: PatronStanding | null = null;
 
-      for (const slip of approvedSlips) {
+      for (const slip of periodSlips) {
+        const matchingItems = activeTypeFilter
+          ? slip.resolvedItems.filter((item) => item.type === activeTypeFilter)
+          : slip.resolvedItems;
+
+        if (matchingItems.length === 0) continue;
+
+        const pointsFromSlip = activeTypeFilter
+          ? matchingItems.reduce((sum, i) => sum + i.points, 0)
+          : slip.demerit_count;
+
         const pId = slip.patron?.id || slip.patron_id;
         if (pId) {
           if (!patronMap.has(pId)) {
@@ -403,18 +500,33 @@ export const DemeritsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
               isAnonymous: false,
               totalDemerits: 0,
               slipCount: 0,
+              offenseCount: 0,
               netScore: 0,
               latestIncidentDate: null,
               latestIncidentTime: null,
               recentInfractions: [],
+              byType: {},
               slips: [],
             });
           }
           const entry = patronMap.get(pId)!;
-          entry.totalDemerits += slip.demerit_count;
+          entry.totalDemerits += pointsFromSlip;
           entry.slipCount += 1;
+          entry.offenseCount += matchingItems.length;
           entry.netScore = entry.totalDemerits;
           entry.slips.push(slip);
+
+          for (const item of matchingItems) {
+            if (!entry.byType[item.type]) {
+              entry.byType[item.type] = { points: 0, count: 0 };
+            }
+            entry.byType[item.type].points += item.points;
+            entry.byType[item.type].count += 1;
+            if (!entry.recentInfractions.includes(item.description)) {
+              entry.recentInfractions.push(item.description);
+            }
+          }
+
           if (
             !entry.latestIncidentDate ||
             slip.incident_date > entry.latestIncidentDate ||
@@ -423,11 +535,6 @@ export const DemeritsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           ) {
             entry.latestIncidentDate = slip.incident_date;
             entry.latestIncidentTime = slip.incident_time;
-          }
-          for (const inf of slip.infractions) {
-            if (!entry.recentInfractions.includes(inf)) {
-              entry.recentInfractions.push(inf);
-            }
           }
         } else {
           if (!anonymousStanding) {
@@ -439,27 +546,29 @@ export const DemeritsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
               isAnonymous: true,
               totalDemerits: 0,
               slipCount: 0,
+              offenseCount: 0,
               netScore: 0,
               latestIncidentDate: null,
               latestIncidentTime: null,
               recentInfractions: [],
+              byType: {},
               slips: [],
             };
           }
-          anonymousStanding.totalDemerits += slip.demerit_count;
+          anonymousStanding.totalDemerits += pointsFromSlip;
           anonymousStanding.slipCount += 1;
+          anonymousStanding.offenseCount += matchingItems.length;
           anonymousStanding.netScore = anonymousStanding.totalDemerits;
           anonymousStanding.slips.push(slip);
-          if (
-            !anonymousStanding.latestIncidentDate ||
-            slip.incident_date > anonymousStanding.latestIncidentDate
-          ) {
-            anonymousStanding.latestIncidentDate = slip.incident_date;
-            anonymousStanding.latestIncidentTime = slip.incident_time;
-          }
-          for (const inf of slip.infractions) {
-            if (!anonymousStanding.recentInfractions.includes(inf)) {
-              anonymousStanding.recentInfractions.push(inf);
+
+          for (const item of matchingItems) {
+            if (!anonymousStanding.byType[item.type]) {
+              anonymousStanding.byType[item.type] = { points: 0, count: 0 };
+            }
+            anonymousStanding.byType[item.type].points += item.points;
+            anonymousStanding.byType[item.type].count += 1;
+            if (!anonymousStanding.recentInfractions.includes(item.description)) {
+              anonymousStanding.recentInfractions.push(item.description);
             }
           }
         }
@@ -467,11 +576,12 @@ export const DemeritsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
       const patronStandings = Array.from(patronMap.values()).sort((a, b) => {
         if (b.totalDemerits !== a.totalDemerits) return b.totalDemerits - a.totalDemerits;
+        if (b.offenseCount !== a.offenseCount) return b.offenseCount - a.offenseCount;
         if (b.slipCount !== a.slipCount) return b.slipCount - a.slipCount;
         return a.displayName.localeCompare(b.displayName);
       });
 
-      return { patronStandings, anonymousStanding };
+      return { patronStandings, anonymousStanding, typeSummaries, periodSlips };
     },
     [demerits, members]
   );
@@ -537,7 +647,6 @@ export const DemeritsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         throw new Error('An uploaded slip photo is required.');
       }
 
-      // 1. Check image-level duplicate (unless part of a multi-slip photo batch)
       if (!payload.allowMultiSlipBatch && (payload.image_sha256 || payload.image_dhash)) {
         const imgDup = checkDuplicateSlipImage(
           {
@@ -564,7 +673,6 @@ export const DemeritsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       const incidentTime = payload.incident_time ? payload.incident_time.slice(0, 5) : null;
       const cleanInfractions = payload.infractions.map((i) => i.trim()).filter(Boolean);
 
-      // 2. Check citation-content & timestamp duplicate (e.g. same slip captured in a scan AND a group photo)
       const citationDup = checkDuplicateCitationContent(
         {
           raw_student: studentTrimmed,
@@ -578,7 +686,6 @@ export const DemeritsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
       if (citationDup.isDuplicate && citationDup.matchedSlip) {
         if (payload.mergeIfCitationDuplicate !== false) {
-          // Merge as secondary photo evidence on the existing citation without double-counting demerits!
           const target = citationDup.matchedSlip;
           const updatedSlip: DemeritSlip = {
             ...target,
@@ -602,11 +709,13 @@ export const DemeritsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
           const patron = resolvePatronName(updatedSlip.raw_student);
           const { member: issuer, matchedAlias } = resolveStaffSignature(updatedSlip.raw_signature);
+          const resolvedItems = normalizeSlipDemeritItems(updatedSlip);
 
           return {
             wasMergedDuplicate: true,
             slip: {
               ...updatedSlip,
+              resolvedItems,
               patron,
               issuer,
               patronDisplayName: patron ? patron.display_name : updatedSlip.raw_student,
@@ -635,7 +744,7 @@ export const DemeritsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       const { member: issuer, matchedAlias } = resolveStaffSignature(sigTrimmed);
       const initialStatus: SlipStatus = autoApproveSubmissions ? 'approved' : 'pending';
 
-      const newSlip: DemeritSlip = {
+      const tempSlip: DemeritSlip = {
         id: crypto.randomUUID(),
         patron_id: patron ? patron.id : null,
         raw_student: studentTrimmed,
@@ -646,6 +755,7 @@ export const DemeritsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         incident_time: incidentTime,
         location_area: payload.location_area.trim() || 'Copper Athletic Club',
         infractions: cleanInfractions,
+        demerit_items: payload.demerit_items,
         image_url: payload.image_url,
         source_image_url: payload.source_image_url || null,
         secondary_image_url: payload.secondary_image_url || null,
@@ -654,6 +764,12 @@ export const DemeritsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         capture_note: payload.capture_note || null,
         status: initialStatus,
         created_at: new Date().toISOString(),
+      };
+
+      const resolvedItems = normalizeSlipDemeritItems(tempSlip);
+      const newSlip: DemeritSlip = {
+        ...tempSlip,
+        demerit_items: resolvedItems,
       };
 
       if (isSupabaseConnected) {
@@ -669,6 +785,7 @@ export const DemeritsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
             incident_time: newSlip.incident_time ? `${newSlip.incident_time}:00` : null,
             location_area: newSlip.location_area,
             infractions: newSlip.infractions,
+            demerit_items: newSlip.demerit_items,
             image_url: newSlip.image_url,
             source_image_url: newSlip.source_image_url,
             secondary_image_url: newSlip.secondary_image_url,
@@ -691,6 +808,7 @@ export const DemeritsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         wasMergedDuplicate: false,
         slip: {
           ...newSlip,
+          resolvedItems,
           patron,
           issuer,
           patronDisplayName: patron ? patron.display_name : newSlip.raw_student,
@@ -842,10 +960,8 @@ export const DemeritsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         continue;
       }
 
-      // Check citation-level duplicate first (student + date + time)
       const citDup = checkDuplicateCitationContent(slip, kept);
       if (citDup.isDuplicate && citDup.matchedSlip) {
-        // Attach secondary image to the kept slip if not already present
         const idx = kept.findIndex((k) => k.id === citDup.matchedSlip!.id);
         if (idx >= 0 && !kept[idx].secondary_image_url && slip.image_url !== kept[idx].image_url) {
           kept[idx] = {

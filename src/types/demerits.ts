@@ -15,6 +15,12 @@ export interface StaffAlias {
   created_at?: string;
 }
 
+export interface DemeritLineItem {
+  type: string; // e.g. 'Attendance / No-Show', 'Insubordination / Defiance', 'Bar Etiquette / Seating', 'Drink Crime / Order Foul', 'Attire / Headgear Foul'
+  description: string; // Specific offense written on slip
+  points: number; // Number of demerits assigned to this line item
+}
+
 export interface DemeritSlip {
   id: string;
   patron_id: string | null;
@@ -26,6 +32,7 @@ export interface DemeritSlip {
   incident_time: string | null; // HH:MM
   location_area: string;
   infractions: string[];
+  demerit_items?: DemeritLineItem[];
   image_url: string | null;
   source_image_url?: string | null;
   secondary_image_url?: string | null;
@@ -42,6 +49,7 @@ export interface EnrichedDemeritSlip extends DemeritSlip {
   patronDisplayName: string;
   issuerDisplayName: string;
   matchedAlias: string | null;
+  resolvedItems: DemeritLineItem[];
 }
 
 export interface PatronStanding {
@@ -50,13 +58,32 @@ export interface PatronStanding {
   isStaff: boolean;
   isPatron: boolean;
   isAnonymous: boolean;
-  totalDemerits: number; // Strictly sum of demerit_count from deduplicated uploaded slips
-  slipCount: number; // Strictly count of unique physical slips
-  netScore: number; // Net demerit score from uploaded slip photos
+  totalDemerits: number; // Sum of demerit points in the selected period & type filter
+  slipCount: number; // Count of unique physical slips in the selected period
+  offenseCount: number; // Count of itemized demerit offenses in the selected period
+  netScore: number;
   latestIncidentDate: string | null;
   latestIncidentTime: string | null;
   recentInfractions: string[];
+  byType: Record<string, { points: number; count: number }>;
   slips: EnrichedDemeritSlip[];
+}
+
+export interface DemeritTypeSummary {
+  type: string;
+  totalPoints: number;
+  offenseCount: number;
+  leaderName: string;
+  leaderPoints: number;
+}
+
+export type PeriodMode = 'all-time' | 'this-month' | 'this-week' | 'oct-17-session' | 'custom';
+
+export interface LeaderboardPeriodFilter {
+  mode: PeriodMode;
+  startDate?: string | null;
+  endDate?: string | null;
+  demeritType?: string | null; // 'all' or specific type
 }
 
 export interface UploadedSourceFile {
@@ -79,5 +106,3 @@ export interface UploadedSourceFile {
     isDeduplicatedMerge?: boolean;
   }[];
 }
-
-export type TimeframeFilter = 'all-time' | 'current-month';

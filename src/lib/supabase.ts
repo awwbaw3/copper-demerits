@@ -1,4 +1,4 @@
-import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import { createClient } from '@supabase/supabase-js';
 import { fingerprintImageFile, ImageFingerprint } from './imageDedup';
 
 const FALLBACK_SUPABASE_URL = 'https://iqbpnkttwtugxkospdqt.supabase.co';
@@ -10,8 +10,11 @@ const supabaseAnonKey =
   (import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined) || FALLBACK_SUPABASE_ANON_KEY;
 
 export const isSupabaseConfigured = Boolean(supabaseUrl && supabaseAnonKey);
+export const COPPER_DEMERITS_SCHEMA = 'copper_demerits';
 
-export const supabase: SupabaseClient = createClient(supabaseUrl, supabaseAnonKey);
+export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+  db: { schema: COPPER_DEMERITS_SCHEMA },
+});
 
 export const SLIPS_BUCKET = 'slips';
 

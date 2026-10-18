@@ -15,6 +15,7 @@ import {
   Camera,
   Fingerprint,
   Layers,
+  Tag,
 } from 'lucide-react';
 
 export const DocketPage: React.FC = () => {
@@ -46,7 +47,10 @@ export const DocketPage: React.FC = () => {
         slip.raw_signature.toLowerCase().includes(q) ||
         slip.location_area.toLowerCase().includes(q) ||
         (slip.incident_time || '').toLowerCase().includes(q) ||
-        slip.infractions.some((inf) => inf.toLowerCase().includes(q))
+        slip.resolvedItems.some(
+          (item) =>
+            item.description.toLowerCase().includes(q) || item.type.toLowerCase().includes(q)
+        )
       );
     });
   }, [uploadedSlips, searchQuery]);
@@ -66,10 +70,10 @@ export const DocketPage: React.FC = () => {
             THE <span className="text-[#B87333]">DOCKET</span>
           </h1>
           <p className="mt-1 text-xs sm:text-sm text-[#B5A99D]">
-            Chronological slip log accounting for the 3 slips in{' '}
+            Chronological slip log with itemized demerit types and point counts from{' '}
             <code className="text-[#E8B888]">20261017_211324.jpg</code> (8:50 PM, 8:56 PM, 9:09 PM)
-            and 1 scan in <code className="text-[#E8B888]">Scan_20261017_212309.jpg</code> (9:09 PM
-            Rick — deduplicated).
+            and <code className="text-[#E8B888]">Scan_20261017_212309.jpg</code> (9:09 PM Rick —
+            deduplicated).
           </p>
         </div>
 
@@ -118,7 +122,7 @@ export const DocketPage: React.FC = () => {
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Filter by patron, time (8:50, 8:56, 9:09), room, or reason..."
+              placeholder="Filter by patron, demerit type, time, room, or reason..."
               className="w-full rounded-xl border border-white/10 bg-[#1A1715] pl-10 pr-4 py-2.5 text-xs sm:text-sm text-[#F5F2EB] placeholder-[#7D7065] focus:border-[#B87333] focus:outline-none"
             />
           </div>
@@ -212,7 +216,6 @@ export const DocketPage: React.FC = () => {
               key={slip.id}
               className="group flex flex-col justify-between overflow-hidden rounded-2xl border border-white/15 bg-[#1A1715] shadow-lg transition hover:border-[#B87333]"
             >
-              {/* Actual Uploaded Slip Photo */}
               {slip.image_url && (
                 <button
                   type="button"
@@ -274,20 +277,34 @@ export const DocketPage: React.FC = () => {
                     </div>
                   </div>
 
-                  {/* Infractions */}
-                  {slip.infractions.length > 0 && (
-                    <div className="mt-3.5 rounded-xl border border-white/10 bg-[#121212] p-3">
-                      <ul className="space-y-1.5">
-                        {slip.infractions.map((infraction, i) => (
+                  {/* Itemized Demerit Types & Points */}
+                  {slip.resolvedItems.length > 0 && (
+                    <div className="mt-3.5 rounded-xl border border-white/10 bg-[#121212] p-3 space-y-2">
+                      <span className="block font-mono-docket text-[10px] font-bold uppercase tracking-wider text-[#9E8F82]">
+                        ITEMIZED DEMERIT TYPES &amp; COUNTS:
+                      </span>
+                      <ul className="space-y-2">
+                        {slip.resolvedItems.map((item, i) => (
                           <li
                             key={i}
-                            className="flex items-start gap-2 text-xs sm:text-sm text-[#F5F2EB]"
+                            className="flex flex-col gap-1 border-b border-white/5 pb-1.5 last:border-none last:pb-0"
                           >
-                            <CheckSquare className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[#C86D51]" />
-                            <span>
-                              {slip.infractions.length > 1 ? `${i + 1}) ` : ''}
-                              {infraction}
-                            </span>
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="inline-flex items-center gap-1 rounded bg-[#B87333]/20 border border-[#B87333]/40 px-1.5 py-0.5 font-mono-docket text-[10px] font-bold text-[#E8B888]">
+                                <Tag className="h-2.5 w-2.5" />
+                                {item.type}
+                              </span>
+                              <span className="font-mono-docket text-[10px] font-bold text-[#E08A4E]">
+                                +{item.points} {item.points === 1 ? 'PT' : 'PTS'}
+                              </span>
+                            </div>
+                            <div className="flex items-start gap-1.5 text-xs sm:text-sm text-[#F5F2EB]">
+                              <CheckSquare className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[#C86D51]" />
+                              <span>
+                                {slip.resolvedItems.length > 1 ? `${i + 1}) ` : ''}
+                                {item.description}
+                              </span>
+                            </div>
                           </li>
                         ))}
                       </ul>
