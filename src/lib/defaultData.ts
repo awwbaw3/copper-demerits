@@ -166,6 +166,16 @@ export const DEFAULT_STAFF_ALIASES: StaffAlias[] = [
     member_id: MEMBER_IDS.SARAH,
   },
   {
+    id: 'b2222222-2222-4222-8222-222222222222',
+    alias: 'sarah (cursive signature)',
+    member_id: MEMBER_IDS.SARAH,
+  },
+  {
+    id: 'b3333333-3333-4333-8333-333333333333',
+    alias: 'cursive signature',
+    member_id: MEMBER_IDS.SARAH,
+  },
+  {
     id: '33333333-3333-4333-8333-333333333305',
     alias: 'the douche',
     member_id: MEMBER_IDS.MATT_BARNES,
@@ -371,8 +381,8 @@ export const DEFAULT_DEMERITS: DemeritSlip[] = [
     id: 'a2222222-2222-4222-8222-222222222222',
     patron_id: MEMBER_IDS.BURTIS,
     raw_student: 'Burtis',
-    issuer_id: MEMBER_IDS.MATT_BARNES,
-    raw_signature: 'Matt Barnes (Signature)',
+    issuer_id: MEMBER_IDS.SARAH,
+    raw_signature: 'Sarah (Cursive Signature)',
     demerit_count: 2,
     incident_date: '2026-10-17',
     incident_time: '20:56',

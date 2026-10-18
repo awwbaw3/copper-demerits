@@ -25,3 +25,8 @@
 - [x] Added itemized `demerit_items` (`type`, `description`, `points`) to track the exact number and category of demerits on each slip.
 - [x] Added `docs/28318.jpg` (`David Lee`, `6:27 PM`, `1 - so far` demerit for `"back talk, insubordinate"`, signed `"The Boss Lady"` → `Sarah`) as the 4th verified slip in `copper_demerits`.
 - [x] Upgraded the Leaderboard (`/`) to calculate demerit leaders across selectable time periods (`All-Time`, `This Month`, `This Week`, `Oct 17 Session`, `Custom Date Range`) and by **Demerit Type**.
+
+## Phase 7: Graphical `copperac.com` & Detroit / Michigan Sports Jumbotron Redesign (Completed — v1.4.0)
+- [x] Updated all 4 slips in `copper_demerits` to be attributed to **Sarah** (`"The Boss Lady"`, `"YOUR BOSS!"`, `"Sarah (Cursive Signature)"`, `"The Boss - AKA Sarah"`).
+- [x] Integrated authentic `copperac.com` interior photography (`CAC_Homepage_Wall.jpg`, `CAC_Homepage_About.jpg`, `CAC_Taps_web.jpg`) and official Stag logo (`CopperLogo_Web.png`).
+- [x] Built animated Detroit Pro Teams (Lions, Red Wings, Bad Boys Pistons, Tigers) & Michigan / MSU visual badges and Copper Moscow Mule Mug point meters (`src/components/MichiganSportsGraphics.tsx`).

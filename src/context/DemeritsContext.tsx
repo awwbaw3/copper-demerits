@@ -29,10 +29,10 @@ import {
 } from '../lib/imageDedup';
 
 const STORAGE_KEYS = {
-  MEMBERS: 'cac_demerits_members_v3',
-  ALIASES: 'cac_demerits_aliases_v3',
-  SLIPS: 'cac_demerits_slips_v3',
-  AUTO_APPROVE: 'cac_demerits_auto_approve_v3',
+  MEMBERS: 'cac_demerits_members_v4',
+  ALIASES: 'cac_demerits_aliases_v4',
+  SLIPS: 'cac_demerits_slips_v4',
+  AUTO_APPROVE: 'cac_demerits_auto_approve_v4',
 };
 
 export interface NewSlipPayload {
@@ -148,8 +148,11 @@ function sanitizeAndDeduplicateSlips(slips: DemeritSlip[]): DemeritSlip[] {
     }
 
     const items = normalizeSlipDemeritItems(s);
+    const isBurtisCursiveSlip = s.id === 'a2222222-2222-4222-8222-222222222222';
     deduped.push({
       ...s,
+      issuer_id: isBurtisCursiveSlip ? '33333333-3333-4333-8333-333333333333' : s.issuer_id,
+      raw_signature: isBurtisCursiveSlip ? 'Sarah (Cursive Signature)' : s.raw_signature,
       incident_time: normTime || null,
       demerit_items: items,
     });

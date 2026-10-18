@@ -37,7 +37,7 @@ export const App: React.FC = () => {
                   copperac.com ↗
                 </a>
                 <span>·</span>
-                <span>PWA v1.3.1</span>
+                <span>PWA v1.4.0</span>
               </div>
             </div>
           </footer>
