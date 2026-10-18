@@ -4,6 +4,33 @@ Chronological log of architectural decisions, database migrations, and infrastru
 
 ---
 
+## 2026-10-18 — v1.6.9 Granular Opt-In Notification Channels, PIN Brute-Force Rate Limiting & Happy Hour Docket
+- **Security Audit & Backend Hardening (`cloudflare/worker.js`, `cloudflare/migration_preferences.sql`)**:
+  - Full audit confirmed 0 leaked keys or private tokens in git history or tracked repository files; all secrets are securely encrypted in Cloudflare Worker environment variables.
+  - Implemented PIN rate-limiting in Cloudflare D1 (`pin_failures` table): locks out unauthorized PIN attempts after 5 failures in 15 minutes.
+  - Enforced strict HTTP security response headers (`X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`) and guaranteed 100% PII stripping on all public endpoints.
+- **Granular Opt-In Notification Matrix (`src/components/ClaimProfileModal.tsx`, `src/types/demerits.ts`, `cloudflare/worker.js`)**:
+  - Added independent 4-way selectors (`[Off] [Email] [Text] [Both]`) for 5 events:
+    1) 👑 Leaderboard Crown (#1 rank takeover)
+    2) 📉 Leaderboard Dethroned (#1 rank loss)
+    3) 📋 New Citation (Slip logged against patron or linked nickname)
+    4) 📢 Ref Whistle Override (Official review decision)
+    5) 🍺 Friday Night Docket (Weekly 5:00 PM EST happy hour digest)
+  - Configured Cloudflare Workers Cron trigger (`0 21 * * 5`) to automate weekly digests, with antispam rate caps (25/day site-wide, 15m/5m cooldowns).
+  - Added Ref Booth test dispatch button in `src/pages/AdminPage.tsx`.
+
+---
+
+## 2026-10-18 — v1.6.8 Full Domain Verification & noreply@copperdemerits.com Live on Resend-Ninjas
+- Successfully verified `copperdemerits.com` directly in user's Resend-Ninjas account (`fe85e77d-54c0-4f74-bc7f-9dd968e94472`), cleaned Cloudflare DNS records, and switched sender to `Copper Demerits <noreply@copperdemerits.com>` with `reply_to: info@drit.ninja`.
+
+---
+
+## 2026-10-18 — v1.6.7 Resend Decoupling, drit.ninja Migration & Discreet Footer Branding
+- Decoupled `copperdemerits.com` from `Resend-Agency`, linked to `DR IT - The IT Ninjas` (`https://drit.ninja`) in website footer, removed Cloudflare marketing references, and routed inquiries to `info@drit.ninja`.
+
+---
+
 ## 2026-10-18 — v1.6.6 Pre-Storage AI Vision Demerit Slip Verification (Reduce Size -> Verify Slip -> Store in R2)
 - **Pre-Storage AI Vision Slip Verification (`cloudflare/worker.js`, `src/lib/moderation.ts`, `src/pages/SubmitSlipPage.tsx`)**:
   - Updated `extractSlipsFromImageWithAI` in `cloudflare/worker.js` to verify `is_demerit_slip: boolean` and return `{ ok: false, isDemeritSlip: false, error: ... }` if an uploaded photo does not contain a physical Demerit Slip.

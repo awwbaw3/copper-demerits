@@ -1,5 +1,5 @@
 /**
- * Copper Demerits (`copperdemerits.com`) — Cloudflare Worker + D1 + R2 + Workers AI Backend (v1.6.8)
+ * Copper Demerits (`copperdemerits.com`) — Cloudflare Worker + D1 + R2 + Workers AI Backend (v1.6.9)
  * - Database: Cloudflare D1 (`DB` binding -> `copper-demerits-db`)
  * - Object Storage: Cloudflare R2 (`SLIPS_BUCKET` binding -> `copper-demerits-slips`)
  * - AI Moderation: Cloudflare Workers AI (`AI` binding) + Optional `GEMINI_API_KEY` (Gemini 2.5 Flash)
@@ -12,12 +12,19 @@ const CORS_HEADERS = {
   'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Member-Id, X-Member-Pin',
 };
 
+const SECURITY_HEADERS = {
+  'X-Content-Type-Options': 'nosniff',
+  'X-Frame-Options': 'DENY',
+  'Referrer-Policy': 'strict-origin-when-cross-origin',
+};
+
 function jsonResponse(data, status = 200) {
   return new Response(JSON.stringify(data), {
     status,
     headers: {
       'Content-Type': 'application/json',
       ...CORS_HEADERS,
+      ...SECURITY_HEADERS,
     },
   });
 }
@@ -635,6 +642,31 @@ function formatPublicMember(row) {
   };
 }
 
+function parseNotificationPreferences(raw) {
+  const defaults = {
+    leader_crowned: 'none',
+    leader_dethroned: 'none',
+    slip_cited: 'none',
+    ref_override: 'none',
+    friday_digest: 'none',
+  };
+  if (!raw) return defaults;
+  try {
+    const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
+    if (!parsed || typeof parsed !== 'object') return defaults;
+    const valid = ['none', 'email', 'text', 'both'];
+    return {
+      leader_crowned: valid.includes(parsed.leader_crowned) ? parsed.leader_crowned : 'none',
+      leader_dethroned: valid.includes(parsed.leader_dethroned) ? parsed.leader_dethroned : 'none',
+      slip_cited: valid.includes(parsed.slip_cited) ? parsed.slip_cited : 'none',
+      ref_override: valid.includes(parsed.ref_override) ? parsed.ref_override : 'none',
+      friday_digest: valid.includes(parsed.friday_digest) ? parsed.friday_digest : 'none',
+    };
+  } catch {
+    return defaults;
+  }
+}
+
 /**
  * Formats a Member row for PRIVATE authenticated profile owner responses (when PIN is verified)
  */
@@ -648,7 +680,85 @@ function formatPrivateMember(row) {
     notification_email: row.notification_email || fallbackEmail || '',
     notification_phone: row.notification_phone || fallbackPhone || '',
     notification_carrier: row.notification_carrier || 'none',
+    notification_preferences: parseNotificationPreferences(row.notification_preferences),
   };
+}
+
+async function checkPinRateLimit(env, ip, memberId) {
+  try {
+    const cutoff = new Date(Date.now() - 15 * 60 * 1000).toISOString();
+    const countRow = await env.DB.prepare(
+      `SELECT COUNT(*) as failures FROM pin_failures
+       WHERE (ip = ? OR (member_id IS NOT NULL AND member_id = ?))
+         AND failed_at >= ?`
+    )
+      .bind(ip || '0.0.0.0', memberId || '', cutoff)
+      .first();
+    return (Number(countRow?.failures) || 0) >= 5;
+  } catch (err) {
+    console.error('checkPinRateLimit error:', err);
+    return false;
+  }
+}
+
+async function recordPinFailure(env, ip, memberId) {
+  try {
+    await env.DB.prepare(
+      `INSERT INTO pin_failures (id, ip, member_id, failed_at)
+       VALUES (?, ?, ?, datetime('now'))`
+    )
+      .bind(crypto.randomUUID(), ip || '0.0.0.0', memberId || null)
+      .run();
+  } catch (err) {
+    console.error('recordPinFailure error:', err);
+  }
+}
+
+async function clearPinFailures(env, ip, memberId) {
+  try {
+    await env.DB.prepare(
+      `DELETE FROM pin_failures WHERE ip = ? OR (member_id IS NOT NULL AND member_id = ?)`
+    )
+      .bind(ip || '0.0.0.0', memberId || '')
+      .run();
+  } catch (err) {
+    console.error('clearPinFailures error:', err);
+  }
+}
+
+async function getTopLeader(env) {
+  try {
+    const row = await env.DB.prepare(
+      `SELECT patron_id, SUM(demerit_count) as total_demerits
+       FROM demerits
+       WHERE status = 'approved' AND patron_id IS NOT NULL
+       GROUP BY patron_id
+       ORDER BY total_demerits DESC
+       LIMIT 1`
+    ).first();
+    if (!row || !row.patron_id) return null;
+    return {
+      patronId: row.patron_id,
+      totalDemerits: Number(row.total_demerits) || 0,
+    };
+  } catch (err) {
+    console.error('getTopLeader error:', err);
+    return null;
+  }
+}
+
+async function isNotificationOnCooldown(env, memberId, eventType, cooldownMinutes = 15) {
+  try {
+    const row = await env.DB.prepare(
+      `SELECT COUNT(*) as cnt FROM notification_log
+       WHERE member_id = ? AND event_type = ? AND created_at >= datetime('now', '-' || ? || ' minutes')`
+    )
+      .bind(memberId, eventType, cooldownMinutes)
+      .first();
+    return (Number(row?.cnt) || 0) > 0;
+  } catch {
+    return false;
+  }
 }
 
 function formatSlip(row, includeAdminOriginals = false) {
@@ -693,11 +803,18 @@ function formatSlip(row, includeAdminOriginals = false) {
  */
 async function sendControlledNotification(
   env,
-  { memberId, eventType, toEmail, toPhone, carrier, subject, htmlText, smsText }
+  { memberId, eventType, toEmail, toPhone, carrier, channel = 'both', subject, htmlText, smsText }
 ) {
   if (!env.RESEND_API_KEY) {
     return { sent: false, reason: 'RESEND_API_KEY not configured' };
   }
+
+  if (channel === 'none') {
+    return { sent: false, reason: 'Channel preference is none' };
+  }
+
+  const allowEmail = channel === 'email' || channel === 'both';
+  const allowSms = channel === 'text' || channel === 'both';
 
   // Enforce strict D1 daily rate cap (max 25 notifications/day across the entire site to guarantee $0 cost)
   const countRow = await env.DB.prepare(
@@ -707,8 +824,8 @@ async function sendControlledNotification(
     return { sent: false, reason: 'Daily free notification cap reached (25/day)' };
   }
 
-  const cleanEmail = (toEmail || '').trim().toLowerCase();
-  const cleanDigits = (toPhone || '').replace(/\D/g, '');
+  const cleanEmail = allowEmail ? (toEmail || '').trim().toLowerCase() : '';
+  const cleanDigits = allowSms ? (toPhone || '').replace(/\D/g, '') : '';
   const normalizedDigits =
     cleanDigits.length === 11 && cleanDigits.startsWith('1') ? cleanDigits.slice(1) : cleanDigits;
 
@@ -731,7 +848,7 @@ async function sendControlledNotification(
   };
 
   const smsRecipients =
-    normalizedDigits.length === 10 && carrier && carrier !== 'none' && gatewayMap[carrier]
+    allowSms && normalizedDigits.length === 10 && carrier && carrier !== 'none' && gatewayMap[carrier]
       ? gatewayMap[carrier]
       : [];
 
@@ -745,7 +862,7 @@ async function sendControlledNotification(
 
   try {
     // 1. Send Rich HTML + Plain-Text Email to the Member's Email Address
-    if (cleanEmail && cleanEmail.includes('@')) {
+    if (allowEmail && cleanEmail && cleanEmail.includes('@')) {
       const emailRes = await fetch('https://api.resend.com/emails', {
         method: 'POST',
         headers: {
@@ -767,8 +884,7 @@ async function sendControlledNotification(
     }
 
     // 2. Send Pure Plain-Text (No HTML, Short Subject) to Carrier SMS Gateway(s)
-    // Carrier gateways (@vtext.com, @txt.att.net, @tmomail.net) require short plain-text bodies without HTML tags
-    if (smsRecipients.length > 0) {
+    if (allowSms && smsRecipients.length > 0) {
       const smsRes = await fetch('https://api.resend.com/emails', {
         method: 'POST',
         headers: {
@@ -815,6 +931,74 @@ async function sendControlledNotification(
       sent: false,
       reason: err instanceof Error ? err.message : 'Notification error',
     };
+  }
+}
+
+/**
+ * Weekly Happy Hour Digest (Friday 5:00 PM EST / 21:00 UTC)
+ */
+async function dispatchFridayDocket(env) {
+  if (!env.RESEND_API_KEY) return { ok: false, error: 'RESEND_API_KEY missing' };
+
+  try {
+    const allMembersRes = await env.DB.prepare('SELECT * FROM members').all();
+    const subscribed = (allMembersRes.results || []).filter((m) => {
+      const prefs = parseNotificationPreferences(m.notification_preferences);
+      return prefs.friday_digest && prefs.friday_digest !== 'none';
+    });
+
+    if (subscribed.length === 0) {
+      return { ok: true, dispatched: 0, message: 'No patrons subscribed to Friday Night Docket.' };
+    }
+
+    const topPatronsRes = await env.DB.prepare(
+      `SELECT m.display_name, SUM(d.demerit_count) as total_demerits
+       FROM demerits d
+       JOIN members m ON m.id = d.patron_id
+       WHERE d.status = 'approved'
+       GROUP BY d.patron_id
+       ORDER BY total_demerits DESC
+       LIMIT 3`
+    ).all();
+    const topPatrons = topPatronsRes.results || [];
+
+    const totalSlipsRes = await env.DB.prepare(
+      `SELECT COUNT(*) as slip_count, SUM(demerit_count) as total_points FROM demerits WHERE status = 'approved'`
+    ).first();
+
+    let dispatchedCount = 0;
+    for (const member of subscribed) {
+      const prefs = parseNotificationPreferences(member.notification_preferences);
+      const res = await sendControlledNotification(env, {
+        memberId: member.id,
+        eventType: 'friday_digest',
+        toEmail: member.notification_email,
+        toPhone: member.notification_phone || member.claimed_by_contact,
+        carrier: member.notification_carrier,
+        channel: prefs.friday_digest,
+        subject: `🍺 Friday Night Docket: Happy Hour Kickoff & Ring of Honor Leaders!`,
+        htmlText: `<div style="font-family:sans-serif;background:#121212;color:#F5F2EB;padding:24px;border-radius:16px;border:2px solid #B87333;">
+          <h2 style="color:#DFC15E;margin-top:0;">🍺 FRIDAY NIGHT DOCKET — HAPPY HOUR KICKOFF</h2>
+          <p>Happy Friday! It's 5:00 PM in Marshall, MI and the taps are open at Copper Athletic Club.</p>
+          <div style="background:#1A1614;padding:16px;border-radius:12px;margin:16px 0;border-left:4px solid #DFC15E;">
+            <h4 style="color:#DFC15E;margin:0 0 8px 0;">👑 CURRENT LEADERBOARD PODIUM</h4>
+            <ol style="margin:0;padding-left:20px;line-height:1.6;">
+              ${topPatrons.map((p) => `<li><strong>${p.display_name}</strong> — ${p.total_demerits} Demerits</li>`).join('')}
+            </ol>
+          </div>
+          <p><strong>Total Wall Demerits:</strong> ${totalSlipsRes?.total_points || 0} demerits across ${totalSlipsRes?.slip_count || 0} physical slips.</p>
+          <p style="margin-top:20px;"><a href="https://copperdemerits.com" style="color:#121212;background:#DFC15E;padding:12px 20px;border-radius:10px;text-decoration:none;font-weight:bold;display:inline-block;">View Live Ring of Honor Leaderboard →</a></p>
+          <p style="font-size:11px;color:#9E8F82;margin-top:20px;">Unofficial Patron-Run Fan Site for Good-Natured Fun Only — Not Affiliated with Copper Athletic Club. Manage notification channels anytime in My Locker.</p>
+        </div>`,
+        smsText: `Copper Demerits Friday Docket: Happy hour is LIVE! Leaders: ${topPatrons.map(p => `${p.display_name} (${p.total_demerits})`).join(', ')}. View board: https://copperdemerits.com`,
+      });
+      if (res.sent) dispatchedCount++;
+    }
+
+    return { ok: true, dispatched: dispatchedCount, totalSubscribed: subscribed.length };
+  } catch (err) {
+    console.error('dispatchFridayDocket error:', err);
+    return { ok: false, error: err.message };
   }
 }
 
@@ -910,6 +1094,7 @@ async function ensureSchemaAndSeed(db) {
     'ALTER TABLE members ADD COLUMN notification_verified INTEGER NOT NULL DEFAULT 0',
     'ALTER TABLE members ADD COLUMN verification_code TEXT',
     'ALTER TABLE members ADD COLUMN verification_sent_at TEXT',
+    'ALTER TABLE members ADD COLUMN notification_preferences TEXT',
   ];
   for (const sql of memberCols) {
     try {
@@ -918,6 +1103,17 @@ async function ensureSchemaAndSeed(db) {
       // Column already exists
     }
   }
+
+  await db
+    .prepare(
+      `CREATE TABLE IF NOT EXISTS pin_failures (
+        id TEXT PRIMARY KEY,
+        ip TEXT,
+        member_id TEXT,
+        failed_at TEXT NOT NULL DEFAULT (datetime('now'))
+      )`
+    )
+    .run();
 
   const demeritCols = [
     'ALTER TABLE demerits ADD COLUMN is_blurred INTEGER NOT NULL DEFAULT 0',
@@ -1192,6 +1388,7 @@ export default {
           favoriteTeam,
           tagline,
           role,
+          notificationPreferences,
         } = body;
         const cleanPin = String(pin || '').trim();
 
@@ -1272,7 +1469,20 @@ export default {
             );
           }
 
+          const ip = request.headers.get('cf-connecting-ip') || '0.0.0.0';
+          if (await checkPinRateLimit(env, ip, matchedMember.id)) {
+            return jsonResponse(
+              {
+                ok: false,
+                error:
+                  'Too many incorrect PIN attempts. Security lockout active for 15 minutes.',
+              },
+              429
+            );
+          }
+
           if (String(matchedMember.claimed_pin || '').trim() !== cleanPin) {
+            await recordPinFailure(env, ip, matchedMember.id);
             return jsonResponse(
               {
                 ok: false,
@@ -1281,6 +1491,8 @@ export default {
               403
             );
           }
+
+          await clearPinFailures(env, ip, matchedMember.id);
 
           return jsonResponse({
             ok: true,
@@ -1398,6 +1610,10 @@ export default {
           }
 
           const now = new Date().toISOString();
+          const notifPrefs = notificationPreferences
+            ? JSON.stringify(parseNotificationPreferences(notificationPreferences))
+            : null;
+
           await env.DB.prepare(
             `UPDATE members
              SET is_claimed = 1,
@@ -1406,6 +1622,7 @@ export default {
                  claimed_by_contact = ?,
                  notification_email = COALESCE(?, notification_email),
                  notification_phone = COALESCE(?, notification_phone),
+                 notification_preferences = COALESCE(?, notification_preferences),
                  favorite_team = COALESCE(?, favorite_team),
                  tagline = COALESCE(?, tagline)
              WHERE id = ?`
@@ -1416,6 +1633,7 @@ export default {
               cleanEmail || cleanPhone,
               cleanEmail || null,
               cleanPhone || null,
+              notifPrefs,
               favoriteTeam || existing.favorite_team || 'lions',
               tagline !== undefined && tagline !== '' ? tagline : existing.tagline,
               existing.id
@@ -1441,10 +1659,13 @@ export default {
         const now = new Date().toISOString();
         const isStaff = role === 'staff' || role === 'both' ? 1 : 0;
         const isPatron = role === 'staff' ? 0 : 1;
+        const newNotifPrefs = JSON.stringify(
+          parseNotificationPreferences(notificationPreferences || {})
+        );
 
         await env.DB.prepare(
-          `INSERT INTO members (id, display_name, is_staff, is_patron, is_admin, claimed_by_contact, claimed_pin, is_claimed, claimed_at, notification_email, notification_phone, favorite_team, tagline, created_at)
-           VALUES (?, ?, ?, ?, 0, ?, ?, 1, ?, ?, ?, ?, ?, ?)`
+          `INSERT INTO members (id, display_name, is_staff, is_patron, is_admin, claimed_by_contact, claimed_pin, is_claimed, claimed_at, notification_email, notification_phone, notification_preferences, favorite_team, tagline, created_at)
+           VALUES (?, ?, ?, ?, 0, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?)`
         )
           .bind(
             newId,
@@ -1456,6 +1677,7 @@ export default {
             now,
             cleanEmail || null,
             cleanPhone || null,
+            newNotifPrefs,
             favoriteTeam || 'lions',
             tagline || 'Copper AC Regular',
             now
@@ -1488,12 +1710,25 @@ export default {
           notificationPhone,
           notificationCarrier,
           notificationOptIn,
+          notificationPreferences,
         } = body;
 
         if (!memberId || !currentPin) {
           return jsonResponse(
             { ok: false, error: 'Your current 4–8 digit Bar PIN is required to save profile changes.' },
             401
+          );
+        }
+
+        const ip = request.headers.get('cf-connecting-ip') || '0.0.0.0';
+        if (await checkPinRateLimit(env, ip, memberId)) {
+          return jsonResponse(
+            {
+              ok: false,
+              error:
+                'Too many incorrect PIN attempts. Security lockout active for 15 minutes.',
+            },
+            429
           );
         }
 
@@ -1506,8 +1741,11 @@ export default {
         }
 
         if (existing.is_claimed && existing.claimed_pin && existing.claimed_pin !== String(currentPin).trim()) {
+          await recordPinFailure(env, ip, memberId);
           return jsonResponse({ ok: false, error: 'Incorrect current Bar PIN.' }, 403);
         }
+
+        await clearPinFailures(env, ip, memberId);
 
         const nextEmail =
           notificationEmail !== undefined
@@ -1581,6 +1819,11 @@ export default {
         const nextVerified =
           emailChanged || phoneChanged ? 0 : Number(existing.notification_verified) || 0;
 
+        const nextPreferences =
+          notificationPreferences !== undefined
+            ? JSON.stringify(parseNotificationPreferences(notificationPreferences))
+            : existing.notification_preferences;
+
         await env.DB.prepare(
           `UPDATE members
            SET display_name = ?,
@@ -1593,7 +1836,8 @@ export default {
                notification_phone = ?,
                notification_carrier = ?,
                notification_opt_in = ?,
-               notification_verified = ?
+               notification_verified = ?,
+               notification_preferences = ?
            WHERE id = ?`
         )
           .bind(
@@ -1607,6 +1851,7 @@ export default {
             notificationCarrier || existing.notification_carrier || 'none',
             notificationOptIn ? 1 : 0,
             notificationOptIn ? nextVerified : 0,
+            nextPreferences,
             memberId
           )
           .run();
@@ -1743,14 +1988,29 @@ export default {
       // 8B. Send a Live Test Email & Carrier SMS Alert to a Verified/Claimed Profile (`POST /api/notifications/test`)
       if (path === '/api/notifications/test' && request.method === 'POST') {
         const body = await request.json();
-        const { memberId, pin, email, phone, carrier } = body;
+        const { memberId, pin, email, phone, carrier, channel } = body;
+
+        const ip = request.headers.get('cf-connecting-ip') || '0.0.0.0';
+        if (await checkPinRateLimit(env, ip, memberId)) {
+          return jsonResponse(
+            {
+              ok: false,
+              error:
+                'Too many incorrect PIN attempts. Security lockout active for 15 minutes.',
+            },
+            429
+          );
+        }
 
         const existing = await env.DB.prepare('SELECT * FROM members WHERE id = ?')
           .bind(memberId)
           .first();
         if (!existing || (existing.claimed_pin && existing.claimed_pin !== String(pin || '').trim())) {
+          await recordPinFailure(env, ip, memberId);
           return jsonResponse({ ok: false, error: 'Valid Bar PIN required.' }, 403);
         }
+
+        await clearPinFailures(env, ip, memberId);
 
         const targetEmail = normalizeEmail(email || existing.notification_email);
         const targetPhone = normalizePhone(
@@ -1784,6 +2044,7 @@ export default {
           toEmail: targetEmail,
           toPhone: targetPhone,
           carrier: targetCarrier,
+          channel: channel || 'both',
           subject: `🍺 Ring of Honor Test Alert for ${existing.display_name}!`,
           htmlText: `<div style="font-family:sans-serif;background:#121212;color:#F5F2EB;padding:24px;border-radius:16px;border:2px solid #B87333;">
             <h2 style="color:#DFC15E;margin-top:0;">🍺 COPPER DEMERITS • LIVE SYSTEM TEST</h2>
@@ -1808,6 +2069,84 @@ export default {
           ok: true,
           ...testRes,
           member: formatPrivateMember(updated),
+        });
+      }
+
+      // 8C. Send a Live Admin Test Preview of the Friday Night Docket (`POST /api/notifications/friday-digest-test`)
+      if (path === '/api/notifications/friday-digest-test' && request.method === 'POST') {
+        const body = await request.json();
+        const { adminMemberId, pin } = body;
+        const ip = request.headers.get('cf-connecting-ip') || '0.0.0.0';
+
+        if (await checkPinRateLimit(env, ip, adminMemberId)) {
+          return jsonResponse(
+            {
+              ok: false,
+              error:
+                'Too many incorrect PIN attempts. Security lockout active for 15 minutes.',
+            },
+            429
+          );
+        }
+
+        const admin = await env.DB.prepare('SELECT * FROM members WHERE id = ?')
+          .bind(adminMemberId)
+          .first();
+        if (
+          !admin ||
+          (!admin.is_admin && !admin.is_staff) ||
+          String(admin.claimed_pin || '').trim() !== String(pin || '').trim()
+        ) {
+          await recordPinFailure(env, ip, adminMemberId);
+          return jsonResponse({ ok: false, error: 'Valid Admin/Staff Bar PIN required.' }, 403);
+        }
+        await clearPinFailures(env, ip, adminMemberId);
+
+        // Preview dispatch specifically to this admin
+        const topPatronsRes = await env.DB.prepare(
+          `SELECT m.display_name, SUM(d.demerit_count) as total_demerits
+           FROM demerits d
+           JOIN members m ON m.id = d.patron_id
+           WHERE d.status = 'approved'
+           GROUP BY d.patron_id
+           ORDER BY total_demerits DESC
+           LIMIT 3`
+        ).all();
+        const topPatrons = topPatronsRes.results || [];
+
+        const totalSlipsRes = await env.DB.prepare(
+          `SELECT COUNT(*) as slip_count, SUM(demerit_count) as total_points FROM demerits WHERE status = 'approved'`
+        ).first();
+
+        const previewRes = await sendControlledNotification(env, {
+          memberId: admin.id,
+          eventType: 'friday_digest_preview',
+          toEmail: admin.notification_email,
+          toPhone: admin.notification_phone || admin.claimed_by_contact,
+          carrier: admin.notification_carrier,
+          channel: 'both',
+          subject: `🍺 [Admin Preview] Friday Night Docket: Happy Hour Kickoff!`,
+          htmlText: `<div style="font-family:sans-serif;background:#121212;color:#F5F2EB;padding:24px;border-radius:16px;border:2px solid #DFC15E;">
+            <span style="background:#DFC15E;color:#121212;font-size:10px;font-weight:900;padding:3px 8px;border-radius:6px;text-transform:uppercase;">Admin Test Preview</span>
+            <h2 style="color:#DFC15E;margin-top:12px;">🍺 FRIDAY NIGHT DOCKET — HAPPY HOUR KICKOFF</h2>
+            <p>Hey ${admin.display_name}, this is the Friday 5:00 PM Happy Hour broadcast sent to subscribed Ring of Honor patrons:</p>
+            <div style="background:#1A1614;padding:16px;border-radius:12px;margin:16px 0;border-left:4px solid #DFC15E;">
+              <h4 style="color:#DFC15E;margin:0 0 8px 0;">👑 CURRENT LEADERBOARD PODIUM</h4>
+              <ol style="margin:0;padding-left:20px;line-height:1.6;">
+                ${topPatrons.map((p) => `<li><strong>${p.display_name}</strong> — ${p.total_demerits} Demerits</li>`).join('')}
+              </ol>
+            </div>
+            <p><strong>Total Wall Demerits:</strong> ${totalSlipsRes?.total_points || 0} demerits across ${totalSlipsRes?.slip_count || 0} physical slips.</p>
+            <p style="margin-top:20px;"><a href="https://copperdemerits.com" style="color:#121212;background:#DFC15E;padding:12px 20px;border-radius:10px;text-decoration:none;font-weight:bold;display:inline-block;">View Live Ring of Honor Leaderboard →</a></p>
+            <p style="font-size:11px;color:#9E8F82;margin-top:20px;">Unofficial Patron-Run Fan Site for Good-Natured Fun Only — Not Affiliated with Copper Athletic Club.</p>
+          </div>`,
+          smsText: `[Admin Preview] Friday Docket: Happy hour is LIVE! Leaders: ${topPatrons.map(p => `${p.display_name} (${p.total_demerits})`).join(', ')}. View wall: https://copperdemerits.com`,
+        });
+
+        return jsonResponse({
+          ok: true,
+          previewSent: previewRes.sent,
+          dispatchDetails: previewRes.dispatchDetails,
         });
       }
 
@@ -1942,6 +2281,9 @@ export default {
           ? mod.reason || body.moderation_flag_reason || 'Blurred by Referee Monitor — Pending Admin Override'
           : null;
 
+        // Track leaderboard status prior to this slip
+        const previousLeader = await getTopLeader(env);
+
         await env.DB.prepare(
           `INSERT INTO demerits (
             id, patron_id, raw_student, issuer_id, raw_signature, demerit_count,
@@ -2000,29 +2342,121 @@ export default {
               smsText: `Copper Demerits Ref Booth: Blurred slip for ${sanitizedStudent} queued for your admin override at copperdemerits.com/admin`,
             });
           }
-        } else if (resolvedPatronId) {
-          // If clean and approved, notify the cited patron if they opted into verified notifications
-          const patronRow = await env.DB.prepare(
-            `SELECT * FROM members WHERE id = ? AND notification_opt_in = 1 AND notification_verified = 1`
-          )
-            .bind(resolvedPatronId)
-            .first();
-          if (patronRow) {
-            await sendControlledNotification(env, {
-              memberId: patronRow.id,
-              eventType: 'patron_new_slip',
-              toEmail: patronRow.notification_email,
-              toPhone: patronRow.notification_phone || patronRow.claimed_by_contact,
-              carrier: patronRow.notification_carrier,
-              subject: `🚨 Penalty Box Alert: +${body.demerit_count || 1} Demerit(s) Logged for ${patronRow.display_name}!`,
-              htmlText: `<div style="font-family:sans-serif;background:#121212;color:#F5F2EB;padding:20px;border-radius:16px;border:2px solid #B87333;">
-                <h3 style="color:#B87333;margin-top:0;">🚨 NEW RING OF HONOR DEMERIT SLIP</h3>
-                <p>Hey <strong>${patronRow.display_name}</strong>, a new slip (+${body.demerit_count || 1} Demerits) was just logged on the wall!</p>
-                <p><strong>Offense:</strong> ${sanitizedInfractions.join(', ')}</p>
-                <p><a href="https://copperdemerits.com/docket" style="color:#DFC15E;font-weight:bold;">View the Wall of Slips →</a></p>
-              </div>`,
-              smsText: `Ring of Honor Alert: +${body.demerit_count || 1} Demerit(s) logged for ${patronRow.display_name} (${sanitizedInfractions.join(', ')}). View at copperdemerits.com`,
-            });
+        } else {
+          // If clean and approved:
+          const currentLeader = await getTopLeader(env);
+
+          // 1. Leaderboard Crown / Dethroned Check
+          if (
+            previousLeader &&
+            currentLeader &&
+            previousLeader.patronId !== currentLeader.patronId
+          ) {
+            // New Leader Crowned
+            const newLeaderRow = await env.DB.prepare('SELECT * FROM members WHERE id = ?')
+              .bind(currentLeader.patronId)
+              .first();
+            if (newLeaderRow) {
+              const prefs = parseNotificationPreferences(newLeaderRow.notification_preferences);
+              if (prefs.leader_crowned !== 'none') {
+                const onCooldown = await isNotificationOnCooldown(
+                  env,
+                  newLeaderRow.id,
+                  'leader_crowned',
+                  15
+                );
+                if (!onCooldown) {
+                  await sendControlledNotification(env, {
+                    memberId: newLeaderRow.id,
+                    eventType: 'leader_crowned',
+                    toEmail: newLeaderRow.notification_email,
+                    toPhone: newLeaderRow.notification_phone || newLeaderRow.claimed_by_contact,
+                    carrier: newLeaderRow.notification_carrier,
+                    channel: prefs.leader_crowned,
+                    subject: `👑 Ring of Honor Crown: You are now the #1 Demerit Leader!`,
+                    htmlText: `<div style="font-family:sans-serif;background:#121212;color:#F5F2EB;padding:24px;border-radius:16px;border:2px solid #DFC15E;">
+                      <h2 style="color:#DFC15E;margin-top:0;">👑 YOU ARE NOW THE #1 DEMERIT LEADER!</h2>
+                      <p>Hail to the King! You just claimed the #1 spot on the Copper Athletic Club <strong>Ring of Honor Leaderboard</strong> with <strong>${currentLeader.totalDemerits} Demerits</strong>.</p>
+                      <p style="margin-top:20px;"><a href="https://copperdemerits.com" style="color:#121212;background:#DFC15E;padding:12px 20px;border-radius:10px;text-decoration:none;font-weight:bold;display:inline-block;">View Ring of Honor Leaderboard →</a></p>
+                      <p style="font-size:11px;color:#9E8F82;margin-top:20px;">Unofficial Patron-Run Fan Site for Good-Natured Fun Only — Not Affiliated with Copper Athletic Club.</p>
+                    </div>`,
+                    smsText: `👑 Crowned! You just took the #1 spot on the Ring of Honor Leaderboard with ${currentLeader.totalDemerits} Demerits! View board: https://copperdemerits.com`,
+                  });
+                }
+              }
+            }
+
+            // Previous Leader Dethroned
+            const prevLeaderRow = await env.DB.prepare('SELECT * FROM members WHERE id = ?')
+              .bind(previousLeader.patronId)
+              .first();
+            if (prevLeaderRow) {
+              const prefs = parseNotificationPreferences(prevLeaderRow.notification_preferences);
+              if (prefs.leader_dethroned !== 'none') {
+                const onCooldown = await isNotificationOnCooldown(
+                  env,
+                  prevLeaderRow.id,
+                  'leader_dethroned',
+                  15
+                );
+                if (!onCooldown) {
+                  await sendControlledNotification(env, {
+                    memberId: prevLeaderRow.id,
+                    eventType: 'leader_dethroned',
+                    toEmail: prevLeaderRow.notification_email,
+                    toPhone: prevLeaderRow.notification_phone || prevLeaderRow.claimed_by_contact,
+                    carrier: prevLeaderRow.notification_carrier,
+                    channel: prefs.leader_dethroned,
+                    subject: `📉 Dethroned! You were just overtaken for #1 on the Leaderboard`,
+                    htmlText: `<div style="font-family:sans-serif;background:#121212;color:#F5F2EB;padding:24px;border-radius:16px;border:2px solid #B87333;">
+                      <h2 style="color:#E08A4E;margin-top:0;">📉 DETHRONED FROM THE #1 SPOT!</h2>
+                      <p>Hey ${prevLeaderRow.display_name}, someone just overtook you for #1 on the Ring of Honor Leaderboard.</p>
+                      <p style="margin-top:20px;"><a href="https://copperdemerits.com" style="color:#121212;background:#DFC15E;padding:12px 20px;border-radius:10px;text-decoration:none;font-weight:bold;display:inline-block;">Reclaim Your Crown on the Board →</a></p>
+                      <p style="font-size:11px;color:#9E8F82;margin-top:20px;">Unofficial Patron-Run Fan Site for Good-Natured Fun Only — Not Affiliated with Copper Athletic Club.</p>
+                    </div>`,
+                    smsText: `📉 Dethroned! You were just overtaken for #1 on the Ring of Honor Leaderboard. Reclaim your title at https://copperdemerits.com`,
+                  });
+                }
+              }
+            }
+          }
+
+          // 2. Slip Cited Alert to Patron
+          if (resolvedPatronId) {
+            const patronRow = await env.DB.prepare('SELECT * FROM members WHERE id = ?')
+              .bind(resolvedPatronId)
+              .first();
+            if (patronRow) {
+              const prefs = parseNotificationPreferences(patronRow.notification_preferences);
+              const channelChoice =
+                prefs.slip_cited !== 'none'
+                  ? prefs.slip_cited
+                  : patronRow.notification_opt_in && patronRow.notification_verified
+                  ? 'both'
+                  : 'none';
+
+              if (channelChoice !== 'none') {
+                const onCooldown = await isNotificationOnCooldown(env, patronRow.id, 'slip_cited', 5);
+                if (!onCooldown) {
+                  await sendControlledNotification(env, {
+                    memberId: patronRow.id,
+                    eventType: 'slip_cited',
+                    toEmail: patronRow.notification_email,
+                    toPhone: patronRow.notification_phone || patronRow.claimed_by_contact,
+                    carrier: patronRow.notification_carrier,
+                    channel: channelChoice,
+                    subject: `🚨 Penalty Box Alert: +${body.demerit_count || 1} Demerit(s) Logged for ${patronRow.display_name}!`,
+                    htmlText: `<div style="font-family:sans-serif;background:#121212;color:#F5F2EB;padding:20px;border-radius:16px;border:2px solid #B87333;">
+                      <h3 style="color:#B87333;margin-top:0;">🚨 NEW RING OF HONOR DEMERIT SLIP</h3>
+                      <p>Hey <strong>${patronRow.display_name}</strong>, a new slip (+${body.demerit_count || 1} Demerits) was just logged on the wall!</p>
+                      <p><strong>Offense:</strong> ${sanitizedInfractions.join(', ')}</p>
+                      <p><a href="https://copperdemerits.com/docket" style="color:#DFC15E;font-weight:bold;">View the Wall of Slips →</a></p>
+                    </div>`,
+                    smsText: `Ring of Honor Alert: +${body.demerit_count || 1} Demerit(s) logged for ${patronRow.display_name} (${sanitizedInfractions.join(', ')}). View at copperdemerits.com`,
+                  });
+                }
+              }
+            }
           }
         }
 
@@ -2131,6 +2565,41 @@ export default {
           )
             .bind(slipId)
             .run();
+        }
+
+        if (slipRow.patron_id) {
+          const patronRow = await env.DB.prepare('SELECT * FROM members WHERE id = ?')
+            .bind(slipRow.patron_id)
+            .first();
+          if (patronRow) {
+            const prefs = parseNotificationPreferences(patronRow.notification_preferences);
+            if (prefs.ref_override !== 'none') {
+              const actionLabel =
+                action === 'reject'
+                  ? 'Disallowed & Removed from Wall'
+                  : action === 'approve_unblur'
+                  ? 'Approved & Unblurred'
+                  : 'Approved (Kept Blurred)';
+              await sendControlledNotification(env, {
+                memberId: patronRow.id,
+                eventType: 'ref_override',
+                toEmail: patronRow.notification_email,
+                toPhone: patronRow.notification_phone || patronRow.claimed_by_contact,
+                carrier: patronRow.notification_carrier,
+                channel: prefs.ref_override,
+                subject: `📢 Referee Decision on Your Slip: ${actionLabel}`,
+                htmlText: `<div style="font-family:sans-serif;background:#121212;color:#F5F2EB;padding:20px;border-radius:16px;border:2px solid #DFC15E;">
+                  <h3 style="color:#DFC15E;margin-top:0;">📢 REFEREE BOOTH OVERRIDE DECISION</h3>
+                  <p>Hey <strong>${patronRow.display_name}</strong>,</p>
+                  <p>The Official Bar Referee reviewed a slip logged under your name:</p>
+                  <p><strong>Decision:</strong> ${actionLabel}</p>
+                  <p><strong>Cited Name:</strong> ${slipRow.raw_student}</p>
+                  <p><a href="https://copperdemerits.com/docket" style="color:#DFC15E;font-weight:bold;">View Current Wall of Slips →</a></p>
+                </div>`,
+                smsText: `Referee Decision: Your slip for "${slipRow.raw_student}" was reviewed in the Ref Booth (${actionLabel}). View docket: https://copperdemerits.com/docket`,
+              });
+            }
+          }
         }
 
         const updated = await env.DB.prepare('SELECT * FROM demerits WHERE id = ?')
@@ -2322,6 +2791,10 @@ export default {
         500
       );
     }
+  },
+
+  async scheduled(event, env, ctx) {
+    ctx.waitUntil(dispatchFridayDocket(env));
   },
 };
 

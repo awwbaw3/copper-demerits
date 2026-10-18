@@ -47,6 +47,9 @@
 - [x] Configured DNS-verified **`copperdemerits.com`** on Resend Free Tier (`referee@copperdemerits.com`) with **Opt-In 6-Digit Verified Email & Free Carrier SMS Gateway Notifications** capped at 25/day ($0 cost).
 - [x] Added **Preset Jovial Bar Reactions**, **Unofficial Patron-Run Fan Site Disclaimer**, and **Complementary Local SEO (`index.html` JSON-LD `BarOrPub` attribution + dofollow backlink to `copperac.com`)**.
 
-
-
-
+## Phase 10: Granular Notification Matrix, PIN Rate-Limiting Defense & Automated Happy Hour Docket (Completed — v1.6.9)
+- [x] Zero-Leak Security Audit: Verified 0 API keys in git history or tracked repository files; all secrets encrypted in Cloudflare Worker environment variables.
+- [x] Backend PIN Brute-Force Defense: Added rate-limiting table (`pin_failures`) on Cloudflare D1 with automatic 5-attempt/15-minute lockouts.
+- [x] Strict Security Headers: Enforced `nosniff`, `DENY`, and `strict-origin-when-cross-origin` on all API responses.
+- [x] Granular Opt-In Notification Triggers (Off by default): Independent 4-way selectors (`[Off] [Email] [Text] [Both]`) for 👑 Crown, 📉 Dethroned, 📋 New Citation, 📢 Ref Whistle, and 🍺 Friday Night Docket.
+- [x] Automated Friday 5:00 PM EST Cron: Cloudflare Workers Cron trigger (`0 21 * * 5`) with Ref Booth preview trigger and safety caps.

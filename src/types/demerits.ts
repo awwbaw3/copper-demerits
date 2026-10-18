@@ -1,5 +1,23 @@
 export type SlipStatus = 'pending' | 'approved' | 'rejected';
 
+export type NotificationChannelPreference = 'none' | 'email' | 'text' | 'both';
+
+export interface NotificationPreferences {
+  leader_crowned: NotificationChannelPreference;
+  leader_dethroned: NotificationChannelPreference;
+  slip_cited: NotificationChannelPreference;
+  ref_override: NotificationChannelPreference;
+  friday_digest: NotificationChannelPreference;
+}
+
+export const DEFAULT_NOTIFICATION_PREFERENCES: NotificationPreferences = {
+  leader_crowned: 'none',
+  leader_dethroned: 'none',
+  slip_cited: 'none',
+  ref_override: 'none',
+  friday_digest: 'none',
+};
+
 export interface Member {
   id: string;
   display_name: string;
@@ -15,6 +33,7 @@ export interface Member {
   notification_carrier?: string;
   notification_opt_in?: boolean;
   notification_verified?: boolean;
+  notification_preferences?: NotificationPreferences;
   created_at?: string;
 }
 

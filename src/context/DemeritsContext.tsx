@@ -11,6 +11,7 @@ import {
   SlipStatus,
   SlipReactionKey,
   UploadedSourceFile,
+  NotificationPreferences,
 } from '../types/demerits';
 import {
   DEFAULT_MEMBERS,
@@ -73,6 +74,7 @@ export interface ClaimProfilePayload {
   favoriteTeam?: string;
   tagline?: string;
   role?: 'staff' | 'patron' | 'both';
+  notificationPreferences?: NotificationPreferences;
 }
 
 export interface UpdateMyProfilePayload {
@@ -86,6 +88,7 @@ export interface UpdateMyProfilePayload {
   notificationPhone?: string;
   notificationCarrier?: string;
   notificationOptIn?: boolean;
+  notificationPreferences?: NotificationPreferences;
 }
 
 interface DemeritsContextValue {
@@ -121,6 +124,7 @@ interface DemeritsContextValue {
     code: string;
   }) => Promise<{ ok: boolean; member?: Member; error?: string }>;
   logoutProfile: () => void;
+  sendFridayDigestTest: () => Promise<{ ok: boolean; message?: string; preview?: any; error?: string }>;
   autoApproveSubmissions: boolean;
   setAutoApproveSubmissions: (val: boolean) => void;
   resolveStaffSignature: (rawSignature: string) => { member: Member | null; matchedAlias: string | null };
@@ -572,6 +576,33 @@ export const DemeritsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     setCurrentMember(null);
     setActivePin('');
   }, []);
+
+  const sendFridayDigestTest = useCallback(
+    async (): Promise<{ ok: boolean; message?: string; preview?: any; error?: string }> => {
+      if (!currentMember || !activePin) {
+        return { ok: false, error: 'Sign in with your Admin/Ref PIN first.' };
+      }
+      try {
+        const res = await cloudflareFetch<{ ok: boolean; message: string; preview: any }>(
+          '/api/notifications/friday-digest-test',
+          {
+            method: 'POST',
+            body: JSON.stringify({
+              memberId: currentMember.id,
+              pin: activePin,
+            }),
+          }
+        );
+        return { ok: true, message: res.message, preview: res.preview };
+      } catch (err) {
+        return {
+          ok: false,
+          error: err instanceof Error ? err.message : 'Could not trigger test Friday Docket.',
+        };
+      }
+    },
+    [currentMember, activePin]
+  );
 
   const resolveStaffSignature = useCallback(
     (rawSignature: string): { member: Member | null; matchedAlias: string | null } => {
@@ -1650,6 +1681,7 @@ export const DemeritsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         requestNotificationVerification,
         verifyNotificationCode,
         logoutProfile,
+        sendFridayDigestTest,
         autoApproveSubmissions,
         setAutoApproveSubmissions,
         resolveStaffSignature,

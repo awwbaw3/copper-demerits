@@ -17,6 +17,8 @@ import {
   Database,
   Fingerprint,
   Lock,
+  Beer,
+  Send,
 } from 'lucide-react';
 
 export const AdminPage: React.FC = () => {
@@ -38,9 +40,11 @@ export const AdminPage: React.FC = () => {
     addOrUpdateMember,
     deduplicateExistingSlips,
     adminOverrideSlip,
+    sendFridayDigestTest,
   } = useDemerits();
 
   const [selectedSlip, setSelectedSlip] = useState<EnrichedDemeritSlip | null>(null);
+  const [sendingDigestTest, setSendingDigestTest] = useState(false);
 
   // Alias Mapper State
   const [newAliasInput, setNewAliasInput] = useState('');
@@ -180,6 +184,26 @@ export const AdminPage: React.FC = () => {
     }
   };
 
+  const handleSendFridayDigestTest = async () => {
+    setSendingDigestTest(true);
+    try {
+      const res = await sendFridayDigestTest();
+      if (res.ok) {
+        setFeedback({
+          type: 'ok',
+          msg: `✓ ${res.message || 'Friday Docket test triggered!'} (Podium #1: ${res.preview?.topLeader || 'None'})`,
+        });
+      } else {
+        setFeedback({
+          type: 'err',
+          msg: res.error || 'Could not send test Friday Docket.',
+        });
+      }
+    } finally {
+      setSendingDigestTest(false);
+    }
+  };
+
   const staffRes = resolveStaffSignature(testSignature);
   const patronRes = resolvePatronNickname(testSignature);
   const testResolution = staffRes.member ? staffRes : patronRes;
@@ -229,6 +253,34 @@ export const AdminPage: React.FC = () => {
           {feedback.msg}
         </div>
       )}
+
+      {/* Friday Night Docket & Dispatcher Info */}
+      <section className="rounded-2xl border border-white/10 bg-[#141110] p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="space-y-1">
+          <div className="flex items-center gap-2 flex-wrap">
+            <Beer className="h-4 w-4 text-[#DFC15E]" />
+            <span className="font-athletic text-base sm:text-lg font-bold uppercase tracking-wider text-[#F5F2EB]">
+              FRIDAY NIGHT DOCKET DISPATCHER (AUTOMATED CRON)
+            </span>
+            <span className="rounded-full bg-emerald-500/15 border border-emerald-400/40 px-2.5 py-0.5 font-mono-docket text-[10px] font-bold uppercase text-emerald-300">
+              Fridays @ 5:00 PM EST
+            </span>
+          </div>
+          <p className="font-mono-docket text-xs text-[#A8988B]">
+            Automatically summarizes podium standings, weekly demerits, and top offenses to opted-in patrons via their chosen channel (Email, SMS, or Both). Patrons configure preferences in their locker.
+          </p>
+        </div>
+
+        <button
+          type="button"
+          onClick={handleSendFridayDigestTest}
+          disabled={sendingDigestTest}
+          className="inline-flex items-center justify-center gap-2 rounded-xl border border-[#DFC15E] bg-gradient-to-r from-[#DFC15E]/20 to-[#B87333]/30 px-4 py-2.5 font-mono-docket text-xs font-bold text-[#DFC15E] transition hover:brightness-125 disabled:opacity-50 shrink-0 cursor-pointer"
+        >
+          <Send className="h-3.5 w-3.5" />
+          <span>{sendingDigestTest ? 'Dispatching Test...' : 'Send Test Friday Docket'}</span>
+        </button>
+      </section>
 
       {/* AI Referee Auto-Blur & Pending Override Queue */}
       <section className="rounded-2xl border-2 border-amber-500/40 bg-amber-950/15 p-4 sm:p-6 space-y-4">

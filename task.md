@@ -1,6 +1,25 @@
 # Task Tracker — Copper Demerits (`copperdemerits.com`)
 
-## Active Sprint — v1.6.8 (copperdemerits.com Verified on Resend-Ninjas + noreply@ Live)
+## Active Sprint — v1.6.9 (Granular Notification Channels, PIN Rate-Limiting & Security Audit)
+- [x] Security Audit: Verified 0 API keys/secrets in git history; all secrets encrypted in Cloudflare Worker
+- [x] Backend Security: Added PIN brute-force lockout (5 failed attempts in 15 min via D1 `pin_failures` table)
+- [x] Backend Security: Added strict HTTP security headers (`nosniff`, `DENY`, `strict-origin-when-cross-origin`)
+- [x] D1 Migration: Added `notification_preferences TEXT` to `members` table in `copper-demerits-db`
+- [x] Notification Channels: Implemented independent 4-way selectors (`[Off] [Email] [Text] [Both]`) for 5 events:
+  - 👑 Leaderboard Crown (#1 rank takeover)
+  - 📉 Leaderboard Dethroned (#1 rank loss)
+  - 📋 New Citation (Slip logged against patron or linked nickname)
+  - 📢 Ref Whistle Override (Official review decision)
+  - 🍺 Friday Night Docket (Weekly 5:00 PM EST happy hour digest)
+- [x] My Locker UI: Added Granular Notification Matrix with inline email/carrier warnings and bulk toggles
+- [x] Cloudflare Worker Cron: Added `0 21 * * 5` in `wrangler.toml` and `scheduled(event, env, ctx)` handler
+- [x] Ref Booth Controls: Added "Send Test Friday Docket" button in `src/pages/AdminPage.tsx`
+- [x] Verified live test: Dispatched preview email and SMS to Rick's profile via `noreply@copperdemerits.com`
+- [x] Anti-Spam Safety: 15-min cooldown for ranks, 5-min for batch slips, site-wide safety cap of 25 messages/day
+- [x] Honor user directive: Do NOT publish to Netlify production
+
+## Completed Sprints
+### v1.6.8 (copperdemerits.com Verified on Resend-Ninjas + noreply@ Live)
 - [x] Verify `copperdemerits.com` directly inside `Resend-Ninjas` (`fe85e77d-54c0-4f74-bc7f-9dd968e94472`)
 - [x] Clean Cloudflare DNS: removed stale Agency DKIM and conflicting manual MX/TXT records
 - [x] Switch sender address to `Copper Demerits <noreply@copperdemerits.com>` with `reply_to: 'info@drit.ninja'`

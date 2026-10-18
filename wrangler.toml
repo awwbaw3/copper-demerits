@@ -17,3 +17,6 @@ binding = "AI"
 [[routes]]
 pattern = "api.copperdemerits.com"
 custom_domain = true
+
+[triggers]
+crons = ["0 21 * * 5"]

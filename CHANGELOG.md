@@ -2,6 +2,28 @@
 
 All notable changes to the **Copper Athletic Club — Ring of Honor** web application are documented in this file.
 
+## [1.6.9] - 2026-10-18
+
+### Added & Hardened
+- **Security Audit & Backend Hardening (`cloudflare/worker.js`, `cloudflare/migration_preferences.sql`)**:
+  - Confirmed via Git commit history and tracked repository audits that **0 API keys or private secrets were ever committed**.
+  - Verified all runtime secrets (`RESEND_API_KEY`, Cloudflare bindings) are encrypted inside Cloudflare Worker runtime variables.
+  - Implemented PIN brute-force defense in `cloudflare/worker.js`: 5 failed attempts per IP or member within 15 minutes triggers an automated lockout recorded in the `pin_failures` table on Cloudflare D1.
+  - Added strict HTTP security headers across all API responses (`X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: strict-origin-when-cross-origin`).
+  - Verified 100% PII stripping on all public endpoints (`/api/members`, `/api/bootstrap`, `/api/docket`, `/api/demerits`).
+- **Granular Opt-In Notification Triggers & Channels (`src/components/ClaimProfileModal.tsx`, `src/types/demerits.ts`, `cloudflare/worker.js`)**:
+  - Implemented granular notification preference schema with 4-way selectors (`[Off] [Email] [Text] [Both]`), **disabled by default** (`none`), across 5 core events:
+    1. 👑 **Leaderboard Crown**: When you take over 1st place on the Copper Demerit Leaderboard.
+    2. 📉 **Leaderboard Dethroned**: When another patron knocks you out of #1.
+    3. 📋 **New Citation**: When a demerit slip cites your name or nickname.
+    4. 📢 **Ref Whistle Override**: When an official review approves, unblurs, or rejects your slip.
+    5. 🍺 **Friday Night Docket**: Weekly 5:00 PM EST happy hour summary of podium standings and top offenses.
+  - Integrated notification preference matrix inside "My Locker" modal with inline validation warnings if Email or 10-Digit Mobile + Carrier are required, along with quick "Mute All" and "Enable All (Both)" helpers.
+- **Automated Friday Night Docket (Happy Hour Digest) (`wrangler.toml`, `cloudflare/worker.js`, `src/pages/AdminPage.tsx`)**:
+  - Configured Cloudflare Workers Cron trigger `[triggers] crons = ["0 21 * * 5"]` (Fridays at 5:00 PM EDT / 21:00 UTC) invoking `scheduled(event, env, ctx)` to automatically digest podium standings and infractions for opted-in patrons.
+  - Added Ref Booth control in `AdminPage.tsx` with a "Send Test Friday Docket" dispatch trigger calling `POST /api/notifications/friday-digest-test`.
+  - Added anti-spam safety guards: 15-minute cooldown for rank shifts, 5-minute cooldown for batch citations, and a site-wide safety cap of 25 messages/day to guarantee $0 cost.
+
 ## [1.6.8] - 2026-10-18
 
 ### Added & Verified

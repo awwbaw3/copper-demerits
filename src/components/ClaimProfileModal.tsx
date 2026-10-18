@@ -3,6 +3,11 @@ import { useDemerits } from '../context/DemeritsContext';
 import { MichiganTeamBadge, TeamBadgeMeta } from './MichiganSportsGraphics';
 import { moderateTextInstant } from '../lib/moderation';
 import {
+  NotificationPreferences,
+  NotificationChannelPreference,
+  DEFAULT_NOTIFICATION_PREFERENCES,
+} from '../types/demerits';
+import {
   X,
   KeyRound,
   ShieldCheck,
@@ -19,7 +24,63 @@ import {
   Smartphone,
   Tag,
   Trash2,
+  Crown,
+  TrendingDown,
+  FileText,
+  Megaphone,
+  Beer,
 } from 'lucide-react';
+
+const NOTIFICATION_CHANNELS: {
+  key: keyof NotificationPreferences;
+  title: string;
+  badge: string;
+  description: string;
+  icon: React.ElementType;
+}[] = [
+  {
+    key: 'leader_crowned',
+    title: 'Crown: #1 Demerit Leader',
+    badge: 'LEADERBOARD',
+    description: 'Instant alert when you take over 1st place on the Copper Demerit Leaderboard.',
+    icon: Crown,
+  },
+  {
+    key: 'leader_dethroned',
+    title: 'Dethroned: Lost #1 Rank',
+    badge: 'RANK DROP',
+    description: 'Alert when another patron knocks you out of the #1 demerit position.',
+    icon: TrendingDown,
+  },
+  {
+    key: 'slip_cited',
+    title: 'Citation: New Slip Cited to Me',
+    badge: 'CITATION',
+    description: 'Instant notification whenever a demerit slip cites your name or nickname.',
+    icon: FileText,
+  },
+  {
+    key: 'ref_override',
+    title: 'Ref Whistle: Review Overrides',
+    badge: 'DECISION',
+    description: 'Alert when an official review approves, unblurs, or dismisses your slip.',
+    icon: Megaphone,
+  },
+  {
+    key: 'friday_digest',
+    title: 'Happy Hour: Friday Night Docket',
+    badge: 'WEEKLY 5 PM',
+    description: 'Weekly Friday 5:00 PM EST happy hour summary of podium standings & top offenses.',
+    icon: Beer,
+  },
+];
+
+const CHANNEL_OPTIONS: { id: NotificationChannelPreference; label: string }[] = [
+  { id: 'none', label: 'Off' },
+  { id: 'email', label: 'Email' },
+  { id: 'text', label: 'Text' },
+  { id: 'both', label: 'Both' },
+];
 
 export const TEAM_CHOICES: {
   id: TeamBadgeMeta['iconType'];
@@ -73,6 +134,9 @@ export const ClaimProfileModal: React.FC = () => {
   const [notifPhone, setNotifPhone] = useState('');
   const [notifCarrier, setNotifCarrier] = useState('none');
   const [optInAccepted, setOptInAccepted] = useState(false);
+  const [notifPreferences, setNotifPreferences] = useState<NotificationPreferences>(
+    DEFAULT_NOTIFICATION_PREFERENCES
+  );
   const [verificationCodeSent, setVerificationCodeSent] = useState(false);
   const [verificationCodeInput, setVerificationCodeInput] = useState('');
   const [sendingCode, setSendingCode] = useState(false);
@@ -81,6 +145,19 @@ export const ClaimProfileModal: React.FC = () => {
   const [submitting, setSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
+
+  const handlePreferenceChange = (
+    key: keyof NotificationPreferences,
+    value: NotificationChannelPreference
+  ) => {
+    setNotifPreferences((prev) => ({
+      ...prev,
+      [key]: value,
+    }));
+    if (value !== 'none') {
+      setOptInAccepted(true);
+    }
+  };
 
   // Only show UNCLAIMED profiles in the claimable list — once claimed, they never appear here
   const unclaimedMembers = members.filter((m) => !m.is_claimed);
@@ -104,11 +181,15 @@ export const ClaimProfileModal: React.FC = () => {
         setNotifPhone(currentMember.notification_phone || '');
         setNotifCarrier(currentMember.notification_carrier || 'none');
         setOptInAccepted(Boolean(currentMember.notification_opt_in));
+        setNotifPreferences(
+          currentMember.notification_preferences || DEFAULT_NOTIFICATION_PREFERENCES
+        );
         if (activePin) {
           setPin(activePin);
         }
       } else {
         setMode('login');
+        setNotifPreferences(DEFAULT_NOTIFICATION_PREFERENCES);
         const firstUnclaimed = members.find((m) => !m.is_claimed);
         if (firstUnclaimed) {
           setSelectedMemberId(firstUnclaimed.id);
@@ -229,6 +310,7 @@ export const ClaimProfileModal: React.FC = () => {
         favoriteTeam,
         tagline: tagline.trim() || undefined,
         role: mode === 'new' ? newRole : undefined,
+        notificationPreferences: notifPreferences,
       });
 
       if (!res.ok) {
@@ -291,6 +373,7 @@ export const ClaimProfileModal: React.FC = () => {
         notificationPhone: notifPhone.trim(),
         notificationCarrier: notifCarrier,
         notificationOptIn: optInAccepted,
+        notificationPreferences: notifPreferences,
       });
 
       if (!res.ok) {
@@ -893,6 +976,122 @@ export const ClaimProfileModal: React.FC = () => {
                   )}
                 </div>
               )}
+
+              {/* Granular Notification Channels Selector Matrix */}
+              <div className="rounded-xl border border-white/10 bg-[#120F0D] p-3 space-y-3">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-white/10 pb-2">
+                  <div>
+                    <div className="flex items-center gap-1.5 font-athletic text-sm font-bold uppercase tracking-wider text-[#F5F2EB]">
+                      <Bell className="h-3.5 w-3.5 text-[#DFC15E]" />
+                      <span>Custom Notification Channels</span>
+                    </div>
+                    <p className="font-mono-docket text-[10px] text-[#9E8F82]">
+                      All notifications are <strong>Off by default</strong>. Choose Email, Text, or Both for each event.
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => setNotifPreferences(DEFAULT_NOTIFICATION_PREFERENCES)}
+                      className="rounded-lg border border-white/15 bg-white/5 px-2.5 py-1 font-mono-docket text-[10px] text-[#B5A99D] hover:bg-white/10 hover:text-white transition cursor-pointer"
+                    >
+                      Mute All
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setNotifPreferences({
+                          leader_crowned: 'both',
+                          leader_dethroned: 'both',
+                          slip_cited: 'both',
+                          ref_override: 'both',
+                          friday_digest: 'both',
+                        });
+                        setOptInAccepted(true);
+                      }}
+                      className="rounded-lg border border-[#B87333]/40 bg-[#B87333]/15 px-2.5 py-1 font-mono-docket text-[10px] font-bold text-[#DFC15E] hover:bg-[#B87333]/30 transition cursor-pointer"
+                    >
+                      Enable All (Both)
+                    </button>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  {NOTIFICATION_CHANNELS.map(({ key, title, badge, description, icon: Icon }) => {
+                    const currentPref = notifPreferences[key] || 'none';
+                    const needsEmail =
+                      (currentPref === 'email' || currentPref === 'both') && !notifEmail.trim();
+                    const needsText =
+                      (currentPref === 'text' || currentPref === 'both') &&
+                      (!notifPhone.trim() || notifCarrier === 'none');
+
+                    return (
+                      <div
+                        key={key}
+                        className={`flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 rounded-xl border p-2.5 transition ${
+                          currentPref !== 'none'
+                            ? 'border-[#B87333]/40 bg-[#171310]'
+                            : 'border-white/5 bg-[#141110] hover:border-white/10'
+                        }`}
+                      >
+                        <div className="flex items-start gap-2.5">
+                          <div
+                            className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border text-xs ${
+                              currentPref !== 'none'
+                                ? 'border-[#B87333] bg-[#B87333]/20 text-[#DFC15E]'
+                                : 'border-white/10 bg-[#1F1B18] text-[#8E8074]'
+                            }`}
+                          >
+                            <Icon className="h-4 w-4" />
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span className="font-athletic text-xs font-bold uppercase tracking-wider text-[#F5F2EB]">
+                                {title}
+                              </span>
+                              <span className="rounded bg-white/5 px-1.5 py-0.5 font-mono-docket text-[9px] uppercase tracking-wider text-[#B5A99D]">
+                                {badge}
+                              </span>
+                            </div>
+                            <p className="font-mono-docket text-[10px] text-[#A8988B] leading-tight mt-0.5">
+                              {description}
+                            </p>
+                            {(needsEmail || needsText) && (
+                              <div className="mt-1 flex flex-wrap gap-1 font-mono-docket text-[9px] text-amber-300">
+                                {needsEmail && <span>⚠️ Needs Email address above</span>}
+                                {needsEmail && needsText && <span>•</span>}
+                                {needsText && <span>⚠️ Needs 10-Digit Mobile + Carrier</span>}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-1 shrink-0 self-end sm:self-center">
+                          {CHANNEL_OPTIONS.map((opt) => {
+                            const isSelected = currentPref === opt.id;
+                            return (
+                              <button
+                                key={opt.id}
+                                type="button"
+                                onClick={() => handlePreferenceChange(key, opt.id)}
+                                className={`rounded-lg px-2.5 py-1 font-mono-docket text-[10px] font-bold uppercase transition cursor-pointer ${
+                                  isSelected
+                                    ? opt.id === 'none'
+                                      ? 'bg-white/20 text-white border border-white/40 shadow-sm'
+                                      : 'bg-[#B87333] text-[#121212] border border-[#DFC15E] shadow-[0_0_10px_rgba(184,115,51,0.5)]'
+                                    : 'bg-white/5 text-[#8E8074] border border-transparent hover:bg-white/10 hover:text-white'
+                                }`}
+                              >
+                                {opt.label}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
             </div>
 
             {errorMsg && (
