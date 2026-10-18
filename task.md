@@ -1,6 +1,15 @@
 # Task Tracker — Copper Demerits (`copperdemerits.com`)
 
-## Active Sprint — v1.6.12 (Pure Leaderboard Ticker & Backbar Easy Share QR Code Page)
+## Active Sprint — v1.6.13 (Header Share QR Prominence & Cloudflare Copy Purge)
+- [x] Replace header action install button with prominent glowing `[Share QR]` button
+- [x] Rely on dismissible backbar banner below header for PWA installation onboarding
+- [x] Streamline desktop navigation (4 items) and retain 5-item mobile bottom nav
+- [x] Remove Cloudflare reference from Ref Booth status badge (`src/pages/AdminPage.tsx`)
+- [x] Verify 100% zero public-facing and admin-facing copies mention Cloudflare
+- [x] Honor user directive: Do NOT publish to Netlify production
+
+## Completed Sprints
+### v1.6.12 (Pure Leaderboard Ticker & Backbar Easy Share QR Code Page)
 - [x] Remove Cloudflare and venue branding ("Copper Athletic Club", "A sports bar. Not a gym.") from top ticker
 - [x] Dynamically compute pure leaderboard ticker updates (leaders, podium, points, referee records, citations)
 - [x] Create dedicated Backbar Easy Share QR Code page (`/share`, `src/pages/SharePage.tsx`)

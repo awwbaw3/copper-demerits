@@ -2,6 +2,16 @@
 
 All notable changes to the **Copper Athletic Club — Ring of Honor** web application are documented in this file.
 
+## [1.6.13] - 2026-10-18
+
+### Changed & Streamlined
+- **Prominent Header Share QR Positioning (`src/components/Navbar.tsx`)**:
+  - Replaced the top header install button with the prominent, glowing **`[Share QR]`** action button on both mobile and desktop viewports, eliminating header clutter since PWA installation is already cleanly handled by the dismissible banner directly below.
+  - Streamlined desktop navigation to 4 primary views (`Scoreboard`, `Wall of Slips`, `Drop A Slip`, `Ref Booth`), retaining the 5-item mobile bottom navigation bar (`Scoreboard`, `Wall of Slips`, `Drop Slip`, `Share QR`, `Ref Booth`).
+- **Complete Elimination of Cloudflare References from User-Facing Copies (`src/pages/AdminPage.tsx`)**:
+  - Replaced the Ref Booth database status badge text (`Cloudflare D1 + R2 + Workers AI Live` → `Cloud Database & AI Live`).
+  - Verified 100% zero public-facing or admin-facing copies mention Cloudflare across the entire web application.
+
 ## [1.6.12] - 2026-10-18
 
 ### Changed & Streamlined

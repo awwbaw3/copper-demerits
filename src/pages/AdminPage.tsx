@@ -228,7 +228,7 @@ export const AdminPage: React.FC = () => {
         <div className="flex flex-wrap items-center gap-2">
           <span className="inline-flex items-center gap-1.5 rounded-xl border border-white/10 bg-[#1A1715] px-3 py-2 font-mono-docket text-xs text-[#C4B8AC]">
             <Database className="h-3.5 w-3.5 text-[#B87333]" />
-            {isSupabaseConnected ? 'Cloudflare D1 + R2 + Workers AI Live' : 'Local Storage'}
+            {isSupabaseConnected ? 'Cloud Database & AI Live' : 'Local Storage'}
           </span>
 
           <button

@@ -111,10 +111,17 @@ export const Navbar: React.FC = () => {
     [demerits]
   );
 
-  const navItems = [
+  const desktopNavItems = [
     { to: '/', label: 'Scoreboard', icon: Trophy },
     { to: '/docket', label: 'Wall of Slips', icon: FileText },
     { to: '/submit', label: 'Drop A Slip', icon: Camera, highlight: true },
+    { to: '/admin', label: 'Ref Booth', icon: ShieldAlert, badge: pendingCount },
+  ];
+
+  const mobileNavItems = [
+    { to: '/', label: 'Scoreboard', icon: Trophy },
+    { to: '/docket', label: 'Wall of Slips', icon: FileText },
+    { to: '/submit', label: 'Drop Slip', icon: Camera, highlight: true },
     { to: '/share', label: 'Share QR', icon: QrCode },
     { to: '/admin', label: 'Ref Booth', icon: ShieldAlert, badge: pendingCount },
   ];
@@ -211,38 +218,26 @@ export const Navbar: React.FC = () => {
           </NavLink>
 
           <div className="flex items-center gap-2">
-            {!isStandalone && (
-              <button
-                type="button"
-                onClick={handleInstallClick}
-                className="inline-flex items-center gap-1.5 rounded-xl border border-[#DFC15E] bg-gradient-to-r from-[#DFC15E] via-[#E8B888] to-[#B87333] px-2.5 sm:px-3 py-1.5 font-athletic text-xs font-black uppercase tracking-wider text-[#121212] shadow-[0_0_18px_rgba(223,193,94,0.45)] transition hover:brightness-110 active:scale-95 cursor-pointer animate-pulse"
-                title="Install Copper Demerits App on Home Screen"
-              >
-                <Download className="h-3.5 w-3.5 stroke-[2.5]" />
-                <span className="hidden xs:inline">Install App</span>
-                <span className="xs:hidden">Install</span>
-              </button>
-            )}
-
-            {/* Quick Share QR Button */}
+            {/* Prominent Share QR Code Button in Header (in place of Install button) */}
             <NavLink
               to="/share"
               className={({ isActive }) =>
-                `inline-flex items-center gap-1.5 rounded-xl border px-2.5 sm:px-3 py-1.5 font-athletic text-xs font-bold uppercase tracking-wider transition cursor-pointer ${
+                `inline-flex items-center gap-1.5 rounded-xl border px-2.5 sm:px-3 py-1.5 font-athletic text-xs font-black uppercase tracking-wider transition active:scale-95 cursor-pointer ${
                   isActive
-                    ? 'border-[#DFC15E] bg-[#DFC15E] text-[#121212] shadow-[0_0_15px_rgba(223,193,94,0.4)]'
-                    : 'border-[#DFC15E]/60 bg-[#DFC15E]/15 text-[#DFC15E] hover:bg-[#DFC15E] hover:text-[#121212]'
+                    ? 'border-[#DFC15E] bg-gradient-to-r from-[#DFC15E] via-[#E8B888] to-[#B87333] text-[#121212] shadow-[0_0_18px_rgba(223,193,94,0.45)]'
+                    : 'border-[#DFC15E]/70 bg-[#DFC15E]/20 text-[#DFC15E] hover:bg-[#DFC15E] hover:text-[#121212] shadow-[0_0_12px_rgba(223,193,94,0.25)]'
                 }`
               }
               title="Share App & View Backbar QR Code"
             >
-              <QrCode className="h-3.5 w-3.5 stroke-[2.2]" />
+              <QrCode className="h-3.5 w-3.5 stroke-[2.5]" />
               <span className="hidden xs:inline">Share QR</span>
+              <span className="xs:hidden">QR</span>
             </NavLink>
 
             {/* Desktop Nav Links */}
             <nav className="hidden md:flex items-center gap-1.5">
-              {navItems.map(({ to, label, icon: Icon, highlight, badge }) => (
+              {desktopNavItems.map(({ to, label, icon: Icon, highlight, badge }) => (
                 <NavLink
                   key={to}
                   to={to}
@@ -345,7 +340,7 @@ export const Navbar: React.FC = () => {
         aria-label="Mobile Navigation"
         className="fixed bottom-0 inset-x-0 z-40 grid grid-cols-5 border-t border-[#B87333]/30 bg-[#14110F]/95 backdrop-blur-lg pb-[env(safe-area-inset-bottom)] md:hidden shadow-[0_-8px_25px_rgba(0,0,0,0.7)]"
       >
-        {navItems.map(({ to, label, icon: Icon, badge }) => (
+        {mobileNavItems.map(({ to, label, icon: Icon, badge }) => (
           <NavLink
             key={to}
             to={to}

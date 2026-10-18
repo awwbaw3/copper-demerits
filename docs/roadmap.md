@@ -76,4 +76,11 @@
 - [x] Implemented printable Tabletop Placard / Backbar Card with `@media print` layout.
 - [x] Ubiquitous discoverability: top header `[Share QR]`, desktop/mobile nav (`grid-cols-5`), Scoreboard jumbotron, and footer.
 
+## Phase 14: Header Action Layout Optimization & Cloudflare Copy Elimination (Completed — v1.6.13)
+- [x] Replaced header install button with prominent glowing `[Share QR]` button.
+- [x] Dedicated top dismissible callout banner as the single clear PWA installation onboarding channel.
+- [x] Streamlined desktop header navigation and maintained 5-button mobile bottom bar.
+- [x] Completely eliminated Cloudflare references from all public and admin-facing copy.
+
+
 

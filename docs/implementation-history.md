@@ -2,6 +2,16 @@
 
 Chronological log of architectural decisions, database migrations, and infrastructure deployments.
 
+## 2026-10-18 — v1.6.13 Header Share QR Prominence & Page Copy Cloudflare Purge
+- **Header Action Share QR Placement (`src/components/Navbar.tsx`)**:
+  - Replaced the redundant install button in the top action row with the prominent glowing `[Share QR]` button, keeping the dismissible backbar banner below as the primary install onboarding mechanism.
+  - Streamlined desktop navigation to 4 items and mobile bottom bar to 5 items (`Scoreboard`, `Wall of Slips`, `Drop Slip`, `Share QR`, `Ref Booth`).
+- **Complete Elimination of Cloudflare References from User-Facing Copies (`src/pages/AdminPage.tsx`)**:
+  - Replaced the Ref Booth database status badge (`Cloudflare D1 + R2 + Workers AI Live` → `Cloud Database & AI Live`).
+  - Confirmed 0 user-facing or admin-facing copies mention Cloudflare anywhere in the application.
+
+---
+
 ## 2026-10-18 — v1.6.12 Pure Leaderboard Ticker Updates & Easy Share Backbar QR Code Page
 - **Pure Leaderboard Ticker Updates (`src/components/Navbar.tsx`)**:
   - Removed all venue references ("Copper Athletic Club • Marshall, MI", "A sports bar. Not a gym.") and confirmed zero Cloudflare mentions.
