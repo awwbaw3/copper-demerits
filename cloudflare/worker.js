@@ -398,11 +398,14 @@ async function extractSlipsFromImageWithAI(env, { imageBase64, defaultDate, know
     ? `Known Copper Athletic Club patrons & staff names: ${knownMembers.join(', ')}. Known nicknames/signatures: ${knownAliases.join(', ')}.`
     : `Known Copper Athletic Club regulars: Rick, Burtis, Sarah (The Boss / The Boss Lady), David Lee.`;
 
-  const extractionPrompt = `You are an expert OCR reader for Copper Athletic Club's handwritten "DEMERIT SLIP" citations.
-Examine this photo carefully. A photo may contain 1 single Demerit Slip OR multiple physical Demerit Slips (e.g., 2, 3, or 4 slips laying next to each other).
+  const extractionPrompt = `You are an expert OCR reader and Referee for Copper Athletic Club's handwritten "DEMERIT SLIP" citations.
+First, verify whether this image actually contains at least one physical paper "DEMERIT SLIP" (or written citation slip with fields like Student, Date, Time, Room, Demerits, Teacher/Signature, or handwritten offenses).
+- If the image is NOT a demerit slip (for example: a random selfie, a person, a drink, food, a pet, a landscape, or an unrelated screenshot), return:
+{"is_demerit_slip": false, "rejection_reason": "This photo does not appear to contain a Copper Demerit Slip. Please snap a clear photo of the physical demerit slip!", "slips": []}
+
+If the image DOES contain 1 or more physical Demerit Slips (up to 4 slips laying next to each other), set "is_demerit_slip": true and read all handwritten fields for EVERY slip visible:
 ${rosterHint}
 
-For EVERY physical Demerit Slip visible in the image, read all handwritten fields:
 - "raw_student": Handwritten name on the "Student:" line (e.g. "Rick", "Burtis", "David Lee", etc.)
 - "incident_date": Handwritten date on the "Date(s):" line formatted as YYYY-MM-DD (if year is 26 or missing, use 2026; if blank use "${fallbackDate}")
 - "incident_time": Handwritten time on the "Time:" line in 24-hour HH:MM format (note: bar slips are evening PM times unless AM is written, so "9:09" or "9:09 PM" -> "21:09", "6:27" -> "18:27", "8:50" -> "20:50")
@@ -415,7 +418,7 @@ For EVERY physical Demerit Slip visible in the image, read all handwritten field
   - "points": Integer points for this offense so the items sum to "demerit_count"
 
 Respond ONLY with valid JSON in this exact structure (no markdown fences, no extra commentary):
-{"slips": [{"raw_student": "...", "incident_date": "YYYY-MM-DD", "incident_time": "HH:MM", "location_area": "...", "demerit_count": 1, "raw_signature": "...", "demerit_items": [{"type": "...", "description": "...", "points": 1}]}]}`;
+{"is_demerit_slip": true, "slips": [{"raw_student": "...", "incident_date": "YYYY-MM-DD", "incident_time": "HH:MM", "location_area": "...", "demerit_count": 1, "raw_signature": "...", "demerit_items": [{"type": "...", "description": "...", "points": 1}]}]}`;
 
   const dataUrl = imageBase64.startsWith('data:')
     ? imageBase64
@@ -447,9 +450,19 @@ Respond ONLY with valid JSON in this exact structure (no markdown fences, no ext
         const geminiJson = await geminiRes.json();
         const rawOut = geminiJson?.candidates?.[0]?.content?.parts?.[0]?.text;
         const parsed = parseJsonSafe(rawOut, null);
+        if (parsed && parsed.is_demerit_slip === false) {
+          return {
+            ok: false,
+            isDemeritSlip: false,
+            model: 'gemini-2.5-flash',
+            error:
+              parsed.rejection_reason ||
+              'This photo does not appear to contain a physical Demerit Slip.',
+          };
+        }
         const slips = sanitizeExtractedSlips(parsed?.slips || (Array.isArray(parsed) ? parsed : []), fallbackDate);
         if (slips.length > 0) {
-          return { ok: true, model: 'gemini-2.5-flash', slips };
+          return { ok: true, isDemeritSlip: true, model: 'gemini-2.5-flash', slips };
         }
       }
     } catch {
@@ -525,12 +538,22 @@ Respond ONLY with valid JSON in this exact structure (no markdown fences, no ext
         const jsonMatch = String(rawResponse).match(/\{[\s\S]*\}/);
         if (jsonMatch) {
           const parsed = parseJsonSafe(jsonMatch[0], null);
+          if (parsed && parsed.is_demerit_slip === false) {
+            return {
+              ok: false,
+              isDemeritSlip: false,
+              model: modelName,
+              error:
+                parsed.rejection_reason ||
+                'This photo does not appear to contain a physical Demerit Slip.',
+            };
+          }
           const slips = sanitizeExtractedSlips(
             parsed?.slips || (Array.isArray(parsed) ? parsed : []),
             fallbackDate
           );
           if (slips.length > 0) {
-            return { ok: true, model: modelName, slips };
+            return { ok: true, isDemeritSlip: true, model: modelName, slips };
           }
         }
       } catch {
@@ -550,12 +573,22 @@ Respond ONLY with valid JSON in this exact structure (no markdown fences, no ext
       const jsonMatch = String(rawText).match(/\{[\s\S]*\}/);
       if (jsonMatch) {
         const parsed = parseJsonSafe(jsonMatch[0], null);
+        if (parsed && parsed.is_demerit_slip === false) {
+          return {
+            ok: false,
+            isDemeritSlip: false,
+            model: '@cf/llava-hf/llava-1.5-7b-hf',
+            error:
+              parsed.rejection_reason ||
+              'This photo does not appear to contain a physical Demerit Slip.',
+          };
+        }
         const slips = sanitizeExtractedSlips(
           parsed?.slips || (Array.isArray(parsed) ? parsed : []),
           fallbackDate
         );
         if (slips.length > 0) {
-          return { ok: true, model: '@cf/llava-hf/llava-1.5-7b-hf', slips };
+          return { ok: true, isDemeritSlip: true, model: '@cf/llava-hf/llava-1.5-7b-hf', slips };
         }
       }
     } catch {
@@ -986,7 +1019,7 @@ export default {
         return jsonResponse({
           ok: true,
           service: 'copper-demerits-api',
-          version: '1.6.5',
+          version: '1.6.6',
           backend: 'cloudflare-d1-r2-ai',
           database: 'copper-demerits-db',
           bucket: 'copper-demerits-slips',
@@ -1079,7 +1112,7 @@ export default {
           knownAliases,
         });
 
-        return jsonResponse(extraction, extraction.ok ? 200 : 422);
+        return jsonResponse(extraction, 200);
       }
 
       // 4. Bootstrap All Public Data (`GET /api/bootstrap`) — Zero PII Exposed

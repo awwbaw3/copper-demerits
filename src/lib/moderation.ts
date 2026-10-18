@@ -247,6 +247,7 @@ export async function extractSlipsFromPhotoAI(
   defaultDate?: string
 ): Promise<{
   ok: boolean;
+  isDemeritSlip?: boolean;
   model?: string;
   slips?: ExtractedSlipAI[];
   error?: string;
@@ -254,6 +255,7 @@ export async function extractSlipsFromPhotoAI(
   try {
     const res = await cloudflareFetch<{
       ok: boolean;
+      isDemeritSlip?: boolean;
       model?: string;
       slips?: ExtractedSlipAI[];
       error?: string;

@@ -2,6 +2,15 @@
 
 All notable changes to the **Copper Athletic Club — Ring of Honor** web application are documented in this file.
 
+## [1.6.6] - 2026-10-18
+
+### Added & Hardened
+- **AI Vision Pre-Storage Demerit Slip Verification (`cloudflare/worker.js`, `src/lib/moderation.ts`, `src/pages/SubmitSlipPage.tsx`)**:
+  - Upgraded the Zero-Touch capture pipeline so it:
+    1. **Never rejects large smartphone images**: Accepts any size camera photo (`4 MB – 25 MB+`) and reduces it locally in the browser to `~35 KB – 82 KB` + checks SHA-256 and 64-bit Perceptual dHash duplicates.
+    2. **Verifies it is indeed a Demerit Slip BEFORE storing in R2**: Sends the reduced image to `POST /api/extract-slip` first to verify `is_demerit_slip: true` and read all handwritten fields. If the uploaded photo is not a physical Demerit Slip (e.g., a random selfie, drink, or unrelated photo), it is rejected with a Referee Whistle alert and **0 bytes are ever uploaded or stored in Cloudflare R2**.
+    3. **Stores the reduced `< 82 KB` image in R2 & logs to D1**: Only after verifying the image is a genuine Demerit Slip does the app upload the reduced image to `copper-demerits-slips` and log the citation(s) to D1.
+
 ## [1.6.5] - 2026-10-18
 
 ### Added & Optimized

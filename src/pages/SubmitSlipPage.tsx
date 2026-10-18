@@ -278,10 +278,10 @@ export const SubmitSlipPage: React.FC = () => {
   };
 
   /**
-   * Zero-Touch Image Capture + Smart Smartphone Compression:
-   * 1. Compresses 4MB-12MB smartphone photos down to ~45KB-82KB locally in the browser & verifies uniqueness BEFORE uploading any bytes to R2.
-   * 2. Uploads the compact optimized image to Cloudflare R2 (`copper-demerits-slips`).
-   * 3. Runs Vision AI OCR (`/api/extract-slip`) to automatically read all handwritten fields and logs to Cloudflare D1.
+   * Zero-Touch Image Capture + Smart Smartphone Compression + Pre-Storage Slip Verification:
+   * 1. Accepts ANY size smartphone photo (never rejects large photos) and reduces it in-browser down to ~45KB-82KB + checks duplicates.
+   * 2. Verifies via AI Vision (`/api/extract-slip`) that the photo is INDEED a physical Demerit Slip and extracts all handwritten fields BEFORE storing anything in R2.
+   * 3. Only after confirming it is a genuine Demerit Slip, uploads the reduced (<82KB) image to Cloudflare R2 (`copper-demerits-slips`) and logs to Cloudflare D1.
    */
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -300,11 +300,11 @@ export const SubmitSlipPage: React.FC = () => {
     setAutoLoggedSlips(null);
     setCompressionStats(null);
     setUploadStatusMsg(
-      'Step 1/3 · Compressing Smartphone Photo (<80KB) & Verifying Uniqueness (SHA-256 + dHash)...'
+      'Step 1/3 · Reducing Smartphone Photo Size (<80KB) & Verifying Uniqueness (SHA-256 + dHash)...'
     );
 
     try {
-      // 1. Compress & fingerprint locally FIRST so duplicate photos take 0 bytes in Cloudflare R2
+      // 1. Accept any size smartphone image, reduce it in-browser to ~45KB-82KB, and check duplicates FIRST (0 bytes uploaded)
       const fingerprint = await fingerprintImageFile(file, 960, 0.74, 82 * 1024);
       const dupCheck = checkImageDuplicate(fingerprint);
 
@@ -327,22 +327,41 @@ export const SubmitSlipPage: React.FC = () => {
         height: fingerprint.height,
       });
 
-      // 2. Upload the tiny compressed (<82KB) image to Cloudflare R2
-      const filename = `${fingerprint.sha256.slice(0, 24)}.jpg`;
-      const uploaded = await uploadCompressedSlipToR2(fingerprint.dataUrl, filename);
-
-      setImageUrl(uploaded.url);
+      // Show local preview while AI Vision verifies that the photo is indeed a Demerit Slip
+      setImageUrl(fingerprint.dataUrl);
       setRawDataUrl(fingerprint.dataUrl);
       setImageSha256(fingerprint.sha256);
       setImageDhash(fingerprint.dhash);
       setUploadStatusMsg(
-        `Step 2/3 · Optimized (${formatByteSize(fingerprint.originalBytes)} → ${formatByteSize(
+        `Step 2/3 · Reduced (${formatByteSize(fingerprint.originalBytes)} → ${formatByteSize(
           fingerprint.compressedBytes
-        )}) · AI Vision Reading Handwritten Slip(s)...`
+        )}) · AI Vision Verifying Demerit Slip & Reading Handwriting...`
       );
 
       const todayStr = new Date().toISOString().slice(0, 10);
       const aiResult = await extractSlipsFromPhotoAI(fingerprint.dataUrl, todayStr);
+
+      // 2. If AI Vision detects this is NOT a Demerit Slip (e.g., random selfie, drink, pet), block it BEFORE ever storing in Cloudflare R2!
+      if (aiResult.isDemeritSlip === false) {
+        setImageUrl(null);
+        setRawDataUrl(null);
+        setImageSha256(null);
+        setImageDhash(null);
+        setCompressionStats(null);
+        setUploadStatusMsg(null);
+        setErrorMsg(
+          `🦓 Referee Whistle: ${
+            aiResult.error ||
+            'This photo does not appear to contain a physical Copper Demerit Slip. Please snap a clear photo of the demerit slip (0 bytes stored).'
+          }`
+        );
+        return;
+      }
+
+      // 3. Verified as a Demerit Slip! Now store the reduced (<82KB) image in Cloudflare R2
+      const filename = `${fingerprint.sha256.slice(0, 24)}.jpg`;
+      const uploaded = await uploadCompressedSlipToR2(fingerprint.dataUrl, filename);
+      setImageUrl(uploaded.url);
 
       if (aiResult.ok && aiResult.slips && aiResult.slips.length > 0) {
         const extractedDrafts: SlipDraftItem[] = aiResult.slips.map((s) => ({
@@ -369,9 +388,9 @@ export const SubmitSlipPage: React.FC = () => {
 
         setSlipDrafts(extractedDrafts);
         setUploadStatusMsg(
-          `Step 3/3 · Grabbed ${extractedDrafts.length} ${
+          `Step 3/3 · Verified Demerit Slip (${extractedDrafts.length} ${
             extractedDrafts.length === 1 ? 'Slip' : 'Slips'
-          } Automatically! Logging to Ring of Honor...`
+          }) · Storing ${formatByteSize(fingerprint.compressedBytes)} & Logging to Ring of Honor...`
         );
 
         // Automatically log and save the extracted slip(s) so the user doesn't have to do anything else!
@@ -386,19 +405,19 @@ export const SubmitSlipPage: React.FC = () => {
         setUploadStatusMsg(
           `Zero-Touch Complete · ${extractedDrafts.length} ${
             extractedDrafts.length === 1 ? 'Slip' : 'Slips'
-          } Read & Logged Automatically (${formatByteSize(
+          } Verified, Reduced (${formatByteSize(
             fingerprint.originalBytes
           )} → ${formatByteSize(fingerprint.compressedBytes)}${
             fingerprint.savingsPercent > 0 ? `, ${fingerprint.savingsPercent}% saved` : ''
-          })`
+          }) & Logged Automatically!`
         );
       } else {
-        // Only open manual editor if photo was too blurry for AI OCR
+        // Only open manual editor if handwriting was too faint for full OCR
         setShowManualEditor(true);
         setUploadStatusMsg(
-          `Photo optimized (${formatByteSize(fingerprint.originalBytes)} → ${formatByteSize(
+          `Photo reduced (${formatByteSize(fingerprint.originalBytes)} → ${formatByteSize(
             fingerprint.compressedBytes
-          )}) & uploaded to R2 · Review or enter slip details below.`
+          )}) & stored in R2 · Review or enter slip details below.`
         );
       }
     } catch {

@@ -4,6 +4,13 @@ Chronological log of architectural decisions, database migrations, and infrastru
 
 ---
 
+## 2026-10-18 — v1.6.6 Pre-Storage AI Vision Demerit Slip Verification (Reduce Size -> Verify Slip -> Store in R2)
+- **Pre-Storage AI Vision Slip Verification (`cloudflare/worker.js`, `src/lib/moderation.ts`, `src/pages/SubmitSlipPage.tsx`)**:
+  - Updated `extractSlipsFromImageWithAI` in `cloudflare/worker.js` to verify `is_demerit_slip: boolean` and return `{ ok: false, isDemeritSlip: false, error: ... }` if an uploaded photo does not contain a physical Demerit Slip.
+  - Reordered `handleFileChange` in `src/pages/SubmitSlipPage.tsx` so any size smartphone photo is reduced in-browser (`< 82 KB`), checked for duplicates, and verified as a genuine Demerit Slip by AI Vision **before** calling `uploadCompressedSlipToR2`, guaranteeing that non-slip photos consume `0 bytes` in Cloudflare R2.
+
+---
+
 ## 2026-10-18 — v1.6.5 Adaptive Smartphone Slip Image Compression (<82 KB Target) & Zero-Waste Cloudflare R2 Storage Optimization
 - **Adaptive Client-Side Slip Image Compressor (`src/lib/imageDedup.ts`, `src/lib/supabase.ts`)**:
   - Upgraded `fingerprintImageFile` to compute raw SHA-256 and 4-rotation 64-bit Perceptual dHash on the original file, then downscale smartphone camera photos to max `960px` on the longest edge with bicubic smoothing (stripping all EXIF/GPS metadata) and step through an adaptive quality loop (`0.74 -> 0.66 -> 0.58 -> 0.52`) so uploaded slip images consistently land between **35 KB and 82 KB** (95%–99% smaller than 4MB–12MB smartphone photos) while keeping handwriting sharp for Vision AI OCR.
