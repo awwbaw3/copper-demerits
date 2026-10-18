@@ -40,17 +40,17 @@ export const App: React.FC = () => {
                   <span className="font-bold text-[#B87333]">COPPER DEMERITS FAN CLUB</span> ·
                   MARSHALL, MI · RING OF HONOR
                 </div>
-                <div className="flex items-center gap-3">
+                <div className="flex flex-wrap items-center justify-center sm:justify-end gap-3">
                   <a
                     href="https://copperac.com"
                     target="_blank"
-                    rel="noreferrer"
-                    className="hover:text-[#E8B888] transition"
+                    rel="noopener"
+                    className="font-bold text-[#E8B888] hover:text-[#DFC15E] transition underline decoration-[#B87333]/50"
                   >
-                    Visit Official Copper AC (copperac.com) ↗
+                    Official Menus, Tap List &amp; Hours: Copper Athletic Club (copperac.com) — Marshall, MI ↗
                   </a>
                   <span>·</span>
-                  <span>Cloudflare D1 + R2 + AI Referee · PWA v1.6.1</span>
+                  <span>Cloudflare D1 + R2 + AI Referee · PWA v1.6.2</span>
                 </div>
               </div>
             </div>

@@ -2,6 +2,15 @@
 
 All notable changes to the **Copper Athletic Club — Ring of Honor** web application are documented in this file.
 
+## [1.6.2] - 2026-10-18
+
+### Added
+- **Complementary Fan-Site Local SEO & Authority Passing to `copperac.com` (`index.html`, `src/App.tsx`, `public/robots.txt`, `public/sitemap.xml`)**:
+  - Replaced `<title>` and `<meta name="description">` in `index.html` to target fan-club companion terms (`"Copper Demerits · Ring of Honor Fan Leaderboard (Marshall, MI)"`) and explicitly direct restaurant/menu searchers to `copperac.com`, preventing any keyword cannibalization against the official bar website.
+  - Added Marshall, MI Geo Meta Tags (`geo.region="US-MI"`, `geo.placename="Marshall, Michigan"`, `ICBM`) and Open Graph tags.
+  - Added **Schema.org JSON-LD (`@graph`)** declaring `https://copperdemerits.com` as an unofficial fan `WebSite` whose `about` and `mentions` point to **`https://copperac.com`** as the canonical `@type: "BarOrPub"` entity in Marshall, MI (`49068`).
+  - Upgraded the footer link in `src/App.tsx` to a clean **dofollow** backlink (`rel="noopener"`) with local anchor text (`"Official Menus, Tap List & Hours: Copper Athletic Club (copperac.com) — Marshall, MI"`), and added `public/robots.txt` and `public/sitemap.xml` (indexing `/` and `/docket`, disallowing `/admin` and `/submit`).
+
 ## [1.6.1] - 2026-10-18
 
 ### Added & Hardened

@@ -4,6 +4,12 @@ Chronological log of architectural decisions, database migrations, and infrastru
 
 ---
 
+## 2026-10-18 — v1.6.2 Complementary Fan-Site Local SEO & Authority Passing to `copperac.com`
+- Updated `index.html` `<title>`, `<meta name="description">`, Marshall MI `geo.*` tags, and Schema.org JSON-LD `@graph` so `https://copperdemerits.com` ranks for companion fan queries (`Copper Demerits`, `Ring of Honor leaderboard`) while attributing the canonical `@type: "BarOrPub"` LocalBusiness entity to `https://copperac.com/`.
+- Updated `src/App.tsx` footer link to a clean dofollow backlink (`rel="noopener"`) passing local anchor text authority to `https://copperac.com`, and added `public/robots.txt` and `public/sitemap.xml` (indexing `/` and `/docket` while disallowing `/admin` and `/submit`).
+
+---
+
 ## 2026-10-18 — v1.6.1 Frictionless Post-Claim Profile Editing, Claimed Profile & Admin-Only Nicknames & Automatic Slip Stat Merging
 - **Frictionless Post-Claim Self-Service Profile Editing ("My Locker")**:
   - Added `activePin` session persistence in `src/context/DemeritsContext.tsx` and pre-populated `pin` inside `src/components/ClaimProfileModal.tsx` (`My Locker & Edit Profile` tab) so newly claimed or signed-in users can immediately adjust their display name, email address, phone number, carrier SMS gateway, notification opt-in settings, friendly bar tagline, and team badge without re-typing their PIN.

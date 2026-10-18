@@ -1,0 +1,7 @@
+User-agent: *
+Allow: /
+Allow: /docket
+Disallow: /admin
+Disallow: /submit
+
+Sitemap: https://copperdemerits.com/sitemap.xml
