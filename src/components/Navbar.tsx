@@ -2,7 +2,6 @@ import React, { useEffect, useState } from 'react';
 import { NavLink } from 'react-router-dom';
 import { Trophy, FileText, Camera, ShieldAlert, Flame, Download } from 'lucide-react';
 import { useDemerits } from '../context/DemeritsContext';
-import { MAX_OFFICIAL_SLIPS } from '../lib/defaultData';
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>;
@@ -36,7 +35,7 @@ export const Navbar: React.FC = () => {
   const navItems = [
     { to: '/', label: 'Standings', icon: Trophy },
     { to: '/docket', label: 'The Docket', icon: FileText },
-    { to: '/submit', label: 'Upload Slip', icon: Camera, highlight: true },
+    { to: '/submit', label: 'Log Slip', icon: Camera, highlight: true },
     { to: '/admin', label: 'Admin', icon: ShieldAlert, badge: pendingCount },
   ];
 
@@ -59,7 +58,7 @@ export const Navbar: React.FC = () => {
               </span>
               <span className="text-white/20">·</span>
               <span className="text-[#A3968A]">
-                {approvedSlips.length}/{MAX_OFFICIAL_SLIPS} SLIPS
+                {approvedSlips.length} UNIQUE SLIPS (4 CAPTURES)
               </span>
             </div>
           </div>

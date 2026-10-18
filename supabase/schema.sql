@@ -30,7 +30,7 @@ create index if not exists idx_staff_aliases_alias on public.staff_aliases (alia
 create index if not exists idx_staff_aliases_member_id on public.staff_aliases (member_id);
 
 -- -----------------------------------------------------------------------------
--- 3. DEMERITS TABLE (Uploaded Physical Slip Images & Deduplication Hashes)
+-- 3. DEMERITS TABLE (Uploaded Physical Slip Images, Multi-Slip & Dedup Hashes)
 -- -----------------------------------------------------------------------------
 create table if not exists public.demerits (
   id uuid primary key default gen_random_uuid(),
@@ -44,8 +44,11 @@ create table if not exists public.demerits (
   location_area text not null default 'Copper Athletic Club',
   infractions jsonb not null default '[]'::jsonb,
   image_url text not null,
-  image_sha256 text unique,
+  source_image_url text,
+  secondary_image_url text,
+  image_sha256 text,
   image_dhash text,
+  capture_note text,
   status text not null default 'approved' check (status in ('pending', 'approved', 'rejected')),
   created_at timestamptz not null default now()
 );

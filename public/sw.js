@@ -1,5 +1,15 @@
-const CACHE_NAME = 'copper-demerits-pwa-v1.1.0';
-const APP_SHELL = ['/', '/index.html', '/manifest.webmanifest', '/icon-192.svg', '/icon-512.svg'];
+const CACHE_NAME = 'copper-demerits-pwa-v1.2.0';
+const APP_SHELL = [
+  '/',
+  '/index.html',
+  '/manifest.webmanifest',
+  '/icon-192.svg',
+  '/icon-512.svg',
+  '/slips/20261017_211324_burtis_2050.jpg',
+  '/slips/20261017_211324_burtis_2056.jpg',
+  '/slips/20261017_211324_rick_2109.jpg',
+  '/slips/Scan_20261017_212309.jpg',
+];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
@@ -23,7 +33,6 @@ self.addEventListener('fetch', (event) => {
   if (request.method !== 'GET') return;
 
   const url = new URL(request.url);
-  // Always use network-first for Supabase API & storage calls
   if (url.hostname.includes('supabase.co')) return;
 
   if (request.mode === 'navigate') {
