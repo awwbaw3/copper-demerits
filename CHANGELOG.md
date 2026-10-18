@@ -2,6 +2,15 @@
 
 All notable changes to the **Copper Athletic Club — Ring of Honor** web application are documented in this file.
 
+## [1.6.8] - 2026-10-18
+
+### Added & Verified
+- **Full Domain Verification & noreply@copperdemerits.com Live on Resend-Ninjas (`cloudflare/worker.js`, `Resend-Ninjas`)**:
+  - Successfully verified domain `copperdemerits.com` directly inside the user's `drit.ninja` Resend account (`fe85e77d-54c0-4f74-bc7f-9dd968e94472`).
+  - Purged conflicting legacy Agency DKIM and manual MX/TXT records in Cloudflare DNS, achieving 100% verified status for DKIM (`resend._domainkey`) and SPF CNAMEs (`rsend`, `send`).
+  - Updated Cloudflare Worker notification sender to `Copper Demerits <noreply@copperdemerits.com>` with `reply_to: 'info@drit.ninja'`.
+  - Tested live delivery across email (`albaughrick@gmail.com`) and carrier SMS (`2692749665@tmomail.net`) with confirmed delivery.
+
 ## [1.6.7] - 2026-10-18
 
 ### Changed & Decoupled

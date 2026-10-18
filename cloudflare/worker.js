@@ -1,5 +1,5 @@
 /**
- * Copper Demerits (`copperdemerits.com`) — Cloudflare Worker + D1 + R2 + Workers AI Backend (v1.6.7)
+ * Copper Demerits (`copperdemerits.com`) — Cloudflare Worker + D1 + R2 + Workers AI Backend (v1.6.8)
  * - Database: Cloudflare D1 (`DB` binding -> `copper-demerits-db`)
  * - Object Storage: Cloudflare R2 (`SLIPS_BUCKET` binding -> `copper-demerits-slips`)
  * - AI Moderation: Cloudflare Workers AI (`AI` binding) + Optional `GEMINI_API_KEY` (Gemini 2.5 Flash)
@@ -753,7 +753,7 @@ async function sendControlledNotification(
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          from: 'Copper Demerits <noreply@drit.ninja>',
+          from: 'Copper Demerits <noreply@copperdemerits.com>',
           reply_to: 'info@drit.ninja',
           to: [cleanEmail],
           subject,
@@ -776,7 +776,7 @@ async function sendControlledNotification(
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          from: 'Copper Demerits <noreply@drit.ninja>',
+          from: 'Copper Demerits <noreply@copperdemerits.com>',
           reply_to: 'info@drit.ninja',
           to: smsRecipients,
           subject: 'Copper Demerits',

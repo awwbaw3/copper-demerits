@@ -1,6 +1,15 @@
 # Task Tracker — Copper Demerits (`copperdemerits.com`)
 
-## Active Sprint — v1.6.7 (Resend Agency Decoupling + drit.ninja Migration + Footer Branding)
+## Active Sprint — v1.6.8 (copperdemerits.com Verified on Resend-Ninjas + noreply@ Live)
+- [x] Verify `copperdemerits.com` directly inside `Resend-Ninjas` (`fe85e77d-54c0-4f74-bc7f-9dd968e94472`)
+- [x] Clean Cloudflare DNS: removed stale Agency DKIM and conflicting manual MX/TXT records
+- [x] Switch sender address to `Copper Demerits <noreply@copperdemerits.com>` with `reply_to: 'info@drit.ninja'`
+- [x] Deploy Cloudflare Worker (`v1.6.8`) to `api.copperdemerits.com`
+- [x] Verify live email & carrier SMS delivery from `noreply@copperdemerits.com` to Rick's profile
+- [x] Honor user directive: Do NOT publish to Netlify production
+
+## Completed Sprints
+### v1.6.7 (Resend Agency Decoupling + drit.ninja Migration + Footer Branding)
 - [x] Decouple completely from `Resend-Agency`: removed `copperdemerits.com` from Agency account
 - [x] Migrate to `Resend-Ninjas`: verified `drit.ninja` domain, provisioned `copper-demerits-worker` API key, and updated Cloudflare Worker `RESEND_API_KEY` secret
 - [x] Configure notification sender to `Copper Demerits <noreply@drit.ninja>` with `reply_to: 'info@drit.ninja'`
@@ -9,8 +18,6 @@
 - [x] Direct all website inquiries, comments, and complaints to `info@drit.ninja`
 - [x] Test live email and carrier SMS notifications to Rick's profile (`albaughrick@gmail.com` and `2692749665@tmomail.net`) with verified delivery
 - [x] Honor user directive: Do NOT publish to Netlify production
-
-## Completed Sprints
 ### v1.6.6 (Pre-Storage AI Slip Verification + Adaptive Smartphone Image Compression)
 - [x] Purge `Matt Barnes` and negative aliases from Cloudflare D1, `cloudflare/worker.js`, `src/lib/defaultData.ts`, and UI placeholders
 - [x] Add Zero-Touch AI Vision Slip OCR (`POST /api/extract-slip` via `@cf/mistralai/mistral-small-3.1-24b-instruct`)
