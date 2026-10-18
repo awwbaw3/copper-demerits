@@ -5,11 +5,16 @@ export interface Member {
   display_name: string;
   is_staff: boolean;
   is_patron: boolean;
+  is_admin?: boolean;
   is_claimed?: boolean;
-  claimed_by_contact?: string | null;
   claimed_at?: string | null;
   favorite_team?: string | null;
   tagline?: string | null;
+  notification_email?: string;
+  notification_phone?: string;
+  notification_carrier?: string;
+  notification_opt_in?: boolean;
+  notification_verified?: boolean;
   created_at?: string;
 }
 
@@ -25,6 +30,15 @@ export interface DemeritLineItem {
   description: string; // Specific offense written on slip
   points: number; // Number of demerits assigned to this line item
 }
+
+export interface SlipReactions {
+  buy_round: number;
+  tough_call: number;
+  two_mins: number;
+  instant_classic: number;
+}
+
+export type SlipReactionKey = keyof SlipReactions;
 
 export interface DemeritSlip {
   id: string;
@@ -46,6 +60,10 @@ export interface DemeritSlip {
   image_dhash?: string | null;
   capture_note?: string | null;
   status: SlipStatus;
+  is_blurred?: boolean;
+  moderation_flag_reason?: string | null;
+  original_infractions?: string[] | null;
+  reactions?: SlipReactions;
   created_at?: string;
 }
 

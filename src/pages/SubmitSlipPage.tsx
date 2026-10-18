@@ -7,6 +7,11 @@ import { DemeritLineItem } from '../types/demerits';
 import { DuplicateCheckResult } from '../lib/imageDedup';
 import { MichiganTeamBadge, TeamBadgeMeta } from '../components/MichiganSportsGraphics';
 import {
+  moderateTextInstant,
+  scanWithRefereeMonitor,
+  applyRefereeBlurStampToImage,
+} from '../lib/moderation';
+import {
   Camera,
   Upload,
   Plus,
@@ -22,6 +27,7 @@ import {
   Tag,
   KeyRound,
   UserCheck,
+  EyeOff,
 } from 'lucide-react';
 
 interface SlipDraftItem {
@@ -65,6 +71,7 @@ export const SubmitSlipPage: React.FC = () => {
 
   const [slipDrafts, setSlipDrafts] = useState<SlipDraftItem[]>([createDefaultDraft('21:00')]);
   const [imageUrl, setImageUrl] = useState<string | null>(null);
+  const [rawDataUrl, setRawDataUrl] = useState<string | null>(null);
   const [imageSha256, setImageSha256] = useState<string | null>(null);
   const [imageDhash, setImageDhash] = useState<string | null>(null);
   const [duplicateAlert, setDuplicateAlert] = useState<DuplicateCheckResult | null>(null);
@@ -75,10 +82,21 @@ export const SubmitSlipPage: React.FC = () => {
   const [submittedSummary, setSubmittedSummary] = useState<{
     newCount: number;
     mergedCount: number;
+    blurredQueueCount: number;
   } | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const cameraInputRef = useRef<HTMLInputElement | null>(null);
+
+  // Real-time client check across all drafts to preview Referee Blur / Queue status
+  const liveModerationCheck = moderateTextInstant(
+    slipDrafts
+      .map(
+        (d) =>
+          `${d.rawStudent} ${d.rawSignature} ${d.items.map((it) => it.description).join(' ')}`
+      )
+      .join(' ')
+  );
 
   const setSlipCountInPhoto = (count: number) => {
     setSlipDrafts((prev) => {
@@ -158,7 +176,7 @@ export const SubmitSlipPage: React.FC = () => {
     setUploadingPhoto(true);
     setErrorMsg(null);
     setDuplicateAlert(null);
-    setUploadStatusMsg('Computing SHA-256 & Rotation-Aware 64-bit Perceptual dHash...');
+    setUploadStatusMsg('Computing SHA-256, 64-bit Perceptual dHash & AI Referee Scan...');
 
     try {
       const asset = await processAndUploadSlipImage(file);
@@ -167,11 +185,13 @@ export const SubmitSlipPage: React.FC = () => {
       if (dupCheck.isDuplicate) {
         setDuplicateAlert(dupCheck);
         setImageUrl(null);
+        setRawDataUrl(null);
         setImageSha256(null);
         setImageDhash(null);
         setUploadStatusMsg(null);
       } else {
         setImageUrl(asset.url);
+        setRawDataUrl(asset.fingerprint.dataUrl);
         setImageSha256(asset.fingerprint.sha256);
         setImageDhash(asset.fingerprint.dhash);
         setUploadStatusMsg(
@@ -207,6 +227,7 @@ export const SubmitSlipPage: React.FC = () => {
     try {
       let newCount = 0;
       let mergedCount = 0;
+      let blurredQueueCount = 0;
       const isMultiSlip = slipDrafts.length > 1;
 
       for (let i = 0; i < slipDrafts.length; i++) {
@@ -222,6 +243,20 @@ export const SubmitSlipPage: React.FC = () => {
         const totalDemeritCount = validItems.reduce((sum, item) => sum + item.points, 0);
         const cleanedInfractions = validItems.map((item) => item.description);
 
+        // Scan text + image with AI Referee Monitor
+        const modScan = await scanWithRefereeMonitor(
+          [d.rawStudent, d.rawSignature, ...cleanedInfractions],
+          rawDataUrl
+        );
+
+        let finalSlipImageUrl = imageUrl;
+        if (modScan.flagged && (rawDataUrl || imageUrl)) {
+          finalSlipImageUrl = await applyRefereeBlurStampToImage(
+            rawDataUrl || imageUrl,
+            modScan.blurRegions
+          );
+        }
+
         const res = await submitDemeritSlip({
           raw_student: d.rawStudent,
           raw_signature: d.rawSignature,
@@ -232,10 +267,12 @@ export const SubmitSlipPage: React.FC = () => {
           location_area: d.locationArea,
           infractions: cleanedInfractions,
           demerit_items: validItems,
-          image_url: imageUrl,
+          image_url: finalSlipImageUrl,
           source_image_url: isMultiSlip ? imageUrl : null,
           image_sha256: i === 0 ? imageSha256 : null,
           image_dhash: i === 0 ? imageDhash : null,
+          is_blurred: modScan.flagged,
+          moderation_flag_reason: modScan.reason,
           capture_note: isMultiSlip
             ? `Slip ${i + 1} of ${slipDrafts.length} extracted from multi-slip photo (${
                 d.incidentTime || d.incidentDate
@@ -248,15 +285,17 @@ export const SubmitSlipPage: React.FC = () => {
 
         if (res.wasMergedDuplicate) {
           mergedCount += 1;
+        } else if (res.wasBlurredAndQueued) {
+          blurredQueueCount += 1;
         } else {
           newCount += 1;
         }
       }
 
-      setSubmittedSummary({ newCount, mergedCount });
+      setSubmittedSummary({ newCount, mergedCount, blurredQueueCount });
       setTimeout(() => {
-        navigate('/docket');
-      }, 1300);
+        navigate(blurredQueueCount > 0 ? '/admin' : '/docket');
+      }, 1600);
     } catch (err) {
       setErrorMsg(err instanceof Error ? err.message : 'Could not save slip.');
     } finally {
@@ -298,7 +337,7 @@ export const SubmitSlipPage: React.FC = () => {
                 <strong className="text-white">Rick</strong>,{' '}
                 <strong className="text-white">Burtis</strong>,{' '}
                 <strong className="text-white">David Lee</strong>, or create a new Patron pass) with
-                a 4-digit Bar PIN so every uploaded slip is tied to a verified bar member.
+                a 4 to 8-digit Bar PIN so every uploaded slip is tied to a verified bar member.
               </p>
             </div>
 
@@ -332,7 +371,9 @@ export const SubmitSlipPage: React.FC = () => {
                 </span>
               </div>
               <p className="font-mono-docket text-[11px] text-emerald-200/80">
-                {currentMember.is_staff
+                {currentMember.is_admin
+                  ? 'Site Administrator & Official Referee'
+                  : currentMember.is_staff
                   ? 'Official Bar Referee / Staff Account'
                   : 'Verified Ring of Honor Patron'}
               </p>
@@ -344,8 +385,29 @@ export const SubmitSlipPage: React.FC = () => {
             onClick={() => setIsProfileModalOpen(true)}
             className="rounded-xl border border-white/15 bg-white/5 px-3 py-1.5 font-mono-docket text-xs text-[#E8B888] hover:border-[#B87333] cursor-pointer"
           >
-            Switch Profile
+            Edit My Profile / Switch
           </button>
+        </div>
+      )}
+
+      {/* Real-Time Referee Auto-Blur & Admin Queue Notice */}
+      {liveModerationCheck.flagged && (
+        <div className="rounded-2xl border-2 border-amber-500/60 bg-amber-950/40 p-4 text-amber-200">
+          <div className="flex items-start gap-3">
+            <EyeOff className="h-6 w-6 text-amber-400 shrink-0 mt-0.5" />
+            <div>
+              <h3 className="font-athletic text-lg font-bold uppercase text-amber-200">
+                🦓 Referee Auto-Blur Active — Will Queue for Admin Review
+              </h3>
+              <p className="mt-0.5 text-xs font-mono-docket text-amber-300">
+                The Automated Referee detected potential profanity or name-calling (
+                <strong>{liveModerationCheck.matchedTerms.join(', ')}</strong>). To keep Copper
+                Demerits friendly and jovial, this slip image will be automatically blurred,
+                profanity censored as <code className="text-white">[🍻 CENSORED BY REF]</code>, and
+                placed in the Ref Booth Queue for the Site Admin (Rick) to review or override.
+              </p>
+            </div>
+          </div>
         </div>
       )}
 
@@ -407,7 +469,10 @@ export const SubmitSlipPage: React.FC = () => {
             </h3>
             <p className="text-xs font-mono-docket">
               {submittedSummary.newCount} new citation(s) logged ·{' '}
-              {submittedSummary.mergedCount} duplicate citation(s) merged as secondary photo evidence.
+              {submittedSummary.mergedCount} duplicate citation(s) merged as secondary photo evidence
+              {submittedSummary.blurredQueueCount > 0
+                ? ` · ${submittedSummary.blurredQueueCount} slip(s) auto-blurred by Referee & queued for Admin override.`
+                : '.'}
             </p>
           </div>
         </div>
@@ -751,7 +816,7 @@ export const SubmitSlipPage: React.FC = () => {
                   required
                   value={draft.rawSignature}
                   onChange={(e) => updateDraft(draftIdx, { rawSignature: e.target.value })}
-                  placeholder='e.g. "YOUR BOSS!", "The Boss - AKA Sarah", "Matt Barnes"'
+                  placeholder='e.g. "YOUR BOSS!", "The Boss - AKA Sarah", "Sarah (Cursive Signature)"'
                   className="mt-1.5 w-full rounded-xl border border-white/15 bg-[#121212] px-3.5 py-2.5 text-sm text-[#F5F2EB] focus:border-[#B87333] focus:outline-none"
                 />
 
@@ -798,14 +863,25 @@ export const SubmitSlipPage: React.FC = () => {
         >
           <span>
             {submitting
-              ? 'Saving & Deduplicating...'
+              ? 'Referee Scanning & Saving...'
               : slipDrafts.length > 1
               ? `Save ${slipDrafts.length} Slips from Photo to Docket`
               : 'Save Slip Photo to Docket'}
           </span>
           <ArrowRight className="h-5 w-5" />
         </button>
+
+        {/* Unofficial Fan Site Disclaimer */}
+        <div className="rounded-xl border border-white/10 bg-[#141210] px-4 py-3 text-center">
+          <p className="font-mono-docket text-[11px] text-[#9E8F82]">
+            🍺 <strong className="text-[#E8B888]">Unofficial Patron-Run Fan Site:</strong> Copper
+            Demerits is intended strictly for friendly, jovial bar fun. Not owned by or affiliated
+            with Copper Athletic Club. Slips with profanity or personal insults are automatically
+            blurred by the AI Referee and held for Admin review.
+          </p>
+        </div>
       </form>
     </div>
   );
 };
+

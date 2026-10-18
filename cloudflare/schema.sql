@@ -1,34 +1,43 @@
 -- ============================================================================
--- COPPER DEMERITS — CLOUDFLARE D1 (SQLite) SCHEMA & SEED
--- Database: copper-demerits-db (feb899d8-606e-4937-91b7-9076e2741961)
--- Storage: Cloudflare R2 Bucket `copper-demerits-slips`
+-- COPPER DEMERITS — CLOUDFLARE D1 (SQLite) SCHEMA (v1.6.0)
+-- Aligned with copperdemerits.com Cloudflare Zone
 -- ============================================================================
 
 CREATE TABLE IF NOT EXISTS members (
   id TEXT PRIMARY KEY,
-  display_name TEXT NOT NULL UNIQUE,
+  display_name TEXT NOT NULL,
   is_staff INTEGER NOT NULL DEFAULT 0,
   is_patron INTEGER NOT NULL DEFAULT 1,
+  is_admin INTEGER NOT NULL DEFAULT 0,
   claimed_by_contact TEXT,
   claimed_pin TEXT,
+  is_claimed INTEGER NOT NULL DEFAULT 0,
   claimed_at TEXT,
   favorite_team TEXT DEFAULT 'lions',
   tagline TEXT,
+  notification_email TEXT,
+  notification_phone TEXT,
+  notification_carrier TEXT DEFAULT 'none',
+  notification_opt_in INTEGER NOT NULL DEFAULT 0,
+  notification_verified INTEGER NOT NULL DEFAULT 0,
+  verification_code TEXT,
+  verification_sent_at TEXT,
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
 CREATE TABLE IF NOT EXISTS staff_aliases (
   id TEXT PRIMARY KEY,
   alias TEXT NOT NULL UNIQUE,
-  member_id TEXT NOT NULL REFERENCES members(id) ON DELETE CASCADE,
-  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  member_id TEXT NOT NULL,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  FOREIGN KEY (member_id) REFERENCES members(id) ON DELETE CASCADE
 );
 
 CREATE TABLE IF NOT EXISTS demerits (
   id TEXT PRIMARY KEY,
-  patron_id TEXT REFERENCES members(id) ON DELETE SET NULL,
+  patron_id TEXT,
   raw_student TEXT NOT NULL,
-  issuer_id TEXT REFERENCES members(id) ON DELETE SET NULL,
+  issuer_id TEXT,
   raw_signature TEXT NOT NULL,
   demerit_count INTEGER NOT NULL DEFAULT 1,
   incident_date TEXT NOT NULL,
@@ -44,10 +53,21 @@ CREATE TABLE IF NOT EXISTS demerits (
   capture_note TEXT,
   submitted_by_member_id TEXT,
   status TEXT NOT NULL DEFAULT 'approved',
+  is_blurred INTEGER NOT NULL DEFAULT 0,
+  moderation_flag_reason TEXT,
+  original_infractions TEXT,
+  reactions TEXT NOT NULL DEFAULT '{"buy_round":0,"tough_call":0,"two_mins":0,"instant_classic":0}',
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
-CREATE INDEX IF NOT EXISTS idx_d1_demerits_patron ON demerits(patron_id);
-CREATE INDEX IF NOT EXISTS idx_d1_demerits_issuer ON demerits(issuer_id);
-CREATE INDEX IF NOT EXISTS idx_d1_demerits_date ON demerits(incident_date DESC);
-CREATE INDEX IF NOT EXISTS idx_d1_demerits_sha256 ON demerits(image_sha256);
+CREATE TABLE IF NOT EXISTS notification_log (
+  id TEXT PRIMARY KEY,
+  member_id TEXT,
+  event_type TEXT NOT NULL,
+  recipient_masked TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_demerits_date_time ON demerits(incident_date DESC, incident_time DESC);
+CREATE INDEX IF NOT EXISTS idx_staff_aliases_alias ON staff_aliases(alias);
+CREATE INDEX IF NOT EXISTS idx_notification_log_created ON notification_log(created_at);

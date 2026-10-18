@@ -21,23 +21,37 @@ export const App: React.FC = () => {
               <Route path="/admin" element={<AdminPage />} />
             </Routes>
           </main>
-          <footer className="mt-12 border-t border-[#B87333]/20 bg-[#0E0C0B] py-6 px-4">
-            <div className="mx-auto max-w-6xl flex flex-col sm:flex-row items-center justify-between gap-3 text-[11px] font-mono-docket text-[#8E8074] text-center sm:text-left">
-              <div>
-                <span className="font-bold text-[#B87333]">COPPER ATHLETIC CLUB</span> · MARSHALL,
-                MI · RING OF HONOR
+          <footer className="mt-12 border-t border-[#B87333]/25 bg-[#0E0C0B] py-7 px-4">
+            <div className="mx-auto max-w-6xl space-y-4">
+              <div className="rounded-2xl border border-[#B87333]/30 bg-[#151210] px-4 py-3 text-center">
+                <p className="font-mono-docket text-[11px] sm:text-xs text-[#D6C7B8]">
+                  🍺 <strong className="text-[#DFC15E]">UNOFFICIAL FAN SITE DISCLAIMER:</strong>{' '}
+                  Copper Demerits (<code className="text-[#E8B888]">copperdemerits.com</code>) is an
+                  unofficial, patron-run fan site created strictly for friendly, jovial fun and
+                  good-natured bar banter. It is{' '}
+                  <strong className="text-white">
+                    not owned by, operated by, or officially affiliated with Copper Athletic Club
+                  </strong>
+                  . Be kind, tip your bartenders, and keep it friendly!
+                </p>
               </div>
-              <div className="flex items-center gap-3">
-                <a
-                  href="https://copperac.com"
-                  target="_blank"
-                  rel="noreferrer"
-                  className="hover:text-[#E8B888] transition"
-                >
-                  copperac.com ↗
-                </a>
-                <span>·</span>
-                <span>Cloudflare D1 + R2 · PWA v1.5.0</span>
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-3 text-[11px] font-mono-docket text-[#8E8074] text-center sm:text-left">
+                <div>
+                  <span className="font-bold text-[#B87333]">COPPER DEMERITS FAN CLUB</span> ·
+                  MARSHALL, MI · RING OF HONOR
+                </div>
+                <div className="flex items-center gap-3">
+                  <a
+                    href="https://copperac.com"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="hover:text-[#E8B888] transition"
+                  >
+                    Visit Official Copper AC (copperac.com) ↗
+                  </a>
+                  <span>·</span>
+                  <span>Cloudflare D1 + R2 + AI Referee · PWA v1.6.0</span>
+                </div>
               </div>
             </div>
           </footer>

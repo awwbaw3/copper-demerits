@@ -2,11 +2,12 @@ import React, { useState } from 'react';
 import {
   Search,
   Eye,
+  EyeOff,
   Images,
   Sparkles,
 } from 'lucide-react';
 import { useDemerits } from '../context/DemeritsContext';
-import { EnrichedDemeritSlip } from '../types/demerits';
+import { EnrichedDemeritSlip, SlipReactions } from '../types/demerits';
 import { SlipModalViewer } from '../components/SlipModalViewer';
 import { normalizeSlipDemeritItems } from '../lib/defaultData';
 import {
@@ -14,8 +15,19 @@ import {
   getMichiganTeamMetaForType,
 } from '../components/MichiganSportsGraphics';
 
+const JOVIAL_REACTION_BUTTONS: Array<{
+  key: keyof SlipReactions;
+  emoji: string;
+  label: string;
+}> = [
+  { key: 'buy_round', emoji: '🍺', label: "Buy 'Em A Round" },
+  { key: 'tough_call', emoji: '🦁', label: 'Tough Call Ref!' },
+  { key: 'two_mins', emoji: '🐙', label: '2 Mins in the Box' },
+  { key: 'instant_classic', emoji: '😂', label: 'Instant Classic' },
+];
+
 export const DocketPage: React.FC = () => {
-  const { demerits, uploadedSourceFiles } = useDemerits();
+  const { demerits, uploadedSourceFiles, reactToSlip } = useDemerits();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedSlip, setSelectedSlip] = useState<EnrichedDemeritSlip | null>(null);
   const [previewPhotoUrl, setPreviewPhotoUrl] = useState<string | null>(null);
@@ -52,7 +64,7 @@ export const DocketPage: React.FC = () => {
           <div>
             <span className="inline-flex items-center gap-1.5 rounded-full border border-[#DFC15E]/50 bg-[#B87333]/20 px-3 py-0.5 text-[11px] font-mono-docket font-bold uppercase tracking-wider text-[#DFC15E]">
               <Sparkles className="h-3.5 w-3.5" />
-              OFFICIAL EVIDENCE LOCKER • 4 SLIPS • ALL SIGNED BY SARAH
+              OFFICIAL EVIDENCE LOCKER • {approvedSlips.length} SLIPS • ALL SIGNED BY SARAH
             </span>
             <h1 className="mt-2 font-display-tall text-4xl sm:text-5xl font-black uppercase tracking-wider text-[#F5F2EB] leading-none">
               WALL OF <span className="text-[#B87333]">SLIPS</span>
@@ -81,6 +93,12 @@ export const DocketPage: React.FC = () => {
             items[0]?.type || '',
             items[0]?.description || ''
           );
+          const reactions: SlipReactions = slip.reactions || {
+            buy_round: 0,
+            tough_call: 0,
+            two_mins: 0,
+            instant_classic: 0,
+          };
 
           return (
             <div
@@ -93,9 +111,20 @@ export const DocketPage: React.FC = () => {
                 <img
                   src={slip.image_url || '/slips/20261017_211324.jpg'}
                   alt={`Slip for ${slip.raw_student}`}
-                  className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+                  className={`h-full w-full object-cover transition-transform duration-500 group-hover:scale-105 ${
+                    slip.is_blurred ? 'blur-md scale-105' : ''
+                  }`}
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-[#121212] via-transparent to-black/40" />
+
+                {slip.is_blurred && (
+                  <div className="absolute inset-0 flex items-center justify-center bg-black/45">
+                    <span className="inline-flex items-center gap-1.5 rounded-2xl border-2 border-amber-400 bg-black/85 px-4 py-2 font-athletic text-lg font-black uppercase tracking-wider text-amber-300 shadow-lg">
+                      <EyeOff className="h-4 w-4" />
+                      <span>🦓 Referee Blurred — Friendly Vibes Only</span>
+                    </span>
+                  </div>
+                )}
 
                 {/* Top Badges */}
                 <div className="absolute top-3 left-3 right-3 flex items-center justify-between">
@@ -146,6 +175,32 @@ export const DocketPage: React.FC = () => {
                           +{item.points}
                         </span>
                       </div>
+                    );
+                  })}
+                </div>
+
+                {/* Preset Jovial Bar Reactions (No Free-Text Comments) */}
+                <div
+                  className="pt-2 flex flex-wrap items-center gap-1.5"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  {JOVIAL_REACTION_BUTTONS.map((btn) => {
+                    const count = reactions[btn.key] || 0;
+                    return (
+                      <button
+                        key={btn.key}
+                        type="button"
+                        onClick={() => reactToSlip(slip.id, btn.key)}
+                        className="inline-flex items-center gap-1.5 rounded-xl border border-white/15 bg-black/50 px-2.5 py-1 font-mono-docket text-[11px] text-[#E8B888] transition hover:border-[#DFC15E] hover:bg-[#B87333]/20 cursor-pointer"
+                      >
+                        <span>{btn.emoji}</span>
+                        <span>{btn.label}</span>
+                        {count > 0 && (
+                          <span className="ml-0.5 rounded-full bg-[#DFC15E]/20 px-1.5 py-0.2 font-bold text-[#DFC15E]">
+                            {count}
+                          </span>
+                        )}
+                      </button>
                     );
                   })}
                 </div>

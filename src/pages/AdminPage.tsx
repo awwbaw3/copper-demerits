@@ -12,8 +12,11 @@ import {
   Users,
   KeyRound,
   Eye,
+  EyeOff,
+  CheckCircle2,
   Database,
   Fingerprint,
+  Lock,
 } from 'lucide-react';
 
 export const AdminPage: React.FC = () => {
@@ -22,6 +25,9 @@ export const AdminPage: React.FC = () => {
     aliases,
     demerits,
     isSupabaseConnected,
+    currentMember,
+    isAdminOrStaff,
+    setIsProfileModalOpen,
     resolveStaffSignature,
     deleteSlip,
     updateSlipAssignment,
@@ -30,6 +36,7 @@ export const AdminPage: React.FC = () => {
     rerunAliasNormalization,
     addOrUpdateMember,
     deduplicateExistingSlips,
+    adminOverrideSlip,
   } = useDemerits();
 
   const [selectedSlip, setSelectedSlip] = useState<EnrichedDemeritSlip | null>(null);
@@ -52,6 +59,46 @@ export const AdminPage: React.FC = () => {
 
   const staffMembers = members.filter((m) => m.is_staff);
   const patronMembers = members.filter((m) => m.is_patron);
+  const queuedOrBlurredSlips = demerits.filter(
+    (s) => s.status === 'pending' || s.is_blurred
+  );
+
+  if (!isAdminOrStaff) {
+    return (
+      <div className="mx-auto max-w-3xl px-4 py-12">
+        <div className="rounded-3xl border-2 border-[#B87333]/50 bg-[#171311] p-6 sm:p-10 text-center space-y-5 shadow-[0_20px_50px_rgba(0,0,0,0.85)]">
+          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl border border-[#DFC15E]/40 bg-[#DFC15E]/15 text-[#DFC15E]">
+            <Lock className="h-8 w-8" />
+          </div>
+          <div className="space-y-2">
+            <span className="font-mono-docket text-xs font-bold uppercase tracking-widest text-[#DFC15E]">
+              🦓 OFFICIAL REFEREE BOOTH ACCESS ONLY
+            </span>
+            <h1 className="font-athletic text-3xl sm:text-5xl font-black uppercase tracking-wide text-[#F5F2EB]">
+              ADMIN &amp; REFEREE SIGN-IN REQUIRED
+            </h1>
+            <p className="mx-auto max-w-xl text-xs sm:text-sm text-[#D6C7B8]">
+              Only the Site Administrator (<strong className="text-white">Rick</strong>) or Official
+              Bar Referee (<strong className="text-white">Sarah</strong>) signed in with their 4–8
+              digit Bar PIN can access the Ref Booth, override auto-blurred slips, or manage
+              aliases.
+            </p>
+          </div>
+
+          <div className="pt-2">
+            <button
+              type="button"
+              onClick={() => setIsProfileModalOpen(true)}
+              className="inline-flex items-center gap-2 rounded-2xl bg-gradient-to-r from-[#DFC15E] to-[#B87333] px-6 py-3.5 font-athletic text-lg font-black uppercase tracking-wider text-[#121212] shadow-[0_0_25px_rgba(223,193,94,0.35)] hover:brightness-110 cursor-pointer"
+            >
+              <KeyRound className="h-5 w-5" />
+              <span>Sign In as Rick (Admin) or Sarah (Ref)</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   const handleAddAlias = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -94,8 +141,42 @@ export const AdminPage: React.FC = () => {
   const handleAddMember = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newMemberName.trim()) return;
-    await addOrUpdateMember(newMemberName, newMemberIsPatron, newMemberIsStaff);
-    setNewMemberName('');
+    try {
+      await addOrUpdateMember(newMemberName, newMemberIsPatron, newMemberIsStaff);
+      setFeedback({
+        type: 'ok',
+        msg: `Added "${newMemberName.trim()}" to bar roster.`,
+      });
+      setNewMemberName('');
+    } catch (err) {
+      setFeedback({
+        type: 'err',
+        msg: err instanceof Error ? err.message : 'Name blocked by Referee filter.',
+      });
+    }
+  };
+
+  const handleOverrideSlip = async (
+    slipId: string,
+    action: 'approve_unblur' | 'approve_keep_blurred' | 'reject'
+  ) => {
+    const res = await adminOverrideSlip(slipId, action);
+    if (res.ok) {
+      setFeedback({
+        type: 'ok',
+        msg:
+          action === 'reject'
+            ? 'Slip rejected and hidden from public docket.'
+            : action === 'approve_keep_blurred'
+            ? 'Slip approved with Referee Blur kept active.'
+            : 'Admin Override complete: Slip unblurred and approved for the public docket!',
+      });
+    } else {
+      setFeedback({
+        type: 'err',
+        msg: res.error || 'Could not override slip.',
+      });
+    }
   };
 
   const testResolution = resolveStaffSignature(testSignature);
@@ -107,17 +188,20 @@ export const AdminPage: React.FC = () => {
         <div>
           <div className="inline-flex items-center gap-2 rounded-full border border-[#B87333]/40 bg-[#B87333]/10 px-3 py-1 text-[11px] font-mono-docket uppercase tracking-widest text-[#E8B888]">
             <ShieldAlert className="h-3.5 w-3.5 text-[#B87333]" />
-            <span>MODERATION &amp; DEDUPLICATION</span>
+            <span>
+              SIGNED IN AS {currentMember?.display_name.toUpperCase()} (
+              {currentMember?.is_admin ? 'SITE ADMIN' : 'BAR REFEREE'})
+            </span>
           </div>
           <h1 className="mt-2 font-athletic text-3xl sm:text-5xl font-extrabold uppercase tracking-wide text-[#F5F2EB]">
-            ADMIN <span className="text-[#B87333]">CONTROL</span>
+            REFEREE <span className="text-[#B87333]">BOOTH &amp; OVERRIDE QUEUE</span>
           </h1>
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
           <span className="inline-flex items-center gap-1.5 rounded-xl border border-white/10 bg-[#1A1715] px-3 py-2 font-mono-docket text-xs text-[#C4B8AC]">
             <Database className="h-3.5 w-3.5 text-[#B87333]" />
-            {isSupabaseConnected ? 'Cloudflare D1 + R2 Live' : 'Local Storage'}
+            {isSupabaseConnected ? 'Cloudflare D1 + R2 + Workers AI Live' : 'Local Storage'}
           </span>
 
           <button
@@ -143,11 +227,106 @@ export const AdminPage: React.FC = () => {
         </div>
       )}
 
+      {/* AI Referee Auto-Blur & Pending Override Queue */}
+      <section className="rounded-2xl border-2 border-amber-500/40 bg-amber-950/15 p-4 sm:p-6 space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-amber-500/25 pb-3">
+          <div>
+            <span className="font-mono-docket text-[10px] font-bold uppercase tracking-widest text-amber-300">
+              🦓 REAL-TIME REFEREE MONITOR · AUTO-BLUR &amp; ADMIN OVERRIDE
+            </span>
+            <h2 className="font-athletic text-xl sm:text-2xl font-bold uppercase text-[#F5F2EB]">
+              FLAGGED / BLURRED SLIPS QUEUE ({queuedOrBlurredSlips.length})
+            </h2>
+          </div>
+          <span className="rounded-full border border-amber-400/40 bg-amber-500/15 px-3 py-1 font-mono-docket text-[11px] font-bold text-amber-200">
+            Zero-Cost Workers AI + Referee Filter Active
+          </span>
+        </div>
+
+        {queuedOrBlurredSlips.length === 0 ? (
+          <div className="rounded-xl border border-white/10 bg-[#121212] p-5 text-center">
+            <p className="font-mono-docket text-xs text-emerald-300">
+              ✓ No blurred or pending slips in the Referee Queue! All active slips are clean and
+              jovial.
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {queuedOrBlurredSlips.map((slip) => (
+              <div
+                key={slip.id}
+                className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 rounded-xl border border-amber-500/40 bg-[#121212] p-4"
+              >
+                <div className="flex items-center gap-3.5">
+                  {slip.image_url && (
+                    <img
+                      src={slip.image_url}
+                      alt={`Queued slip for ${slip.patronDisplayName}`}
+                      className={`h-16 w-16 shrink-0 rounded-lg border border-amber-400/50 object-cover bg-black ${
+                        slip.is_blurred ? 'blur-[2px]' : ''
+                      }`}
+                    />
+                  )}
+                  <div className="space-y-1">
+                    <div className="flex flex-wrap items-center gap-2 font-mono-docket text-xs">
+                      <span className="rounded bg-amber-500/20 px-2 py-0.5 font-bold uppercase text-amber-300">
+                        STATUS: {slip.status.toUpperCase()}
+                      </span>
+                      {slip.is_blurred && (
+                        <span className="rounded bg-rose-500/20 px-2 py-0.5 font-bold uppercase text-rose-300">
+                          AUTO-BLURRED
+                        </span>
+                      )}
+                      <span className="text-[#E8B888]">{slip.incident_date}</span>
+                    </div>
+                    <div className="font-athletic text-lg font-bold uppercase text-white">
+                      {slip.patronDisplayName} · {slip.infractions.join(' · ')}
+                    </div>
+                    {slip.moderation_flag_reason && (
+                      <p className="font-mono-docket text-[11px] text-amber-300">
+                        Ref Note: {slip.moderation_flag_reason}
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => handleOverrideSlip(slip.id, 'approve_unblur')}
+                    className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-500 px-3 py-2 font-mono-docket text-xs font-bold text-[#121212] hover:brightness-110 cursor-pointer"
+                  >
+                    <CheckCircle2 className="h-4 w-4" />
+                    <span>Approve &amp; Unblur (Override)</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleOverrideSlip(slip.id, 'approve_keep_blurred')}
+                    className="inline-flex items-center gap-1.5 rounded-xl border border-amber-400/50 bg-amber-500/20 px-3 py-2 font-mono-docket text-xs font-bold text-amber-200 hover:bg-amber-500/30 cursor-pointer"
+                  >
+                    <EyeOff className="h-4 w-4" />
+                    <span>Approve (Keep Blurred)</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => deleteSlip(slip.id)}
+                    className="inline-flex items-center gap-1 rounded-xl border border-rose-500/40 bg-rose-950/40 px-3 py-2 font-mono-docket text-xs font-bold text-rose-300 hover:bg-rose-900/50 cursor-pointer"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                    <span>Eject Slip</span>
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
+
       {/* Uploaded Slips Queue */}
       <section className="rounded-2xl border border-white/10 bg-[#1A1715] p-4 sm:p-6 space-y-4">
         <div className="flex items-center justify-between border-b border-white/10 pb-3">
           <h2 className="font-athletic text-xl sm:text-2xl font-bold uppercase text-[#F5F2EB]">
-            UPLOADED SLIP PHOTOS ({demerits.length}/4)
+            ALL UPLOADED SLIP PHOTOS ({demerits.length})
           </h2>
           <button
             type="button"
@@ -175,7 +354,9 @@ export const AdminPage: React.FC = () => {
                     <img
                       src={slip.image_url}
                       alt={`Slip for ${slip.patronDisplayName}`}
-                      className="h-16 w-16 shrink-0 rounded-lg border border-[#B87333]/40 object-cover bg-black"
+                      className={`h-16 w-16 shrink-0 rounded-lg border border-[#B87333]/40 object-cover bg-black ${
+                        slip.is_blurred ? 'blur-[2px]' : ''
+                      }`}
                     />
                   )}
                   <div className="space-y-1">
@@ -183,6 +364,11 @@ export const AdminPage: React.FC = () => {
                       <span>{slip.incident_date}</span>
                       {slip.incident_time && <span>· {slip.incident_time}</span>}
                       <span className="font-bold text-[#C86D51]">+{slip.demerit_count} PTS</span>
+                      {slip.is_blurred && (
+                        <span className="rounded bg-amber-500/20 px-1.5 py-0.5 text-[10px] font-bold text-amber-300">
+                          BLURRED
+                        </span>
+                      )}
                     </div>
                     <div className="font-athletic text-lg font-bold uppercase text-[#F5F2EB]">
                       {slip.patronDisplayName} · Issued by {slip.issuerDisplayName}
@@ -237,6 +423,20 @@ export const AdminPage: React.FC = () => {
 
                   <button
                     type="button"
+                    onClick={() =>
+                      handleOverrideSlip(
+                        slip.id,
+                        slip.is_blurred ? 'approve_unblur' : 'approve_keep_blurred'
+                      )
+                    }
+                    className="inline-flex items-center gap-1 rounded-lg border border-amber-500/30 bg-amber-500/10 px-2.5 py-1.5 font-mono-docket text-xs text-amber-200 hover:bg-amber-500/20 cursor-pointer"
+                  >
+                    <EyeOff className="h-3.5 w-3.5" />
+                    <span>{slip.is_blurred ? 'Unblur' : 'Blur'}</span>
+                  </button>
+
+                  <button
+                    type="button"
                     onClick={() => setSelectedSlip(slip)}
                     className="inline-flex items-center gap-1 rounded-lg border border-white/15 bg-white/5 px-2.5 py-1.5 font-mono-docket text-xs text-[#D6C7B8]"
                   >
@@ -274,7 +474,7 @@ export const AdminPage: React.FC = () => {
                 required
                 value={newAliasInput}
                 onChange={(e) => setNewAliasInput(e.target.value)}
-                placeholder='Alias (e.g. "the boss - aka sarah")'
+                placeholder='Friendly alias (e.g. "the boss - aka sarah")'
                 className="w-full rounded-xl border border-white/15 bg-[#121212] px-3.5 py-2 text-xs text-[#F5F2EB]"
               />
             </div>
@@ -377,7 +577,7 @@ export const AdminPage: React.FC = () => {
               required
               value={newMemberName}
               onChange={(e) => setNewMemberName(e.target.value)}
-              placeholder="Display Name"
+              placeholder="Friendly Display Name"
               className="w-full rounded-lg border border-white/15 bg-[#1A1715] px-3 py-2 text-xs text-[#F5F2EB]"
             />
             <div className="flex items-center justify-between gap-4">
@@ -420,6 +620,11 @@ export const AdminPage: React.FC = () => {
                   {m.display_name}
                 </span>
                 <div className="flex items-center gap-1.5">
+                  {m.is_admin && (
+                    <span className="rounded bg-amber-500/20 px-2 py-0.5 font-mono-docket text-[10px] font-bold text-amber-300">
+                      ADMIN
+                    </span>
+                  )}
                   {m.is_patron && (
                     <span className="rounded bg-[#B87333]/20 px-2 py-0.5 font-mono-docket text-[10px] text-[#E8B888]">
                       PATRON

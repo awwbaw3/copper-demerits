@@ -4,6 +4,24 @@ Chronological log of architectural decisions, database migrations, and infrastru
 
 ---
 
+## 2026-10-18 — v1.6.0 AI Referee Auto-Blur & Admin Override Queue, Self-Service Profile Editor, Zero-Cost Verified Notifications & Fan Site Disclaimer
+- **Roster Cleanup (`Matt Barnes` & Negative Aliases Purged)**:
+  - Executed Cloudflare D1 SQL cleanup removing `Matt Barnes` (`44444444-4444-4444-8444-444444444444`) and any negative aliases from `copper-demerits-db`, `cloudflare/worker.js`, `src/lib/defaultData.ts`, `supabase/seed.sql`, and UI placeholders.
+- **Real-Time AI Referee Monitor + Automatic Slip Blurring & Admin Override Queue**:
+  - Bound Cloudflare Workers AI (`[ai] binding = "AI"` in `wrangler.toml`) to `copper-demerits-api` (`$0/mo`, zero external API key required) alongside deterministic profanity/slur/insult guardrails (`src/lib/moderation.ts` & `cloudflare/worker.js`).
+  - Configured slip uploads so any slip flagged for profanity or name-calling is **automatically blurred** (`applyRefereeBlurStampToImage` + `is_blurred = 1`), censored (`[🍻 CENSORED BY REF]`), and routed to `status = 'pending'` in the **Ref Booth Override Queue (`/admin`)** for Site Admin (**Rick**) to review and override (`approve_unblur`, `approve_keep_blurred`, or `reject`).
+  - Configured strict immediate blocking for offensive display names, taglines, and staff aliases.
+- **Edit Your Own Profile ("My Locker"), 4–8 Digit PINs & Ref Booth RBAC**:
+  - Upgraded PIN validation to 4–8 digits across client and worker (`PATCH /api/my-profile`).
+  - Designated **Rick** (`11111111-1111-4111-8111-111111111111`) as Site Administrator (`is_admin = 1`) and gated `/admin` behind `isAdminOrStaff`.
+- **Zero-Cost Verified Notifications (`Resend-Agency` + Carrier SMS Gateways) & Privacy Hardening**:
+  - Created and DNS-verified domain `copperdemerits.com` (`id: fee19476-c651-4f63-8ede-76e3ad5dd10f`) in `Resend-Agency` (Free tier) and stored `RESEND_API_KEY` in Cloudflare Worker secrets.
+  - Added 6-digit verification code endpoints (`POST /api/notifications/send-code`, `POST /api/notifications/verify-code`) and D1 `notification_log` rate-limiting (max 25/day) with zero PII exposed in `GET /api/bootstrap`.
+- **Preset Jovial Bar Reactions & Unofficial Fan Site Disclaimer**:
+  - Added `POST /api/demerits/:id/react` (`🍺 Buy 'Em A Round`, `🦁 Tough Call Ref!`, `🐙 2 Mins in the Box`, `😂 Instant Classic`) and added the Unofficial Fan Site Disclaimer across the footer, upload page, and profile modal.
+
+---
+
 ## 2026-10-18 — v1.5.0 Cloudflare D1 + R2 + Worker Backend Migration & Staff/Patron Profile Claiming
 - **Cloudflare Backend Provisioning (`https://api.copperdemerits.com`)**:
   - Provisioned **Cloudflare D1** database `copper-demerits-db` (`feb899d8-606e-4937-91b7-9076e2741961`) and applied `cloudflare/schema.sql` (`members`, `staff_aliases`, `demerits`) + seeded all 5 members, 12 aliases, and 4 verified slips.

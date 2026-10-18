@@ -9,6 +9,7 @@ import {
   DemeritTypeSummary,
   LeaderboardPeriodFilter,
   SlipStatus,
+  SlipReactionKey,
   UploadedSourceFile,
 } from '../types/demerits';
 import {
@@ -27,13 +28,14 @@ import {
   fingerprintImageUrl,
   ImageFingerprint,
 } from '../lib/imageDedup';
+import { moderateTextInstant, scanWithRefereeMonitor } from '../lib/moderation';
 
 const STORAGE_KEYS = {
-  MEMBERS: 'cac_demerits_members_v5',
-  ALIASES: 'cac_demerits_aliases_v5',
-  SLIPS: 'cac_demerits_slips_v5',
-  AUTO_APPROVE: 'cac_demerits_auto_approve_v5',
-  ACTIVE_MEMBER: 'cac_demerits_active_member_v5',
+  MEMBERS: 'cac_demerits_members_v6',
+  ALIASES: 'cac_demerits_aliases_v6',
+  SLIPS: 'cac_demerits_slips_v6',
+  AUTO_APPROVE: 'cac_demerits_auto_approve_v6',
+  ACTIVE_MEMBER: 'cac_demerits_active_member_v6',
 };
 
 export interface NewSlipPayload {
@@ -52,6 +54,8 @@ export interface NewSlipPayload {
   image_sha256?: string | null;
   image_dhash?: string | null;
   capture_note?: string | null;
+  is_blurred?: boolean;
+  moderation_flag_reason?: string | null;
   createPatronIfNew?: boolean;
   allowMultiSlipBatch?: boolean;
   mergeIfCitationDuplicate?: boolean;
@@ -60,11 +64,23 @@ export interface NewSlipPayload {
 export interface ClaimProfilePayload {
   memberId?: string;
   displayName?: string;
-  contact?: string;
   pin: string;
   favoriteTeam?: string;
   tagline?: string;
   role?: 'staff' | 'patron' | 'both';
+}
+
+export interface UpdateMyProfilePayload {
+  memberId: string;
+  currentPin: string;
+  newPin?: string;
+  displayName?: string;
+  tagline?: string;
+  favoriteTeam?: string;
+  notificationEmail?: string;
+  notificationPhone?: string;
+  notificationCarrier?: string;
+  notificationOptIn?: boolean;
 }
 
 interface DemeritsContextValue {
@@ -76,11 +92,28 @@ interface DemeritsContextValue {
   isSupabaseConnected: boolean;
   isCloudflareConnected: boolean;
   currentMember: Member | null;
+  isAdminOrStaff: boolean;
   isProfileModalOpen: boolean;
   setIsProfileModalOpen: (open: boolean) => void;
   claimOrLoginProfile: (
     payload: ClaimProfilePayload
   ) => Promise<{ ok: boolean; member?: Member; mode?: string; error?: string }>;
+  updateMyProfile: (
+    payload: UpdateMyProfilePayload
+  ) => Promise<{ ok: boolean; member?: Member; error?: string }>;
+  requestNotificationVerification: (payload: {
+    memberId: string;
+    pin: string;
+    email?: string;
+    phone?: string;
+    carrier?: string;
+    optInAccepted: boolean;
+  }) => Promise<{ ok: boolean; message?: string; verificationCodePreview?: string; error?: string }>;
+  verifyNotificationCode: (payload: {
+    memberId: string;
+    pin: string;
+    code: string;
+  }) => Promise<{ ok: boolean; member?: Member; error?: string }>;
   logoutProfile: () => void;
   autoApproveSubmissions: boolean;
   setAutoApproveSubmissions: (val: boolean) => void;
@@ -104,7 +137,17 @@ interface DemeritsContextValue {
   };
   submitDemeritSlip: (
     payload: NewSlipPayload
-  ) => Promise<{ slip: EnrichedDemeritSlip; wasMergedDuplicate: boolean }>;
+  ) => Promise<{
+    slip: EnrichedDemeritSlip;
+    wasMergedDuplicate: boolean;
+    wasBlurredAndQueued?: boolean;
+    moderationReason?: string | null;
+  }>;
+  reactToSlip: (slipId: string, reaction: SlipReactionKey) => Promise<void>;
+  adminOverrideSlip: (
+    slipId: string,
+    action: 'approve_unblur' | 'approve_keep_blurred' | 'reject'
+  ) => Promise<{ ok: boolean; error?: string }>;
   updateSlipStatus: (id: string, status: SlipStatus) => Promise<void>;
   deleteSlip: (id: string) => Promise<void>;
   updateSlipAssignment: (id: string, patronId: string | null, issuerId: string | null) => Promise<void>;
@@ -125,6 +168,31 @@ function loadFromStorage<T>(key: string, fallback: T): T {
   } catch {
     return fallback;
   }
+}
+
+function sanitizeMembersList(list: Member[]): Member[] {
+  return list
+    .filter(
+      (m) =>
+        m &&
+        m.id !== '44444444-4444-4444-8444-444444444444' &&
+        m.display_name.trim().toLowerCase() !== 'matt barnes'
+    )
+    .map((m) => ({
+      ...m,
+      is_admin: m.id === '11111111-1111-4111-8111-111111111111' ? true : Boolean(m.is_admin),
+    }));
+}
+
+function sanitizeAliasesList(list: StaffAlias[]): StaffAlias[] {
+  return list.filter(
+    (a) =>
+      a &&
+      a.member_id !== '44444444-4444-4444-8444-444444444444' &&
+      !a.alias.toLowerCase().includes('douche') &&
+      !a.alias.toLowerCase().includes('matt') &&
+      !moderateTextInstant(a.alias).flagged
+  );
 }
 
 function sanitizeAndDeduplicateSlips(slips: DemeritSlip[]): DemeritSlip[] {
@@ -175,6 +243,12 @@ function sanitizeAndDeduplicateSlips(slips: DemeritSlip[]): DemeritSlip[] {
       raw_signature: isBurtisCursiveSlip ? 'Sarah (Cursive Signature)' : s.raw_signature,
       incident_time: normTime || null,
       demerit_items: items,
+      reactions: s.reactions || {
+        buy_round: 0,
+        tough_call: 0,
+        two_mins: 0,
+        instant_classic: 0,
+      },
     });
   }
 
@@ -183,10 +257,10 @@ function sanitizeAndDeduplicateSlips(slips: DemeritSlip[]): DemeritSlip[] {
 
 export const DemeritsProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [members, setMembers] = useState<Member[]>(() =>
-    loadFromStorage(STORAGE_KEYS.MEMBERS, DEFAULT_MEMBERS)
+    sanitizeMembersList(loadFromStorage(STORAGE_KEYS.MEMBERS, DEFAULT_MEMBERS))
   );
   const [aliases, setAliases] = useState<StaffAlias[]>(() =>
-    loadFromStorage(STORAGE_KEYS.ALIASES, DEFAULT_STAFF_ALIASES)
+    sanitizeAliasesList(loadFromStorage(STORAGE_KEYS.ALIASES, DEFAULT_STAFF_ALIASES))
   );
   const [rawSlips, setRawSlips] = useState<DemeritSlip[]>(() =>
     sanitizeAndDeduplicateSlips(loadFromStorage(STORAGE_KEYS.SLIPS, DEFAULT_DEMERITS))
@@ -200,6 +274,13 @@ export const DemeritsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   );
   const [loading, setLoading] = useState<boolean>(false);
   const [isCloudflareConnected, setIsCloudflareConnected] = useState<boolean>(false);
+
+  const isAdminOrStaff = Boolean(
+    currentMember &&
+      (currentMember.is_admin ||
+        currentMember.is_staff ||
+        currentMember.id === '11111111-1111-4111-8111-111111111111')
+  );
 
   useEffect(() => {
     try {
@@ -264,15 +345,16 @@ export const DemeritsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         if (cancelled || !data?.ok) return;
 
         if (Array.isArray(data.members) && data.members.length > 0) {
-          setMembers(data.members);
+          const cleanMembers = sanitizeMembersList(data.members);
+          setMembers(cleanMembers);
           setCurrentMember((prev) => {
             if (!prev) return null;
-            const refreshed = data.members.find((m) => m.id === prev.id);
-            return refreshed || prev;
+            const refreshed = cleanMembers.find((m) => m.id === prev.id);
+            return refreshed ? { ...prev, ...refreshed } : prev;
           });
         }
         if (Array.isArray(data.aliases) && data.aliases.length > 0) {
-          setAliases(data.aliases);
+          setAliases(sanitizeAliasesList(data.aliases));
         }
         if (Array.isArray(data.demerits) && data.demerits.length > 0) {
           const remoteSlips = sanitizeAndDeduplicateSlips(
@@ -304,8 +386,18 @@ export const DemeritsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       payload: ClaimProfilePayload
     ): Promise<{ ok: boolean; member?: Member; mode?: string; error?: string }> => {
       const cleanPin = (payload.pin || '').trim();
-      if (cleanPin.length < 4) {
-        return { ok: false, error: 'Please enter a 4-digit Bar PIN.' };
+      if (cleanPin.length < 4 || cleanPin.length > 8) {
+        return { ok: false, error: 'Please enter a 4 to 8 digit Bar PIN.' };
+      }
+
+      const modCheck = moderateTextInstant(
+        `${payload.displayName || ''} ${payload.tagline || ''}`
+      );
+      if (modCheck.flagged) {
+        return {
+          ok: false,
+          error: `Referee Whistle: Please keep names and taglines friendly, jovial, and profanity-free!`,
+        };
       }
 
       try {
@@ -322,7 +414,7 @@ export const DemeritsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           setMembers((prev) => {
             const exists = prev.some((m) => m.id === res.member.id);
             if (exists) {
-              return prev.map((m) => (m.id === res.member.id ? res.member : m));
+              return prev.map((m) => (m.id === res.member.id ? { ...m, ...res.member } : m));
             }
             return [...prev, res.member];
           });
@@ -334,6 +426,114 @@ export const DemeritsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         return {
           ok: false,
           error: err instanceof Error ? err.message : 'Profile verification failed.',
+        };
+      }
+    },
+    []
+  );
+
+  const updateMyProfile = useCallback(
+    async (
+      payload: UpdateMyProfilePayload
+    ): Promise<{ ok: boolean; member?: Member; error?: string }> => {
+      const modCheck = moderateTextInstant(
+        `${payload.displayName || ''} ${payload.tagline || ''}`
+      );
+      if (modCheck.flagged) {
+        return {
+          ok: false,
+          error:
+            'Referee Whistle: Please keep your display name and bar tagline friendly and profanity-free!',
+        };
+      }
+
+      try {
+        const res = await cloudflareFetch<{ ok: boolean; member: Member }>('/api/my-profile', {
+          method: 'PATCH',
+          body: JSON.stringify(payload),
+        });
+        if (res.ok && res.member) {
+          setMembers((prev) =>
+            prev.map((m) => (m.id === res.member.id ? { ...m, ...res.member } : m))
+          );
+          setCurrentMember(res.member);
+          return { ok: true, member: res.member };
+        }
+        return { ok: false, error: 'Could not update profile.' };
+      } catch (err) {
+        return {
+          ok: false,
+          error: err instanceof Error ? err.message : 'Could not update profile.',
+        };
+      }
+    },
+    []
+  );
+
+  const requestNotificationVerification = useCallback(
+    async (payload: {
+      memberId: string;
+      pin: string;
+      email?: string;
+      phone?: string;
+      carrier?: string;
+      optInAccepted: boolean;
+    }): Promise<{
+      ok: boolean;
+      message?: string;
+      verificationCodePreview?: string;
+      error?: string;
+    }> => {
+      try {
+        const res = await cloudflareFetch<{
+          ok: boolean;
+          message: string;
+          verificationCodePreview?: string;
+        }>('/api/notifications/send-code', {
+          method: 'POST',
+          body: JSON.stringify(payload),
+        });
+        return {
+          ok: true,
+          message: res.message,
+          verificationCodePreview: res.verificationCodePreview,
+        };
+      } catch (err) {
+        return {
+          ok: false,
+          error: err instanceof Error ? err.message : 'Could not send verification code.',
+        };
+      }
+    },
+    []
+  );
+
+  const verifyNotificationCode = useCallback(
+    async (payload: {
+      memberId: string;
+      pin: string;
+      code: string;
+    }): Promise<{ ok: boolean; member?: Member; error?: string }> => {
+      try {
+        const res = await cloudflareFetch<{ ok: boolean; member: Member }>(
+          '/api/notifications/verify-code',
+          {
+            method: 'POST',
+            body: JSON.stringify(payload),
+          }
+        );
+        if (res.ok && res.member) {
+          setMembers((prev) =>
+            prev.map((m) => (m.id === res.member.id ? { ...m, ...res.member } : m))
+          );
+          setCurrentMember(res.member);
+          return { ok: true, member: res.member };
+        }
+        return { ok: false, error: 'Verification failed.' };
+      } catch (err) {
+        return {
+          ok: false,
+          error: err instanceof Error ? err.message : 'Invalid verification code.',
         };
       }
     },
@@ -658,6 +858,13 @@ export const DemeritsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const addOrUpdateMember = useCallback(
     async (displayName: string, isPatron: boolean, isStaff: boolean): Promise<Member> => {
       const trimmed = displayName.trim();
+      const mod = moderateTextInstant(trimmed);
+      if (mod.flagged) {
+        throw new Error(
+          'Referee Whistle: Member names must be friendly, jovial, and profanity-free!'
+        );
+      }
+
       const existing = members.find(
         (m) => m.display_name.toLowerCase() === trimmed.toLowerCase()
       );
@@ -722,7 +929,12 @@ export const DemeritsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const submitDemeritSlip = useCallback(
     async (
       payload: NewSlipPayload
-    ): Promise<{ slip: EnrichedDemeritSlip; wasMergedDuplicate: boolean }> => {
+    ): Promise<{
+      slip: EnrichedDemeritSlip;
+      wasMergedDuplicate: boolean;
+      wasBlurredAndQueued?: boolean;
+      moderationReason?: string | null;
+    }> => {
       if (!payload.image_url) {
         throw new Error('An uploaded slip photo is required.');
       }
@@ -753,13 +965,27 @@ export const DemeritsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       const incidentTime = payload.incident_time ? payload.incident_time.slice(0, 5) : null;
       const cleanInfractions = payload.infractions.map((i) => i.trim()).filter(Boolean);
 
+      // Run AI + Deterministic Referee Monitor on text fields
+      const modScan = await scanWithRefereeMonitor([
+        studentTrimmed,
+        sigTrimmed,
+        ...cleanInfractions,
+      ]);
+
+      const isFlaggedOrBlurred = Boolean(modScan.flagged || payload.is_blurred);
+      const sanitizedStudent = modScan.sanitizedTexts[0] || studentTrimmed;
+      const sanitizedSig = modScan.sanitizedTexts[1] || sigTrimmed;
+      const sanitizedInfractions = cleanInfractions.map(
+        (orig, idx) => modScan.sanitizedTexts[idx + 2] || orig
+      );
+
       const citationDup = checkDuplicateCitationContent(
         {
-          raw_student: studentTrimmed,
+          raw_student: sanitizedStudent,
           incident_date: incidentDate,
           incident_time: incidentTime,
           demerit_count: payload.demerit_count,
-          infractions: cleanInfractions,
+          infractions: sanitizedInfractions,
         },
         rawSlips
       );
@@ -770,7 +996,7 @@ export const DemeritsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           const updatedSlip: DemeritSlip = {
             ...target,
             secondary_image_url: target.secondary_image_url || payload.image_url,
-            capture_note: `Deduplicated across multiple uploads: matched ${studentTrimmed} (${incidentDate} ${
+            capture_note: `Deduplicated across multiple uploads: matched ${sanitizedStudent} (${incidentDate} ${
               incidentTime || ''
             })`,
           };
@@ -816,31 +1042,43 @@ export const DemeritsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         }
       }
 
-      let patron = resolvePatronName(studentTrimmed);
+      let patron = resolvePatronName(sanitizedStudent);
       if (
         !patron &&
         payload.createPatronIfNew !== false &&
-        !['anonymous', 'anonymous patron', 'unknown'].includes(studentTrimmed.toLowerCase())
+        !isFlaggedOrBlurred &&
+        !['anonymous', 'anonymous patron', 'unknown'].includes(sanitizedStudent.toLowerCase())
       ) {
-        patron = await addOrUpdateMember(studentTrimmed, true, false);
+        patron = await addOrUpdateMember(sanitizedStudent, true, false);
       }
 
-      const { member: issuer, matchedAlias } = resolveStaffSignature(sigTrimmed);
-      const initialStatus: SlipStatus = autoApproveSubmissions ? 'approved' : 'pending';
+      const { member: issuer, matchedAlias } = resolveStaffSignature(sanitizedSig);
+      // Flagged/blurred slips ALWAYS go to 'pending' (Rick's Admin Override Queue)!
+      const initialStatus: SlipStatus = isFlaggedOrBlurred
+        ? 'pending'
+        : autoApproveSubmissions
+        ? 'approved'
+        : 'pending';
+
+      const sanitizedItems = (payload.demerit_items || []).map((item, idx) => ({
+        ...item,
+        description:
+          sanitizedInfractions[idx] || moderateTextInstant(item.description || '').sanitized,
+      }));
 
       const tempSlip: DemeritSlip = {
         id: crypto.randomUUID(),
         patron_id: patron ? patron.id : null,
-        raw_student: studentTrimmed,
+        raw_student: sanitizedStudent,
         issuer_id: issuer ? issuer.id : null,
-        raw_signature: sigTrimmed,
+        raw_signature: sanitizedSig,
         submitted_by_member_id: payload.submitted_by_member_id || currentMember?.id || null,
         demerit_count: Math.max(1, Number(payload.demerit_count) || 1),
         incident_date: incidentDate,
         incident_time: incidentTime,
         location_area: payload.location_area.trim() || 'Copper Athletic Club',
-        infractions: cleanInfractions,
-        demerit_items: payload.demerit_items,
+        infractions: sanitizedInfractions,
+        demerit_items: sanitizedItems,
         image_url: payload.image_url,
         source_image_url: payload.source_image_url || null,
         secondary_image_url: payload.secondary_image_url || null,
@@ -848,6 +1086,19 @@ export const DemeritsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         image_dhash: payload.image_dhash || null,
         capture_note: payload.capture_note || null,
         status: initialStatus,
+        is_blurred: isFlaggedOrBlurred,
+        moderation_flag_reason: isFlaggedOrBlurred
+          ? modScan.reason ||
+            payload.moderation_flag_reason ||
+            'Blurred by Referee Monitor — Queued for Site Admin (Rick) Override'
+          : null,
+        original_infractions: isFlaggedOrBlurred ? cleanInfractions : null,
+        reactions: {
+          buy_round: 0,
+          tough_call: 0,
+          two_mins: 0,
+          instant_classic: 0,
+        },
         created_at: new Date().toISOString(),
       };
 
@@ -857,14 +1108,34 @@ export const DemeritsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         demerit_items: resolvedItems,
       };
 
+      let wasBlurredAndQueued = isFlaggedOrBlurred;
+      let moderationReason = newSlip.moderation_flag_reason;
+
       if (isCloudflareConnected) {
         try {
-          const res = await cloudflareFetch<{ ok: boolean; slip: DemeritSlip }>('/api/demerits', {
+          const res = await cloudflareFetch<{
+            ok: boolean;
+            wasBlurredAndQueued?: boolean;
+            moderationReason?: string | null;
+            slip: DemeritSlip;
+          }>('/api/demerits', {
             method: 'POST',
-            body: JSON.stringify(newSlip),
+            body: JSON.stringify({
+              ...newSlip,
+              infractions: cleanInfractions,
+              demerit_items: payload.demerit_items,
+            }),
           });
           if (res.slip?.id) {
             newSlip.id = res.slip.id;
+            newSlip.status = res.slip.status;
+            newSlip.is_blurred = res.slip.is_blurred;
+            newSlip.moderation_flag_reason = res.slip.moderation_flag_reason;
+            newSlip.infractions = res.slip.infractions;
+          }
+          if (res.wasBlurredAndQueued) {
+            wasBlurredAndQueued = true;
+            moderationReason = res.moderationReason || moderationReason;
           }
         } catch {
           // Keep local UUID
@@ -875,6 +1146,8 @@ export const DemeritsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
       return {
         wasMergedDuplicate: false,
+        wasBlurredAndQueued,
+        moderationReason,
         slip: {
           ...newSlip,
           resolvedItems,
@@ -895,6 +1168,103 @@ export const DemeritsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       isCloudflareConnected,
       currentMember,
     ]
+  );
+
+  const reactToSlip = useCallback(
+    async (slipId: string, reaction: SlipReactionKey) => {
+      setRawSlips((prev) =>
+        prev.map((s) => {
+          if (s.id !== slipId) return s;
+          const prevReactions = s.reactions || {
+            buy_round: 0,
+            tough_call: 0,
+            two_mins: 0,
+            instant_classic: 0,
+          };
+          return {
+            ...s,
+            reactions: {
+              ...prevReactions,
+              [reaction]: (prevReactions[reaction] || 0) + 1,
+            },
+          };
+        })
+      );
+
+      if (isCloudflareConnected) {
+        try {
+          await cloudflareFetch(`/api/demerits/${slipId}/react`, {
+            method: 'POST',
+            body: JSON.stringify({ reaction }),
+          });
+        } catch {
+          // Keep optimistic update
+        }
+      }
+    },
+    [isCloudflareConnected]
+  );
+
+  const adminOverrideSlip = useCallback(
+    async (
+      slipId: string,
+      action: 'approve_unblur' | 'approve_keep_blurred' | 'reject'
+    ): Promise<{ ok: boolean; error?: string }> => {
+      if (!currentMember || (!currentMember.is_admin && !currentMember.is_staff)) {
+        return {
+          ok: false,
+          error: 'Only Site Admin (Rick) or verified Bar Staff can override queued slips.',
+        };
+      }
+
+      if (action === 'reject') {
+        setRawSlips((prev) => prev.filter((s) => s.id !== slipId));
+      } else if (action === 'approve_unblur') {
+        setRawSlips((prev) =>
+          prev.map((s) => {
+            if (s.id !== slipId) return s;
+            const restoredInfractions =
+              s.original_infractions && s.original_infractions.length > 0
+                ? s.original_infractions
+                : s.infractions;
+            return {
+              ...s,
+              status: 'approved',
+              is_blurred: false,
+              moderation_flag_reason: 'Approved & Unblurred by Admin Override',
+              infractions: restoredInfractions,
+            };
+          })
+        );
+      } else if (action === 'approve_keep_blurred') {
+        setRawSlips((prev) =>
+          prev.map((s) =>
+            s.id === slipId ? { ...s, status: 'approved', is_blurred: true } : s
+          )
+        );
+      }
+
+      if (isCloudflareConnected) {
+        try {
+          await cloudflareFetch('/api/admin/override-slip', {
+            method: 'POST',
+            body: JSON.stringify({
+              slipId,
+              action,
+              adminMemberId: currentMember.id,
+            }),
+          });
+        } catch (err) {
+          return {
+            ok: false,
+            error: err instanceof Error ? err.message : 'Admin override failed.',
+          };
+        }
+      }
+
+      return { ok: true };
+    },
+    [currentMember, isCloudflareConnected]
   );
 
   const updateSlipStatus = useCallback(
@@ -956,6 +1326,15 @@ export const DemeritsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       const normalized = alias.trim().toLowerCase();
       if (!normalized) {
         return { ok: false, error: 'Alias cannot be empty.' };
+      }
+
+      const mod = moderateTextInstant(normalized);
+      if (mod.flagged) {
+        return {
+          ok: false,
+          error:
+            'Referee Whistle: Staff aliases cannot contain insults, name-calling, or profanity!',
+        };
       }
 
       const duplicate = aliases.find((a) => a.alias.toLowerCase() === normalized);
@@ -1105,9 +1484,13 @@ export const DemeritsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         isSupabaseConnected: isCloudflareConnected,
         isCloudflareConnected,
         currentMember,
+        isAdminOrStaff,
         isProfileModalOpen,
         setIsProfileModalOpen,
         claimOrLoginProfile,
+        updateMyProfile,
+        requestNotificationVerification,
+        verifyNotificationCode,
         logoutProfile,
         autoApproveSubmissions,
         setAutoApproveSubmissions,
@@ -1117,6 +1500,8 @@ export const DemeritsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         checkCitationDuplicate,
         computeStandings,
         submitDemeritSlip,
+        reactToSlip,
+        adminOverrideSlip,
         updateSlipStatus,
         deleteSlip,
         updateSlipAssignment,

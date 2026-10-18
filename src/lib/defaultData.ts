@@ -10,7 +10,6 @@ export const MEMBER_IDS = {
   RICK: '11111111-1111-4111-8111-111111111111',
   BURTIS: '22222222-2222-4222-8222-222222222222',
   SARAH: '33333333-3333-4333-8333-333333333333',
-  MATT_BARNES: '44444444-4444-4444-8444-444444444444',
   DAVID_LEE: '55555555-5555-4555-8555-555555555555',
 } as const;
 
@@ -97,6 +96,10 @@ export const DEFAULT_MEMBERS: Member[] = [
     display_name: 'Rick',
     is_staff: false,
     is_patron: true,
+    is_admin: true,
+    is_claimed: true,
+    favorite_team: 'lions',
+    tagline: 'Never ordering Gin and Diet Coke again!',
     created_at: '2026-10-17T20:00:00Z',
   },
   {
@@ -104,6 +107,8 @@ export const DEFAULT_MEMBERS: Member[] = [
     display_name: 'Burtis',
     is_staff: true,
     is_patron: true,
+    favorite_team: 'red-wings',
+    tagline: 'No-Show & Unbothered',
     created_at: '2026-10-17T20:00:00Z',
   },
   {
@@ -111,13 +116,8 @@ export const DEFAULT_MEMBERS: Member[] = [
     display_name: 'Sarah',
     is_staff: true,
     is_patron: false,
-    created_at: '2026-10-17T20:00:00Z',
-  },
-  {
-    id: MEMBER_IDS.MATT_BARNES,
-    display_name: 'Matt Barnes',
-    is_staff: true,
-    is_patron: false,
+    favorite_team: 'lions',
+    tagline: 'The Boss Lady • Head Referee',
     created_at: '2026-10-17T20:00:00Z',
   },
   {
@@ -125,6 +125,8 @@ export const DEFAULT_MEMBERS: Member[] = [
     display_name: 'David Lee',
     is_staff: false,
     is_patron: true,
+    favorite_team: 'pistons-bad-boys',
+    tagline: '1 Demerit — So Far',
     created_at: '2026-10-17T18:27:00Z',
   },
 ];
@@ -174,21 +176,6 @@ export const DEFAULT_STAFF_ALIASES: StaffAlias[] = [
     id: 'b3333333-3333-4333-8333-333333333333',
     alias: 'cursive signature',
     member_id: MEMBER_IDS.SARAH,
-  },
-  {
-    id: '33333333-3333-4333-8333-333333333305',
-    alias: 'the douche',
-    member_id: MEMBER_IDS.MATT_BARNES,
-  },
-  {
-    id: '33333333-3333-4333-8333-333333333306',
-    alias: 'matt barnes',
-    member_id: MEMBER_IDS.MATT_BARNES,
-  },
-  {
-    id: '33333333-3333-4333-8333-333333333310',
-    alias: 'matt barnes (signature)',
-    member_id: MEMBER_IDS.MATT_BARNES,
   },
   {
     id: '33333333-3333-4333-8333-333333333307',

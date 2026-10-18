@@ -2,6 +2,26 @@
 
 All notable changes to the **Copper Athletic Club — Ring of Honor** web application are documented in this file.
 
+## [1.6.0] - 2026-10-18
+
+### Added & Hardened
+- **Roster Cleanup & Removal of Negative Remarks**:
+  - Removed `Matt Barnes` and all non-authentic / negative aliases from Cloudflare D1 (`copper-demerits-db`), `cloudflare/worker.js`, `src/lib/defaultData.ts`, `supabase/seed.sql`, and all UI placeholders. Only the 4 authentic members from the uploaded slips (`Rick`, `Burtis`, `Sarah`, `David Lee`) remain in the seeded roster.
+- **Real-Time AI Referee Monitor + Automatic Slip Blurring & Admin Override Queue (`src/lib/moderation.ts`, `cloudflare/worker.js`, `src/pages/AdminPage.tsx`)**:
+  - Bound **Cloudflare Workers AI (`env.AI` — 100% Free, Zero API Key Required)** + deterministic Referee profanity/slur/insult guardrails (`moderateTextInstant`, `scanWithRefereeMonitor`).
+  - **Names, Taglines & Aliases**: Immediately blocks any profane, racist, vulgar, or insulting display names, taglines, or staff aliases with a Referee Whistle warning.
+  - **Slip Uploads**: Instead of hard-denying a slip when profanity or name-calling is detected, the system automatically blurs the slip image (`applyRefereeBlurStampToImage` + `is_blurred = true`), censors the text as `[🍻 CENSORED BY REF]`, and sends the slip to the **Referee Override Queue (`status = 'pending'`)** in the Ref Booth (`/admin`) where Site Admin (**Rick**) or Referee (**Sarah**) can **Approve & Unblur (Override)**, **Approve & Keep Blurred**, or **Eject** the slip.
+- **Edit Your Own Profile ("My Locker") + 4–8 Digit Bar PINs (`ClaimProfileModal.tsx`)**:
+  - Upgraded Bar PINs to support **4 to 8 digits**.
+  - Added the **My Locker & Edit Profile** tab (`PATCH /api/my-profile`) so signed-in users can update their Display Name, Jovial Bar Tagline, Favorite Detroit/Michigan Team Badge, and 4–8 digit PIN at any time.
+  - Locked the **Ref Booth (`/admin`)** behind `isAdminOrStaff` so only Site Admin (**Rick**, `is_admin = true`) or Bar Referee (**Sarah**, `is_staff = true`) signed in with their PIN can access moderation controls.
+- **Zero-Cost, Opt-In Verified Notifications & Strict Privacy Protection**:
+  - Stripped all PII (`claimed_by_contact`, `notification_email`, `notification_phone`, `claimed_pin`) from public API responses (`GET /api/bootstrap`).
+  - Verified domain **`copperdemerits.com`** on Resend Free Tier (`$0/mo`, `referee@copperdemerits.com`) and added explicit **Opt-In Notification Consent + 6-Digit Verification Code** (`POST /api/notifications/send-code` and `POST /api/notifications/verify-code`) supporting both Email and free Carrier Email-to-SMS Gateways (`@vtext.com`, `@txt.att.net`, `@tmomail.net`, `@email.uscc.net`) with a strict 25/day D1 rate cap.
+- **Preset Jovial Bar Reactions & Unofficial Fan Site Disclaimer**:
+  - Added 1-tap preset jovial reactions (`🍺 Buy 'Em A Round`, `🦁 Tough Call Ref!`, `🐙 2 Mins in the Box`, `😂 Instant Classic`) on the Wall of Slips (`/docket`) instead of free-text comments.
+  - Added a clear **Unofficial Fan Site Disclaimer** across the global footer (`src/App.tsx`), Drop-a-Slip page (`src/pages/SubmitSlipPage.tsx`), and Profile Modal (`src/components/ClaimProfileModal.tsx`) stating that `copperdemerits.com` is an unofficial, patron-run fan site for friendly fun only and is not affiliated with Copper Athletic Club.
+
 ## [1.5.0] - 2026-10-18
 
 ### Added

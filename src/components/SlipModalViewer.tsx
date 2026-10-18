@@ -174,12 +174,21 @@ export const SlipModalViewer: React.FC<SlipModalViewerProps> = ({ slip, onClose 
             )}
 
             {currentImageUrl && (
-              <div className="overflow-hidden rounded-xl border-2 border-[#B87333]/40 bg-black">
+              <div className="relative overflow-hidden rounded-xl border-2 border-[#B87333]/40 bg-black">
                 <img
                   src={currentImageUrl}
                   alt={`Uploaded demerit slip for ${slip.patronDisplayName}`}
-                  className="mx-auto max-h-[52vh] w-auto object-contain"
+                  className={`mx-auto max-h-[52vh] w-auto object-contain ${
+                    slip.is_blurred ? 'blur-md' : ''
+                  }`}
                 />
+                {slip.is_blurred && (
+                  <div className="absolute inset-0 flex items-center justify-center bg-black/45 p-4 text-center">
+                    <span className="rounded-2xl border-2 border-amber-400 bg-black/90 px-4 py-2 font-athletic text-lg font-black uppercase tracking-wider text-amber-300">
+                      🦓 Referee Blurred — Friendly Vibes Only
+                    </span>
+                  </div>
+                )}
               </div>
             )}
 

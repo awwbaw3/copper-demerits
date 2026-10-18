@@ -1,11 +1,6 @@
 name = "copper-demerits-api"
 main = "cloudflare/worker.js"
-compatibility_date = "2025-01-01"
-workers_dev = true
-
-routes = [
-  { pattern = "api.copperdemerits.com", custom_domain = true }
-]
+compatibility_date = "2025-02-01"
 
 [[d1_databases]]
 binding = "DB"
@@ -15,3 +10,10 @@ database_id = "feb899d8-606e-4937-91b7-9076e2741961"
 [[r2_buckets]]
 binding = "SLIPS_BUCKET"
 bucket_name = "copper-demerits-slips"
+
+[ai]
+binding = "AI"
+
+[[routes]]
+pattern = "api.copperdemerits.com"
+custom_domain = true

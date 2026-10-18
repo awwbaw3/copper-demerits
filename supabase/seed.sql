@@ -9,13 +9,12 @@ delete from copper_demerits.demerits;
 delete from copper_demerits.staff_aliases;
 delete from copper_demerits.members;
 
--- 1. Seed Core Roster (Rick, Burtis, Sarah, Matt Barnes, David Lee)
+-- 1. Seed Core Roster (Rick, Burtis, Sarah, David Lee)
 insert into copper_demerits.members (id, display_name, is_staff, is_patron, created_at)
 values
   ('11111111-1111-4111-8111-111111111111', 'Rick', false, true, '2026-10-17T20:00:00Z'),
   ('22222222-2222-4222-8222-222222222222', 'Burtis', true, true, '2026-10-17T20:00:00Z'),
   ('33333333-3333-4333-8333-333333333333', 'Sarah', true, false, '2026-10-17T20:00:00Z'),
-  ('44444444-4444-4444-8444-444444444444', 'Matt Barnes', true, false, '2026-10-17T20:00:00Z'),
   ('55555555-5555-4555-8555-555555555555', 'David Lee', false, true, '2026-10-17T18:27:00Z')
 on conflict (id) do update
 set display_name = excluded.display_name,
@@ -33,10 +32,6 @@ values
   ('33333333-3333-4333-8333-333333333308', 'your boss!', '33333333-3333-4333-8333-333333333333'),
   ('33333333-3333-4333-8333-333333333309', 'your boss', '33333333-3333-4333-8333-333333333333'),
   ('b1111111-1111-4111-8111-111111111111', 'the boss lady', '33333333-3333-4333-8333-333333333333'),
-  -- Matt Barnes aliases
-  ('33333333-3333-4333-8333-333333333305', 'the douche', '44444444-4444-4444-8444-444444444444'),
-  ('33333333-3333-4333-8333-333333333306', 'matt barnes', '44444444-4444-4444-8444-444444444444'),
-  ('33333333-3333-4333-8333-333333333310', 'matt barnes (signature)', '44444444-4444-4444-8444-444444444444'),
   -- Burtis alias
   ('33333333-3333-4333-8333-333333333307', 'burtis', '22222222-2222-4222-8222-222222222222')
 on conflict (alias) do update
