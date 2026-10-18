@@ -2,6 +2,20 @@
 
 All notable changes to the **Copper Athletic Club — Ring of Honor** web application are documented in this file.
 
+## [1.6.16] - 2026-10-18
+
+### Added & Enhanced
+- **Instant Quick QR Modal in Header (`src/components/Navbar.tsx`)**:
+  - Tapping the prominent header **`[QR Code]`** button on mobile or desktop now immediately opens a high-contrast popup modal featuring:
+    - High-resolution in-memory generated QR code for `copperdemerits.com` with the official Copper Athletic Club crest.
+    - 1-tap **"Text / Share"** button utilizing native mobile sheet (`navigator.share`) for instant SMS/messaging share.
+    - 1-tap **"Copy Link"** button with tactile confirmation feedback.
+    - Direct link to full tabletop placard templates and printable flyers at `/share`.
+- **Header Button Visibility & Label Clarity (`src/components/Navbar.tsx`)**:
+  - Replaced unsupported Tailwind `xs:` breakpoint classes with responsive `<span className="hidden sm:inline font-bold">Share QR</span><span className="sm:hidden font-extrabold">QR Code</span>`.
+  - Added golden glow, amber border, and high-visibility font styling so mobile users instantly spot the QR code trigger next to the Ref Booth / Login button.
+  - Added `Share QR` to desktop navigation bar items for rapid discovery on laptop and tablet screens.
+
 ## [1.6.15] - 2026-10-18
 
 ### Changed & Standardized

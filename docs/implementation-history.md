@@ -2,6 +2,20 @@
 
 Chronological log of architectural decisions, database migrations, and infrastructure deployments.
 
+## 2026-10-18 — v1.6.16 Instant Quick QR Modal & Backbar QR Visibility
+- **Instant Quick QR Modal (`src/components/Navbar.tsx`)**:
+  - Integrated `qrcode` dynamically inside the sticky navigation header so tapping **`[QR Code]`** or **`[Share QR]`** immediately displays an instant, full-screen high-contrast modal.
+  - Generates the live `copperdemerits.com` QR code in-memory on mount with high error correction, Copper Athletic Club logo, and backbar theme styling.
+  - Included 1-tap **"Text / Share"** native share sheet integration (`navigator.share`) and 1-tap **"Copy Link"** with visual clipboard confirmation.
+  - Included direct link to the dedicated printable tabletop placards and downloadable print-ready flyer page at `/share`.
+- **Header Button Visibility Fix for All Screen Widths**:
+  - Fixed issue where the header button label was invisible on some viewports due to unsupported Tailwind `xs:` breakpoint classes.
+  - Standardized responsive markup: `<span className="hidden sm:inline font-bold">Share QR</span><span className="sm:hidden font-extrabold">QR Code</span>`.
+  - Added golden glow, amber border, and high-visibility font styling so mobile users immediately spot the button next to the Ref Booth / Login button.
+  - Added `Share QR` to desktop navigation bar items for rapid discovery on laptop and tablet screens.
+
+---
+
 ## 2026-10-18 — v1.6.15 Profile Display Name Prioritization & Slip Attribution Rule
 - **Universal Chosen Display Name Priority Across All Features**:
   - Implemented the core rule: All features must display the user's chosen profile display name (`patronDisplayName`) over the raw handwritten name on the physical demerit form (`raw_student`) whenever a profile exists.

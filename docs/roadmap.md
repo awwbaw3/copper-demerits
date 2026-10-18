@@ -95,5 +95,11 @@
 - [x] Dynamically computed Referee Sarah's sustained citation conviction rate in `Navbar.tsx`.
 - [x] Fixed slip attribution for Kristine Boley in live Cloudflare D1 and purged phantom "Josh" member.
 
+## Phase 17: Instant Quick QR Modal & Backbar QR Visibility (Completed — v1.6.16)
+- [x] Integrated instant 1-tap Quick QR Modal into header button (`src/components/Navbar.tsx`) with in-memory QR code generation, 1-tap Text/Share sheet, and 1-tap Copy Link.
+- [x] Fixed mobile header button label visibility by eliminating non-standard Tailwind breakpoint classes and rendering responsive, high-contrast labels (`[QR Code]` on mobile, `[Share QR]` on desktop).
+- [x] Added `Share QR` item to desktop navigation bar.
+- [x] Provided instant link to printable tabletop placards and downloadable flyer templates at `/share`.
+
 
 

@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { NavLink, Link } from 'react-router-dom';
+import QRCode from 'qrcode';
 import {
   Trophy,
   FileText,
@@ -14,6 +15,8 @@ import {
   PlusSquare,
   X,
   QrCode,
+  Copy,
+  Check,
 } from 'lucide-react';
 import { useDemerits } from '../context/DemeritsContext';
 import { ClaimProfileModal } from './ClaimProfileModal';
@@ -36,6 +39,9 @@ export const Navbar: React.FC = () => {
     );
   });
   const [showInstallGuideModal, setShowInstallGuideModal] = useState<boolean>(false);
+  const [showQuickQrModal, setShowQuickQrModal] = useState<boolean>(false);
+  const [quickQrDataUrl, setQuickQrDataUrl] = useState<string>('');
+  const [copiedQuickLink, setCopiedQuickLink] = useState<boolean>(false);
   const [isBannerDismissed, setIsBannerDismissed] = useState<boolean>(() => {
     try {
       const dismissedUntil = localStorage.getItem('pwa_prompt_dismissed_until');
@@ -115,6 +121,7 @@ export const Navbar: React.FC = () => {
     { to: '/', label: 'Scoreboard', icon: Trophy },
     { to: '/docket', label: 'Wall of Slips', icon: FileText },
     { to: '/submit', label: 'Drop A Slip', icon: Camera, highlight: true },
+    { to: '/share', label: 'Share QR', icon: QrCode },
     { to: '/admin', label: 'Ref Booth', icon: ShieldAlert, badge: pendingCount },
   ];
 
@@ -125,6 +132,49 @@ export const Navbar: React.FC = () => {
     { to: '/share', label: 'Share QR', icon: QrCode },
     { to: '/admin', label: 'Ref Booth', icon: ShieldAlert, badge: pendingCount },
   ];
+
+  useEffect(() => {
+    const origin = typeof window !== 'undefined' ? window.location.origin : 'https://copperdemerits.com';
+    QRCode.toDataURL(origin, {
+      width: 440,
+      margin: 2,
+      errorCorrectionLevel: 'H',
+      color: {
+        dark: '#121212',
+        light: '#FFFFFF',
+      },
+    })
+      .then((url) => setQuickQrDataUrl(url))
+      .catch(() => {});
+  }, []);
+
+  const handleQuickShare = async () => {
+    const url = typeof window !== 'undefined' ? window.location.origin : 'https://copperdemerits.com';
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: 'Copper Demerits — Ring of Honor',
+          text: 'Scan to check the live backbar demerit standings, top infractions, and drop slips at Copper Athletic Club!',
+          url,
+        });
+      } catch {
+        handleQuickCopy();
+      }
+    } else {
+      handleQuickCopy();
+    }
+  };
+
+  const handleQuickCopy = async () => {
+    const url = typeof window !== 'undefined' ? window.location.origin : 'https://copperdemerits.com';
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopiedQuickLink(true);
+      setTimeout(() => setCopiedQuickLink(false), 2500);
+    } catch {
+      window.prompt('Copy this link:', url);
+    }
+  };
 
   // Pure Leaderboard Updates only: Leaders, Points, Citations, and Infraction Calls (No venue or cloudflare mentions)
   const tickerItems = useMemo(() => {
@@ -218,22 +268,17 @@ export const Navbar: React.FC = () => {
           </NavLink>
 
           <div className="flex items-center gap-2 sm:gap-2.5">
-            {/* Prominent Share QR Code Button in Header (in place of Install button) */}
-            <NavLink
-              to="/share"
-              className={({ isActive }) =>
-                `inline-flex items-center justify-center gap-1.5 rounded-xl border min-h-[44px] px-3 sm:px-3.5 py-2 font-sans text-xs sm:text-sm font-bold tracking-normal transition-all active:scale-95 touch-manipulation cursor-pointer select-none ${
-                  isActive
-                    ? 'border-[#DFC15E] bg-gradient-to-r from-[#DFC15E] via-[#E8B888] to-[#B87333] text-[#121212] shadow-[0_0_18px_rgba(223,193,94,0.45)]'
-                    : 'border-[#B87333]/70 bg-[#281A12]/80 text-[#E8B888] hover:border-[#DFC15E] hover:text-[#DFC15E] shadow-sm'
-                }`
-              }
-              title="Share App & View Backbar QR Code"
+            {/* Prominent Instant Backbar QR Code Button in Header */}
+            <button
+              type="button"
+              onClick={() => setShowQuickQrModal(true)}
+              className="inline-flex items-center justify-center gap-1.5 rounded-xl border min-h-[44px] px-3 sm:px-3.5 py-2 font-sans text-xs sm:text-sm font-bold tracking-normal transition-all active:scale-95 touch-manipulation cursor-pointer select-none border-[#DFC15E] bg-gradient-to-r from-[#DFC15E]/20 via-[#B87333]/30 to-[#DFC15E]/20 text-[#DFC15E] hover:bg-[#DFC15E] hover:text-[#121212] shadow-[0_0_14px_rgba(223,193,94,0.3)]"
+              title="Open Backbar QR Code to Scan & Share"
             >
               <QrCode className="h-4 w-4 stroke-[2.2] shrink-0" />
-              <span className="hidden xs:inline">Share QR</span>
-              <span className="xs:hidden">QR</span>
-            </NavLink>
+              <span className="hidden sm:inline font-bold">Share QR</span>
+              <span className="sm:hidden font-extrabold">QR Code</span>
+            </button>
 
             {/* Desktop Nav Links */}
             <nav className="hidden md:flex items-center gap-1.5">
@@ -453,6 +498,111 @@ export const Navbar: React.FC = () => {
 
       {/* Claim / Login Modal */}
       <ClaimProfileModal />
+
+      {/* Instant Quick QR Modal */}
+      {showQuickQrModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-3 sm:p-4 backdrop-blur-md pt-[env(safe-area-inset-top,12px)] pb-[env(safe-area-inset-bottom,12px)] pr-[env(safe-area-inset-right,12px)] pl-[env(safe-area-inset-left,12px)]"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Backbar App QR Code"
+        >
+          <div className="relative w-full max-w-sm rounded-3xl border-2 border-[#B87333]/60 bg-[#14110F] p-5 sm:p-6 shadow-[0_25px_80px_rgba(0,0,0,0.95)] text-center space-y-4">
+            {/* Header */}
+            <div className="flex items-center justify-between border-b border-white/10 pb-3">
+              <div className="flex items-center gap-2">
+                <img
+                  src="/brand/CopperLogo_Web.png"
+                  alt="Copper Athletic Club"
+                  className="h-9 w-auto object-contain"
+                />
+                <div className="text-left">
+                  <span className="block font-mono-docket text-[10px] font-bold uppercase tracking-widest text-[#DFC15E]">
+                    BACKBAR QR CODE
+                  </span>
+                  <h3 className="font-sans font-black text-base uppercase text-[#F5F2EB] leading-none">
+                    SCAN WITH CAMERA
+                  </h3>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowQuickQrModal(false)}
+                aria-label="Close QR modal"
+                className="flex items-center justify-center min-h-[44px] min-w-[44px] rounded-xl border border-white/15 bg-white/5 p-2 text-[#B5A99D] hover:border-[#B87333] hover:text-white cursor-pointer touch-manipulation active:scale-95"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            {/* QR Code Container */}
+            <div className="mx-auto rounded-2xl bg-white p-3.5 shadow-2xl inline-block border-2 border-[#B87333]/40">
+              {quickQrDataUrl ? (
+                <img
+                  src={quickQrDataUrl}
+                  alt="Scan to open Copper Demerits"
+                  className="h-52 w-52 sm:h-60 sm:w-60 object-contain mx-auto"
+                />
+              ) : (
+                <div className="h-52 w-52 flex items-center justify-center font-mono-docket text-xs text-[#121212]">
+                  Generating QR...
+                </div>
+              )}
+            </div>
+
+            <div>
+              <p className="font-sans font-extrabold text-sm text-[#DFC15E]">
+                copperdemerits.com
+              </p>
+              <p className="font-mono-docket text-[11px] text-[#9E8F82] mt-0.5">
+                Point any smartphone camera to open live scoreboard &amp; drop demerits!
+              </p>
+            </div>
+
+            {/* 1-Tap Action Buttons */}
+            <div className="grid grid-cols-2 gap-2 pt-1">
+              <button
+                type="button"
+                onClick={handleQuickShare}
+                className="flex items-center justify-center gap-1.5 rounded-xl bg-gradient-to-r from-[#B87333] to-[#C86D51] py-2.5 px-3 min-h-[44px] font-sans font-bold text-xs uppercase tracking-tight text-[#121212] hover:brightness-110 active:scale-95 touch-manipulation cursor-pointer shadow-md"
+              >
+                <Share2 className="h-4 w-4 shrink-0" />
+                <span>Text / Share</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={handleQuickCopy}
+                className="flex items-center justify-center gap-1.5 rounded-xl border border-white/15 bg-white/5 py-2.5 px-3 min-h-[44px] font-sans font-bold text-xs uppercase tracking-tight text-[#F5F2EB] hover:bg-white/10 active:scale-95 touch-manipulation cursor-pointer"
+              >
+                {copiedQuickLink ? (
+                  <>
+                    <Check className="h-4 w-4 text-emerald-400 shrink-0" />
+                    <span className="text-emerald-300">Copied!</span>
+                  </>
+                ) : (
+                  <>
+                    <Copy className="h-4 w-4 shrink-0 text-[#DFC15E]" />
+                    <span>Copy Link</span>
+                  </>
+                )}
+              </button>
+            </div>
+
+            {/* Link to Full Print / Tabletop Placard Page */}
+            <div className="border-t border-white/10 pt-3">
+              <Link
+                to="/share"
+                onClick={() => setShowQuickQrModal(false)}
+                className="inline-flex items-center gap-1.5 font-sans font-bold text-xs text-[#DFC15E] hover:text-[#E8B888] underline decoration-[#DFC15E]/40"
+              >
+                <QrCode className="h-3.5 w-3.5" />
+                <span>Open Printable Tabletop Placards &amp; Flyers (/share) →</span>
+              </Link>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 };

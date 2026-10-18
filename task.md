@@ -1,6 +1,16 @@
 # Task Tracker — Copper Demerits (`copperdemerits.com`)
 
-## Active Sprint — v1.6.15 (Universal Profile Display Name Prioritization)
+## Active Sprint — v1.6.16 (Instant Quick QR Modal & Backbar QR Visibility)
+- [x] Integrate instant 1-tap Quick QR Modal into header `[QR Code]` / `[Share QR]` button (`src/components/Navbar.tsx`)
+- [x] Fix mobile header button label visibility by replacing non-standard `xs:` Tailwind classes with responsive `<span className="sm:hidden font-extrabold">QR Code</span>`
+- [x] Provide instant 1-tap "Text / Share" (`navigator.share`) and "Copy Link" within the Quick QR modal
+- [x] Add link to dedicated tabletop placard and flyer print page (`/share`) directly within Quick QR modal
+- [x] Add `Share QR` item to desktop navigation bar
+- [x] Verified zero Netlify deployment
+- [x] Pass `npm run build` and `npm run lint`
+
+## Completed Sprints
+### v1.6.15 (Universal Profile Display Name Prioritization & Slip Attribution Rule)
 - [x] Prioritize user's chosen profile display name (`patronDisplayName`) across all features over physical demerit slip text (`raw_student`) whenever a profile exists
 - [x] Update `PhysicalSlipCard.tsx` to display `slip.patronDisplayName` as the primary student name with secondary `Slip: "${slip.raw_student}"` note
 - [x] Standardize image alt tags and titles in `DocketPage.tsx` and `LeaderboardPage.tsx`
@@ -9,8 +19,6 @@
 - [x] Standardize Ref Booth notifications in `cloudflare/worker.js`
 - [x] Reassigned Kristine Boley's 2-demerit citation in live Cloudflare D1 and purged phantom "Josh" member
 - [x] Honor user directive: Do NOT publish to Netlify production
-
-## Completed Sprints
 ### v1.6.14 (iPhone Safe-Zone Header Login Button & Font Legibility Overhaul)
 - [x] Add CSS environment safe-area-inset padding to header (`pt-[env(safe-area-inset-top,0px)] pr-[env(safe-area-inset-right,0px)] pl-[env(safe-area-inset-left,0px)]`)
 - [x] Expand upper login button to Apple HIG 44x44pt touch target (`min-h-[44px] px-3.5 py-2`)
