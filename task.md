@@ -1,6 +1,20 @@
 # Task Tracker — Copper Demerits (`copperdemerits.com`)
 
-## Active Sprint — v1.6.16 (Instant Quick QR Modal & Backbar QR Visibility)
+## Active Sprint — v1.6.17 (Mobile Accessibility & Friendly UX Overhaul)
+- [x] Prevent iOS Safari auto-zoom by enforcing `text-base sm:text-sm` / `text-base sm:text-xs` (>= 16px) across all inputs and selects
+- [x] Enforce Apple HIG 44×44px minimum touch targets across buttons, filters, date pickers, thumbnails, and modal actions
+- [x] Add global `touch-action: manipulation` across all buttons, inputs, and links to eliminate 300ms mobile tap delay
+- [x] Add tactile depression feedback (`active:scale-95`) across primary interactive elements and navigation pills
+- [x] Re-architect Hero Jumbotron on `LeaderboardPage` into a mobile-first responsive 2×2 grid with full 48px touch CTAs
+- [x] Upgrade secondary text contrast to `#D6C7B8` / `#E8B888` / `#DFC15E` for WCAG AA/AAA compliance
+- [x] Add global `:focus-visible` golden ring indicators and `aria-label` accessibility attributes
+- [x] Add friendly jovial bar copy and empty-state filter reset button
+- [x] Pass `npm run build` and `npm run lint` cleanly
+- [x] Verified zero Netlify deployment
+- [x] Merge and push to both `dev` and `main`
+
+## Completed Sprints
+### v1.6.16 (Instant Quick QR Modal & Backbar QR Visibility)
 - [x] Integrate instant 1-tap Quick QR Modal into header `[QR Code]` / `[Share QR]` button (`src/components/Navbar.tsx`)
 - [x] Fix mobile header button label visibility by replacing non-standard `xs:` Tailwind classes with responsive `<span className="sm:hidden font-extrabold">QR Code</span>`
 - [x] Provide instant 1-tap "Text / Share" (`navigator.share`) and "Copy Link" within the Quick QR modal
@@ -8,8 +22,6 @@
 - [x] Add `Share QR` item to desktop navigation bar
 - [x] Verified zero Netlify deployment
 - [x] Pass `npm run build` and `npm run lint`
-
-## Completed Sprints
 ### v1.6.15 (Universal Profile Display Name Prioritization & Slip Attribution Rule)
 - [x] Prioritize user's chosen profile display name (`patronDisplayName`) across all features over physical demerit slip text (`raw_student`) whenever a profile exists
 - [x] Update `PhysicalSlipCard.tsx` to display `slip.patronDisplayName` as the primary student name with secondary `Slip: "${slip.raw_student}"` note

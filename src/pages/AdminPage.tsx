@@ -94,7 +94,7 @@ export const AdminPage: React.FC = () => {
             <button
               type="button"
               onClick={() => setIsProfileModalOpen(true)}
-              className="inline-flex items-center gap-2 rounded-2xl bg-gradient-to-r from-[#DFC15E] to-[#B87333] px-6 py-3.5 font-athletic text-lg font-black uppercase tracking-wider text-[#121212] shadow-[0_0_25px_rgba(223,193,94,0.35)] hover:brightness-110 cursor-pointer"
+              className="inline-flex items-center gap-2 rounded-2xl bg-gradient-to-r from-[#DFC15E] to-[#B87333] px-6 py-3.5 min-h-[48px] touch-manipulation active:scale-95 font-athletic text-lg font-black uppercase tracking-wider text-[#121212] shadow-[0_0_25px_rgba(223,193,94,0.35)] hover:brightness-110 cursor-pointer"
             >
               <KeyRound className="h-5 w-5" />
               <span>Sign In as Rick (Admin) or Sarah (Ref)</span>
@@ -234,7 +234,7 @@ export const AdminPage: React.FC = () => {
           <button
             type="button"
             onClick={handleDeduplicate}
-            className="inline-flex items-center gap-1.5 rounded-xl border border-[#B87333] bg-[#B87333]/20 px-3.5 py-2 font-mono-docket text-xs font-bold text-[#E8B888] transition hover:bg-[#B87333] hover:text-[#121212]"
+            className="inline-flex items-center gap-1.5 rounded-xl border border-[#B87333] bg-[#B87333]/20 px-3.5 py-2.5 min-h-[44px] touch-manipulation active:scale-95 font-mono-docket text-xs font-bold text-[#E8B888] transition hover:bg-[#B87333] hover:text-[#121212] cursor-pointer"
           >
             <Fingerprint className="h-3.5 w-3.5" />
             <span>Scan &amp; Deduplicate Images</span>
@@ -275,7 +275,7 @@ export const AdminPage: React.FC = () => {
           type="button"
           onClick={handleSendFridayDigestTest}
           disabled={sendingDigestTest}
-          className="inline-flex items-center justify-center gap-2 rounded-xl border border-[#DFC15E] bg-gradient-to-r from-[#DFC15E]/20 to-[#B87333]/30 px-4 py-2.5 font-mono-docket text-xs font-bold text-[#DFC15E] transition hover:brightness-125 disabled:opacity-50 shrink-0 cursor-pointer"
+          className="inline-flex items-center justify-center gap-2 rounded-xl border border-[#DFC15E] bg-gradient-to-r from-[#DFC15E]/20 to-[#B87333]/30 px-4 py-2.5 min-h-[44px] touch-manipulation active:scale-95 font-mono-docket text-xs font-bold text-[#DFC15E] transition hover:brightness-125 disabled:opacity-50 shrink-0 cursor-pointer"
         >
           <Send className="h-3.5 w-3.5" />
           <span>{sendingDigestTest ? 'Dispatching Test...' : 'Send Test Friday Docket'}</span>
@@ -349,7 +349,7 @@ export const AdminPage: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => handleOverrideSlip(slip.id, 'approve_unblur')}
-                    className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-500 px-3 py-2 font-mono-docket text-xs font-bold text-[#121212] hover:brightness-110 cursor-pointer"
+                    className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-500 px-3.5 py-2.5 min-h-[44px] touch-manipulation active:scale-95 font-mono-docket text-xs font-bold text-[#121212] hover:brightness-110 cursor-pointer"
                   >
                     <CheckCircle2 className="h-4 w-4" />
                     <span>Approve &amp; Unblur (Override)</span>
@@ -357,7 +357,7 @@ export const AdminPage: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => handleOverrideSlip(slip.id, 'approve_keep_blurred')}
-                    className="inline-flex items-center gap-1.5 rounded-xl border border-amber-400/50 bg-amber-500/20 px-3 py-2 font-mono-docket text-xs font-bold text-amber-200 hover:bg-amber-500/30 cursor-pointer"
+                    className="inline-flex items-center gap-1.5 rounded-xl border border-amber-400/50 bg-amber-500/20 px-3.5 py-2.5 min-h-[44px] touch-manipulation active:scale-95 font-mono-docket text-xs font-bold text-amber-200 hover:bg-amber-500/30 cursor-pointer"
                   >
                     <EyeOff className="h-4 w-4" />
                     <span>Approve (Keep Blurred)</span>
@@ -365,7 +365,7 @@ export const AdminPage: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => deleteSlip(slip.id)}
-                    className="inline-flex items-center gap-1 rounded-xl border border-rose-500/40 bg-rose-950/40 px-3 py-2 font-mono-docket text-xs font-bold text-rose-300 hover:bg-rose-900/50 cursor-pointer"
+                    className="inline-flex items-center gap-1 rounded-xl border border-rose-500/40 bg-rose-950/40 px-3.5 py-2.5 min-h-[44px] touch-manipulation active:scale-95 font-mono-docket text-xs font-bold text-rose-300 hover:bg-rose-900/50 cursor-pointer"
                   >
                     <Trash2 className="h-4 w-4" />
                     <span>Eject Slip</span>
@@ -386,7 +386,7 @@ export const AdminPage: React.FC = () => {
           <button
             type="button"
             onClick={handleRerunNormalization}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-[#B87333]/50 bg-[#B87333]/15 px-3 py-1.5 font-mono-docket text-xs font-bold text-[#E8B888]"
+            className="inline-flex items-center gap-1.5 rounded-xl border border-[#B87333]/50 bg-[#B87333]/15 px-3.5 py-2 min-h-[44px] touch-manipulation active:scale-95 font-mono-docket text-xs font-bold text-[#E8B888] cursor-pointer"
           >
             <RefreshCw className="h-3.5 w-3.5" />
             <span>Re-Normalize Aliases</span>
@@ -446,7 +446,7 @@ export const AdminPage: React.FC = () => {
                       )
                     }
                     aria-label="Assign Patron"
-                    className="rounded-lg border border-white/15 bg-[#1A1715] px-2.5 py-1.5 font-mono-docket text-xs text-[#F5F2EB]"
+                    className="rounded-xl border border-white/15 bg-[#1A1715] px-3 py-2 font-mono-docket text-base sm:text-xs min-h-[44px] text-[#F5F2EB]"
                   >
                     <option value="">Anonymous Patron</option>
                     {patronMembers.map((p) => (
@@ -466,7 +466,7 @@ export const AdminPage: React.FC = () => {
                       )
                     }
                     aria-label="Assign Staff Issuer"
-                    className="rounded-lg border border-white/15 bg-[#1A1715] px-2.5 py-1.5 font-mono-docket text-xs text-[#F5F2EB]"
+                    className="rounded-xl border border-white/15 bg-[#1A1715] px-3 py-2 font-mono-docket text-base sm:text-xs min-h-[44px] text-[#F5F2EB]"
                   >
                     <option value="">Unassigned Staff</option>
                     {staffMembers.map((s) => (
@@ -484,7 +484,7 @@ export const AdminPage: React.FC = () => {
                         slip.is_blurred ? 'approve_unblur' : 'approve_keep_blurred'
                       )
                     }
-                    className="inline-flex items-center gap-1 rounded-lg border border-amber-500/30 bg-amber-500/10 px-2.5 py-1.5 font-mono-docket text-xs text-amber-200 hover:bg-amber-500/20 cursor-pointer"
+                    className="inline-flex items-center gap-1 rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-2 min-h-[44px] touch-manipulation active:scale-95 font-mono-docket text-xs text-amber-200 hover:bg-amber-500/20 cursor-pointer"
                   >
                     <EyeOff className="h-3.5 w-3.5" />
                     <span>{slip.is_blurred ? 'Unblur' : 'Blur'}</span>
@@ -493,7 +493,7 @@ export const AdminPage: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => setSelectedSlip(slip)}
-                    className="inline-flex items-center gap-1 rounded-lg border border-white/15 bg-white/5 px-2.5 py-1.5 font-mono-docket text-xs text-[#D6C7B8]"
+                    className="inline-flex items-center gap-1 rounded-xl border border-white/15 bg-white/5 px-3 py-2 min-h-[44px] touch-manipulation active:scale-95 font-mono-docket text-xs text-[#D6C7B8] cursor-pointer"
                   >
                     <Eye className="h-3.5 w-3.5" />
                     <span>Photo</span>
@@ -503,7 +503,7 @@ export const AdminPage: React.FC = () => {
                     type="button"
                     onClick={() => deleteSlip(slip.id)}
                     aria-label="Delete slip"
-                    className="rounded-lg border border-white/10 p-1.5 text-[#9E8F82] hover:text-rose-400"
+                    className="flex h-11 w-11 items-center justify-center rounded-xl border border-white/10 p-2 text-[#9E8F82] hover:text-rose-400 touch-manipulation active:scale-95 cursor-pointer"
                   >
                     <Trash2 className="h-4 w-4" />
                   </button>
@@ -535,7 +535,7 @@ export const AdminPage: React.FC = () => {
                 value={newAliasInput}
                 onChange={(e) => setNewAliasInput(e.target.value)}
                 placeholder='Friendly nickname/alias (e.g. "ricky", "big burt", "the boss")'
-                className="w-full rounded-xl border border-white/15 bg-[#121212] px-3.5 py-2 text-xs text-[#F5F2EB]"
+                className="w-full rounded-xl border border-white/15 bg-[#121212] px-3.5 py-2.5 font-mono-docket text-base sm:text-xs min-h-[44px] text-[#F5F2EB] focus:border-[#B87333] focus:outline-none"
               />
             </div>
 
@@ -544,7 +544,7 @@ export const AdminPage: React.FC = () => {
                 value={selectedStaffId}
                 onChange={(e) => setSelectedStaffId(e.target.value)}
                 aria-label="Target member profile"
-                className="w-full rounded-xl border border-white/15 bg-[#121212] px-3 py-2 text-xs text-[#F5F2EB]"
+                className="w-full rounded-xl border border-white/15 bg-[#121212] px-3.5 py-2.5 font-mono-docket text-base sm:text-xs min-h-[44px] text-[#F5F2EB]"
               >
                 {members.map((m) => (
                   <option key={m.id} value={m.id}>
@@ -557,7 +557,7 @@ export const AdminPage: React.FC = () => {
             <div className="sm:col-span-2">
               <button
                 type="submit"
-                className="flex w-full items-center justify-center gap-1 rounded-xl bg-[#B87333] px-3 py-2 font-athletic text-xs font-bold uppercase text-[#121212] cursor-pointer"
+                className="flex w-full items-center justify-center gap-1 rounded-xl bg-[#B87333] px-3 py-2.5 min-h-[44px] touch-manipulation active:scale-95 font-athletic text-xs font-bold uppercase text-[#121212] cursor-pointer"
               >
                 <Plus className="h-4 w-4" />
                 <span>Map</span>
@@ -602,9 +602,9 @@ export const AdminPage: React.FC = () => {
                           type="button"
                           onClick={() => deleteStaffAlias(aliasObj.id)}
                           aria-label={`Remove alias ${aliasObj.alias}`}
-                          className="text-[#9E8F82] hover:text-rose-400 cursor-pointer"
+                          className="flex h-7 w-7 items-center justify-center rounded text-[#9E8F82] hover:bg-rose-500/20 hover:text-rose-400 touch-manipulation active:scale-95 cursor-pointer"
                         >
-                          <X className="h-3 w-3" />
+                          <X className="h-3.5 w-3.5" />
                         </button>
                       </span>
                     ))}
@@ -624,7 +624,7 @@ export const AdminPage: React.FC = () => {
                 type="text"
                 value={testSignature}
                 onChange={(e) => setTestSignature(e.target.value)}
-                className="flex-1 rounded-lg border border-white/15 bg-[#1A1715] px-3 py-1.5 font-mono-docket text-xs text-[#F5F2EB]"
+                className="flex-1 rounded-xl border border-white/15 bg-[#1A1715] px-3.5 py-2.5 font-mono-docket text-base sm:text-xs min-h-[44px] text-[#F5F2EB] focus:border-[#B87333] focus:outline-none"
               />
               <span className="font-mono-docket text-xs text-emerald-400 font-bold">
                 → {testResolution.member ? testResolution.member.display_name : 'Unmapped'}
@@ -647,11 +647,11 @@ export const AdminPage: React.FC = () => {
               value={newMemberName}
               onChange={(e) => setNewMemberName(e.target.value)}
               placeholder="Friendly Display Name"
-              className="w-full rounded-lg border border-white/15 bg-[#1A1715] px-3 py-2 text-xs text-[#F5F2EB]"
+              className="w-full rounded-xl border border-white/15 bg-[#1A1715] px-3.5 py-2.5 font-mono-docket text-base sm:text-xs min-h-[44px] text-[#F5F2EB] focus:border-[#B87333] focus:outline-none"
             />
             <div className="flex items-center justify-between gap-4">
               <div className="flex items-center gap-4 text-xs font-mono-docket text-[#D6C7B8]">
-                <label className="flex items-center gap-1.5 cursor-pointer">
+                <label className="flex items-center gap-1.5 py-1 cursor-pointer">
                   <input
                     type="checkbox"
                     checked={newMemberIsPatron}
@@ -660,7 +660,7 @@ export const AdminPage: React.FC = () => {
                   />
                   <span>Patron</span>
                 </label>
-                <label className="flex items-center gap-1.5 cursor-pointer">
+                <label className="flex items-center gap-1.5 py-1 cursor-pointer">
                   <input
                     type="checkbox"
                     checked={newMemberIsStaff}
@@ -672,7 +672,7 @@ export const AdminPage: React.FC = () => {
               </div>
               <button
                 type="submit"
-                className="rounded-lg bg-[#B87333] px-3 py-1.5 font-athletic text-xs font-bold uppercase text-[#121212]"
+                className="rounded-xl bg-[#B87333] px-4 py-2 min-h-[44px] touch-manipulation active:scale-95 font-athletic text-xs font-bold uppercase text-[#121212] cursor-pointer"
               >
                 Save
               </button>

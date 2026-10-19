@@ -5,6 +5,7 @@ import {
   EyeOff,
   Images,
   Sparkles,
+  X,
 } from 'lucide-react';
 import { useDemerits } from '../context/DemeritsContext';
 import { EnrichedDemeritSlip, SlipReactions } from '../types/demerits';
@@ -71,22 +72,55 @@ export const DocketPage: React.FC = () => {
             </h1>
           </div>
 
-          {/* Search Input */}
-          <div className="relative w-full md:w-72">
-            <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[#9E8F82]" />
+          {/* Search Input - iOS Auto-Zoom Proof */}
+          <div className="relative w-full md:w-80">
+            <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[#D6C7B8]" />
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search Rick, Burtis, David Lee..."
-              className="w-full rounded-2xl border border-[#B87333]/40 bg-black/70 pl-10 pr-4 py-2.5 text-sm text-[#F5F2EB] placeholder-[#8E8074] focus:border-[#B87333] focus:outline-none"
+              placeholder="Search Rick, Burtis, David Lee, infractions..."
+              aria-label="Search demerit slips by patron name or infraction"
+              className="w-full rounded-2xl border border-[#B87333]/50 bg-black/80 pl-10 pr-10 py-2.5 min-h-[44px] text-base sm:text-sm text-[#F5F2EB] placeholder-[#A3968A] focus:border-[#DFC15E] focus:outline-none"
             />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery('')}
+                aria-label="Clear search query"
+                className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center justify-center min-h-[36px] min-w-[36px] rounded-lg text-[#D6C7B8] hover:text-white cursor-pointer"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            )}
           </div>
         </div>
       </section>
 
-      {/* 2. GRAPHICAL SLIP CARDS GRID */}
-      <section className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      {/* 2. GRAPHICAL SLIP CARDS GRID OR FRIENDLY EMPTY STATE */}
+      {filteredSlips.length === 0 ? (
+        <div className="rounded-3xl border border-white/10 bg-[#151210] p-8 sm:p-12 text-center space-y-3">
+          <p className="text-4xl">🍺</p>
+          <h3 className="font-athletic text-2xl sm:text-3xl font-bold uppercase text-[#F5F2EB]">
+            No Demerit Slips Found
+          </h3>
+          <p className="font-mono-docket text-xs text-[#D6C7B8] max-w-md mx-auto">
+            {searchQuery
+              ? `No slips match "${searchQuery}". Maybe everyone actually behaved themselves tonight!`
+              : 'No verified demerit slips have been logged yet.'}
+          </p>
+          {searchQuery && (
+            <button
+              type="button"
+              onClick={() => setSearchQuery('')}
+              className="inline-flex items-center justify-center min-h-[44px] rounded-xl bg-[#B87333] px-4 py-2 font-sans text-xs font-bold uppercase text-[#121212] hover:bg-[#E8B888] active:scale-95 touch-manipulation transition cursor-pointer"
+            >
+              Clear Search Filter
+            </button>
+          )}
+        </div>
+      ) : (
+        <section className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {filteredSlips.map((slip) => {
           const items = normalizeSlipDemeritItems(slip);
           const primaryMeta = getMichiganTeamMetaForType(
@@ -181,7 +215,7 @@ export const DocketPage: React.FC = () => {
 
                 {/* Preset Jovial Bar Reactions (No Free-Text Comments) */}
                 <div
-                  className="pt-2 flex flex-wrap items-center gap-1.5"
+                  className="pt-2 flex flex-wrap items-center gap-2"
                   onClick={(e) => e.stopPropagation()}
                 >
                   {JOVIAL_REACTION_BUTTONS.map((btn) => {
@@ -191,12 +225,13 @@ export const DocketPage: React.FC = () => {
                         key={btn.key}
                         type="button"
                         onClick={() => reactToSlip(slip.id, btn.key)}
-                        className="inline-flex items-center gap-1.5 rounded-xl border border-white/15 bg-black/50 px-2.5 py-1 font-mono-docket text-[11px] text-[#E8B888] transition hover:border-[#DFC15E] hover:bg-[#B87333]/20 cursor-pointer"
+                        aria-label={`React ${btn.label} (currently ${count})`}
+                        className="inline-flex items-center gap-1.5 rounded-xl border border-white/20 bg-black/60 px-3 py-2 min-h-[42px] font-sans text-xs font-bold text-[#E8B888] transition hover:border-[#DFC15E] hover:bg-[#B87333]/25 active:scale-95 touch-manipulation cursor-pointer"
                       >
-                        <span>{btn.emoji}</span>
+                        <span className="text-sm">{btn.emoji}</span>
                         <span>{btn.label}</span>
                         {count > 0 && (
-                          <span className="ml-0.5 rounded-full bg-[#DFC15E]/20 px-1.5 py-0.2 font-bold text-[#DFC15E]">
+                          <span className="ml-0.5 rounded-full bg-[#DFC15E]/20 border border-[#DFC15E]/40 px-1.5 py-0.2 font-mono-docket font-bold text-[#DFC15E]">
                             {count}
                           </span>
                         )}
@@ -207,13 +242,13 @@ export const DocketPage: React.FC = () => {
 
                 {/* Footer Signature + Inspect Button */}
                 <div className="pt-3 border-t border-white/10 flex items-center justify-between text-xs">
-                  <div className="font-mono-docket text-[#A3968A]">
+                  <div className="font-mono-docket text-[#D6C7B8]">
                     SIGNED: <span className="font-handwriting text-lg text-[#DFC15E] ml-1">{slip.raw_signature}</span>{' '}
                     <span className="text-[#E8B888]">({slip.issuerDisplayName})</span>
                   </div>
-                  <span className="inline-flex items-center gap-1 rounded-xl bg-[#B87333]/20 border border-[#B87333]/50 px-3 py-1 font-athletic uppercase tracking-wider text-[#E8B888] group-hover:bg-[#B87333] group-hover:text-[#121212] transition">
-                    <Eye className="h-3.5 w-3.5" />
-                    Zoom Slip
+                  <span className="inline-flex items-center gap-1.5 rounded-xl bg-[#B87333]/20 border border-[#B87333]/50 px-3.5 py-2 min-h-[40px] font-sans font-bold text-xs uppercase tracking-tight text-[#E8B888] group-hover:bg-[#B87333] group-hover:text-[#121212] active:scale-95 touch-manipulation transition">
+                    <Eye className="h-4 w-4" />
+                    <span>Zoom Slip</span>
                   </span>
                 </div>
               </div>
@@ -221,6 +256,7 @@ export const DocketPage: React.FC = () => {
           );
         })}
       </section>
+      )}
 
       {/* 3. COMPACT UPLOADED CAMERA FILES STRIP (3 SOURCE PHOTOS -> 4 UNIQUE SLIPS) */}
       <section className="rounded-3xl border border-[#B87333]/35 bg-[#151210] p-5">

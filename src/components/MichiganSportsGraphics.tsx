@@ -346,7 +346,7 @@ export const DetroitSportsBannerStrip: React.FC<{
             key={t.key}
             type="button"
             onClick={() => onSelectType(isSelected ? null : t.key)}
-            className={`group relative overflow-hidden rounded-2xl border p-3 text-left transition-all duration-300 cursor-pointer bg-gradient-to-br ${
+            className={`group relative overflow-hidden rounded-2xl border p-3 min-h-[68px] text-left transition-all duration-300 cursor-pointer touch-manipulation active:scale-95 bg-gradient-to-br ${
               t.color
             } ${
               isSelected

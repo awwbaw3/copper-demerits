@@ -101,5 +101,16 @@
 - [x] Added `Share QR` item to desktop navigation bar.
 - [x] Provided instant link to printable tabletop placards and downloadable flyer templates at `/share`.
 
+## Phase 18: Mobile Accessibility & Friendly UX Overhaul (Completed — v1.6.17)
+- [x] Prevented iOS Safari auto-zoom by enforcing `text-base sm:text-sm` / `text-base sm:text-xs` (>= 16px) across all inputs, selects, and textareas across all pages and modals.
+- [x] Enforced Apple HIG 44×44px minimum touch targets across buttons, filters, date pickers, thumbnails, and modal actions.
+- [x] Added global `touch-action: manipulation` across all buttons, inputs, and links to eliminate 300ms mobile tap delay.
+- [x] Added tactile depression feedback (`active:scale-95`) across primary interactive elements and navigation pills.
+- [x] Re-architected Hero Jumbotron on `LeaderboardPage` into a mobile-first responsive 2×2 grid with full 48px touch CTAs.
+- [x] Upgraded secondary text contrast to `#D6C7B8` / `#E8B888` / `#DFC15E` for WCAG AA/AAA compliance.
+- [x] Added global `:focus-visible` golden ring indicators and `aria-label` accessibility attributes.
+- [x] Added friendly jovial bar copy and empty-state filter reset button.
+- [x] Pushed all updates to both `dev` and `main` branches.
+
 
 

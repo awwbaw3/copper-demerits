@@ -695,7 +695,7 @@ export const ClaimProfileModal: React.FC = () => {
                   required
                   value={newDisplayName}
                   onChange={(e) => setNewDisplayName(e.target.value)}
-                  className="mt-1.5 w-full rounded-xl border border-white/15 bg-[#0D0B0A] px-3.5 py-2.5 text-sm text-[#F5F2EB] focus:border-[#B87333] focus:outline-none"
+                  className="mt-1.5 w-full rounded-xl border border-white/15 bg-[#0D0B0A] px-3.5 py-2.5 text-base sm:text-sm min-h-[44px] text-[#F5F2EB] focus:border-[#B87333] focus:outline-none"
                 />
               </div>
 
@@ -708,7 +708,7 @@ export const ClaimProfileModal: React.FC = () => {
                   value={tagline}
                   onChange={(e) => setTagline(e.target.value)}
                   placeholder="e.g. Never ordering Gin & Diet Coke again!"
-                  className="mt-1.5 w-full rounded-xl border border-white/15 bg-[#0D0B0A] px-3.5 py-2.5 text-sm text-[#F5F2EB] focus:border-[#B87333] focus:outline-none"
+                  className="mt-1.5 w-full rounded-xl border border-white/15 bg-[#0D0B0A] px-3.5 py-2.5 text-base sm:text-sm min-h-[44px] text-[#F5F2EB] focus:border-[#B87333] focus:outline-none"
                 />
               </div>
             </div>
@@ -756,9 +756,10 @@ export const ClaimProfileModal: React.FC = () => {
                         type="button"
                         onClick={() => handleDeleteMyNickname(a.id, a.alias)}
                         title={`Remove "${a.alias}" nickname`}
-                        className="ml-0.5 rounded p-0.5 text-[#8E8074] hover:bg-rose-500/20 hover:text-rose-300 cursor-pointer"
+                        aria-label={`Remove "${a.alias}" nickname`}
+                        className="ml-0.5 flex h-7 w-7 items-center justify-center rounded-lg text-[#8E8074] hover:bg-rose-500/20 hover:text-rose-300 cursor-pointer touch-manipulation active:scale-95"
                       >
-                        <Trash2 className="h-3 w-3" />
+                        <Trash2 className="h-3.5 w-3.5" />
                       </button>
                     </span>
                   ))
@@ -778,15 +779,15 @@ export const ClaimProfileModal: React.FC = () => {
                     }
                   }}
                   placeholder="Add a bar-friendly slip nickname (e.g. Ricky, Big Dave)..."
-                  className="flex-1 rounded-xl border border-white/15 bg-[#151210] px-3 py-2 font-mono-docket text-xs text-white focus:border-[#B87333] focus:outline-none"
+                  className="flex-1 rounded-xl border border-white/15 bg-[#151210] px-3.5 py-2.5 font-mono-docket text-base sm:text-xs min-h-[44px] text-white focus:border-[#B87333] focus:outline-none"
                 />
                 <button
                   type="button"
                   onClick={handleAddMyNickname}
                   disabled={addingNickname}
-                  className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-[#B87333]/60 bg-[#B87333]/20 px-3.5 py-2 font-athletic text-xs font-bold uppercase tracking-wider text-[#E8B888] hover:bg-[#B87333] hover:text-[#121212] transition disabled:opacity-50 cursor-pointer shrink-0"
+                  className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-[#B87333]/60 bg-[#B87333]/20 px-4 py-2.5 min-h-[44px] touch-manipulation active:scale-95 font-athletic text-xs font-bold uppercase tracking-wider text-[#E8B888] hover:bg-[#B87333] hover:text-[#121212] transition disabled:opacity-50 cursor-pointer shrink-0"
                 >
-                  <Plus className="h-3.5 w-3.5" />
+                  <Plus className="h-4 w-4" />
                   <span>{addingNickname ? 'Linking...' : 'Add Nickname'}</span>
                 </button>
               </div>
@@ -803,7 +804,7 @@ export const ClaimProfileModal: React.FC = () => {
                     key={team.id}
                     type="button"
                     onClick={() => setFavoriteTeam(team.id)}
-                    className={`flex items-center gap-2 rounded-xl border px-2.5 py-2 text-left transition cursor-pointer ${
+                    className={`flex items-center gap-2 rounded-xl border px-3 py-2.5 min-h-[44px] touch-manipulation active:scale-95 text-left transition cursor-pointer ${
                       favoriteTeam === team.id
                         ? 'border-[#B87333] bg-[#B87333]/20 text-white font-bold'
                         : 'border-white/10 bg-[#0D0B0A] text-[#B5A99D] hover:border-white/25'
@@ -833,7 +834,7 @@ export const ClaimProfileModal: React.FC = () => {
                   value={pin}
                   onChange={(e) => setPin(e.target.value)}
                   placeholder="Enter your 4–8 digit PIN"
-                  className="mt-1.5 w-full rounded-xl border border-[#B87333]/50 bg-[#0D0B0A] px-3.5 py-2.5 font-mono-docket text-sm tracking-widest text-[#F5F2EB] focus:border-[#B87333] focus:outline-none"
+                  className="mt-1.5 w-full rounded-xl border border-[#B87333]/50 bg-[#0D0B0A] px-3.5 py-2.5 font-mono-docket text-base sm:text-sm min-h-[44px] tracking-widest text-[#F5F2EB] focus:border-[#B87333] focus:outline-none"
                 />
               </div>
 
@@ -849,7 +850,7 @@ export const ClaimProfileModal: React.FC = () => {
                   value={newPin}
                   onChange={(e) => setNewPin(e.target.value)}
                   placeholder="Leave blank to keep current PIN"
-                  className="mt-1.5 w-full rounded-xl border border-white/15 bg-[#0D0B0A] px-3.5 py-2.5 font-mono-docket text-sm tracking-widest text-[#F5F2EB] focus:border-[#B87333] focus:outline-none"
+                  className="mt-1.5 w-full rounded-xl border border-white/15 bg-[#0D0B0A] px-3.5 py-2.5 font-mono-docket text-base sm:text-sm min-h-[44px] tracking-widest text-[#F5F2EB] focus:border-[#B87333] focus:outline-none"
                 />
               </div>
             </div>
@@ -892,7 +893,7 @@ export const ClaimProfileModal: React.FC = () => {
                     value={notifEmail}
                     onChange={(e) => setNotifEmail(e.target.value)}
                     placeholder="you@example.com"
-                    className="mt-1 w-full rounded-xl border border-white/15 bg-[#151210] px-3 py-2 font-mono-docket text-xs text-white focus:border-[#B87333] focus:outline-none"
+                    className="mt-1 w-full rounded-xl border border-white/15 bg-[#151210] px-3.5 py-2.5 font-mono-docket text-base sm:text-xs min-h-[44px] text-white focus:border-[#B87333] focus:outline-none"
                   />
                 </div>
 
@@ -907,13 +908,13 @@ export const ClaimProfileModal: React.FC = () => {
                       value={notifPhone}
                       onChange={(e) => setNotifPhone(e.target.value)}
                       placeholder="269-274-9665"
-                      className="w-full rounded-xl border border-white/15 bg-[#151210] px-2.5 py-2 font-mono-docket text-xs text-white focus:border-[#B87333] focus:outline-none"
+                      className="w-full rounded-xl border border-white/15 bg-[#151210] px-3.5 py-2.5 font-mono-docket text-base sm:text-xs min-h-[44px] text-white focus:border-[#B87333] focus:outline-none"
                     />
                     <select
                       value={notifCarrier}
                       onChange={(e) => setNotifCarrier(e.target.value)}
                       aria-label="Mobile Carrier for SMS Gateway"
-                      className="rounded-xl border border-white/15 bg-[#151210] px-2 py-2 font-mono-docket text-[11px] text-[#E8B888]"
+                      className="rounded-xl border border-white/15 bg-[#151210] px-2.5 py-2.5 font-mono-docket text-base sm:text-[11px] min-h-[44px] text-[#E8B888]"
                     >
                       <option value="none">Email Only</option>
                       <option value="verizon">Verizon</option>
@@ -948,7 +949,7 @@ export const ClaimProfileModal: React.FC = () => {
                     type="button"
                     onClick={handleSendVerificationCode}
                     disabled={sendingCode}
-                    className="rounded-xl border border-[#DFC15E]/60 bg-[#DFC15E]/15 px-3 py-1.5 font-mono-docket text-xs font-bold text-[#DFC15E] hover:bg-[#DFC15E] hover:text-[#121212] transition cursor-pointer"
+                    className="rounded-xl border border-[#DFC15E]/60 bg-[#DFC15E]/15 px-3.5 py-2 min-h-[44px] touch-manipulation active:scale-95 font-mono-docket text-xs font-bold text-[#DFC15E] hover:bg-[#DFC15E] hover:text-[#121212] transition cursor-pointer"
                   >
                     {sendingCode
                       ? 'Sending 6-Digit Code...'
@@ -963,13 +964,13 @@ export const ClaimProfileModal: React.FC = () => {
                         value={verificationCodeInput}
                         onChange={(e) => setVerificationCodeInput(e.target.value)}
                         placeholder="6-digit code"
-                        className="w-28 rounded-xl border border-[#DFC15E] bg-black px-2.5 py-1.5 font-mono-docket text-xs tracking-widest text-white"
+                        className="w-32 rounded-xl border border-[#DFC15E] bg-black px-3 py-2 font-mono-docket text-base sm:text-xs min-h-[44px] tracking-widest text-white"
                       />
                       <button
                         type="button"
                         onClick={handleConfirmVerificationCode}
                         disabled={verifyingCode}
-                        className="rounded-xl bg-emerald-500 px-3 py-1.5 font-mono-docket text-xs font-bold text-black hover:bg-emerald-400 cursor-pointer"
+                        className="rounded-xl bg-emerald-500 px-3.5 py-2 min-h-[44px] touch-manipulation active:scale-95 font-mono-docket text-xs font-bold text-black hover:bg-emerald-400 cursor-pointer"
                       >
                         {verifyingCode ? 'Checking...' : 'Verify'}
                       </button>
@@ -994,7 +995,7 @@ export const ClaimProfileModal: React.FC = () => {
                     <button
                       type="button"
                       onClick={() => setNotifPreferences(DEFAULT_NOTIFICATION_PREFERENCES)}
-                      className="rounded-lg border border-white/15 bg-white/5 px-2.5 py-1 font-mono-docket text-[10px] text-[#B5A99D] hover:bg-white/10 hover:text-white transition cursor-pointer"
+                      className="rounded-lg border border-white/15 bg-white/5 px-3 py-1.5 min-h-[36px] touch-manipulation active:scale-95 font-mono-docket text-[10px] text-[#B5A99D] hover:bg-white/10 hover:text-white transition cursor-pointer"
                     >
                       Mute All
                     </button>
@@ -1010,7 +1011,7 @@ export const ClaimProfileModal: React.FC = () => {
                         });
                         setOptInAccepted(true);
                       }}
-                      className="rounded-lg border border-[#B87333]/40 bg-[#B87333]/15 px-2.5 py-1 font-mono-docket text-[10px] font-bold text-[#DFC15E] hover:bg-[#B87333]/30 transition cursor-pointer"
+                      className="rounded-lg border border-[#B87333]/40 bg-[#B87333]/15 px-3 py-1.5 min-h-[36px] touch-manipulation active:scale-95 font-mono-docket text-[10px] font-bold text-[#DFC15E] hover:bg-[#B87333]/30 transition cursor-pointer"
                     >
                       Enable All (Both)
                     </button>
@@ -1075,7 +1076,7 @@ export const ClaimProfileModal: React.FC = () => {
                                 key={opt.id}
                                 type="button"
                                 onClick={() => handlePreferenceChange(key, opt.id)}
-                                className={`rounded-lg px-2.5 py-1 font-mono-docket text-[10px] font-bold uppercase transition cursor-pointer ${
+                                className={`rounded-lg px-2.5 py-1.5 min-h-[36px] touch-manipulation active:scale-95 font-mono-docket text-[10px] font-bold uppercase transition cursor-pointer ${
                                   isSelected
                                     ? opt.id === 'none'
                                       ? 'bg-white/20 text-white border border-white/40 shadow-sm'
@@ -1145,7 +1146,7 @@ export const ClaimProfileModal: React.FC = () => {
                     value={loginIdentifier}
                     onChange={(e) => setLoginIdentifier(e.target.value)}
                     placeholder="you@example.com or 269-274-9665"
-                    className="mt-1.5 w-full rounded-xl border border-white/15 bg-[#151210] px-3.5 py-2.5 font-mono-docket text-sm text-[#F5F2EB] focus:border-[#B87333] focus:outline-none"
+                    className="mt-1.5 w-full rounded-xl border border-white/15 bg-[#151210] px-3.5 py-2.5 font-mono-docket text-base sm:text-sm min-h-[44px] text-[#F5F2EB] focus:border-[#B87333] focus:outline-none"
                   />
                 </div>
 
@@ -1162,7 +1163,7 @@ export const ClaimProfileModal: React.FC = () => {
                     value={pin}
                     onChange={(e) => setPin(e.target.value)}
                     placeholder="4 to 8 digit PIN"
-                    className="mt-1.5 w-full rounded-xl border border-[#B87333]/50 bg-[#151210] px-3.5 py-2.5 font-mono-docket text-sm tracking-widest text-[#F5F2EB] focus:border-[#B87333] focus:outline-none"
+                    className="mt-1.5 w-full rounded-xl border border-[#B87333]/50 bg-[#151210] px-3.5 py-2.5 font-mono-docket text-base sm:text-sm min-h-[44px] tracking-widest text-[#F5F2EB] focus:border-[#B87333] focus:outline-none"
                   />
                 </div>
               </div>
@@ -1238,7 +1239,7 @@ export const ClaimProfileModal: React.FC = () => {
                     value={unclaimedSearch}
                     onChange={(e) => setUnclaimedSearch(e.target.value)}
                     placeholder="Filter unclaimed names..."
-                    className="w-full rounded-xl border border-white/15 bg-[#0D0B0A] px-3 py-2 font-mono-docket text-xs text-[#F5F2EB] focus:border-[#B87333] focus:outline-none"
+                    className="w-full rounded-xl border border-white/15 bg-[#0D0B0A] px-3.5 py-2.5 font-mono-docket text-base sm:text-xs min-h-[44px] text-[#F5F2EB] focus:border-[#B87333] focus:outline-none"
                   />
                 )}
 
@@ -1270,7 +1271,7 @@ export const ClaimProfileModal: React.FC = () => {
                           key={m.id}
                           type="button"
                           onClick={() => handleSelectMember(m.id)}
-                          className={`flex items-center justify-between gap-2.5 rounded-2xl border p-3 text-left transition cursor-pointer ${
+                          className={`flex items-center justify-between gap-2.5 rounded-2xl border p-3 min-h-[52px] touch-manipulation active:scale-[0.98] text-left transition cursor-pointer ${
                             isSelected
                               ? 'border-[#B87333] bg-[#B87333]/20 shadow-[0_0_20px_rgba(184,115,51,0.25)]'
                               : 'border-white/10 bg-[#1B1714] hover:border-[#B87333]/40'
@@ -1314,7 +1315,7 @@ export const ClaimProfileModal: React.FC = () => {
                     value={newDisplayName}
                     onChange={(e) => setNewDisplayName(e.target.value)}
                     placeholder="e.g. Big Dave, Mike, etc."
-                    className="mt-1.5 w-full rounded-xl border border-white/15 bg-[#0D0B0A] px-3.5 py-2.5 text-sm text-[#F5F2EB] focus:border-[#B87333] focus:outline-none"
+                    className="mt-1.5 w-full rounded-xl border border-white/15 bg-[#0D0B0A] px-3.5 py-2.5 text-base sm:text-sm min-h-[44px] text-[#F5F2EB] focus:border-[#B87333] focus:outline-none"
                   />
                 </div>
 
@@ -1326,7 +1327,7 @@ export const ClaimProfileModal: React.FC = () => {
                     value={newRole}
                     onChange={(e) => setNewRole(e.target.value as 'patron' | 'staff' | 'both')}
                     aria-label="Role at the Bar"
-                    className="mt-1.5 w-full rounded-xl border border-white/15 bg-[#0D0B0A] px-3.5 py-2.5 font-mono-docket text-xs text-[#E8B888]"
+                    className="mt-1.5 w-full rounded-xl border border-white/15 bg-[#0D0B0A] px-3.5 py-2.5 font-mono-docket text-base sm:text-xs min-h-[44px] text-[#E8B888]"
                   >
                     <option value="patron">Patron (Ring of Honor Contender)</option>
                     <option value="staff">Bar Staff / Referee</option>
@@ -1358,7 +1359,7 @@ export const ClaimProfileModal: React.FC = () => {
                     value={claimEmail}
                     onChange={(e) => setClaimEmail(e.target.value)}
                     placeholder="you@example.com"
-                    className="mt-1 w-full rounded-xl border border-white/15 bg-[#151210] px-3 py-2 font-mono-docket text-xs text-[#F5F2EB] focus:border-[#B87333] focus:outline-none"
+                    className="mt-1 w-full rounded-xl border border-white/15 bg-[#151210] px-3.5 py-2.5 font-mono-docket text-base sm:text-xs min-h-[44px] text-[#F5F2EB] focus:border-[#B87333] focus:outline-none"
                   />
                 </div>
 
@@ -1372,7 +1373,7 @@ export const ClaimProfileModal: React.FC = () => {
                     value={claimPhone}
                     onChange={(e) => setClaimPhone(e.target.value)}
                     placeholder="269-274-9665"
-                    className="mt-1 w-full rounded-xl border border-white/15 bg-[#151210] px-3 py-2 font-mono-docket text-xs text-[#F5F2EB] focus:border-[#B87333] focus:outline-none"
+                    className="mt-1 w-full rounded-xl border border-white/15 bg-[#151210] px-3.5 py-2.5 font-mono-docket text-base sm:text-xs min-h-[44px] text-[#F5F2EB] focus:border-[#B87333] focus:outline-none"
                   />
                 </div>
               </div>
@@ -1389,7 +1390,7 @@ export const ClaimProfileModal: React.FC = () => {
                     key={team.id}
                     type="button"
                     onClick={() => setFavoriteTeam(team.id)}
-                    className={`flex items-center gap-2 rounded-xl border px-2.5 py-2 text-left transition cursor-pointer ${
+                    className={`flex items-center gap-2 rounded-xl border px-3 py-2.5 min-h-[44px] touch-manipulation active:scale-95 text-left transition cursor-pointer ${
                       favoriteTeam === team.id
                         ? 'border-[#B87333] bg-[#B87333]/20 text-white font-bold'
                         : 'border-white/10 bg-[#0D0B0A] text-[#B5A99D] hover:border-white/25'
@@ -1419,7 +1420,7 @@ export const ClaimProfileModal: React.FC = () => {
                   value={pin}
                   onChange={(e) => setPin(e.target.value)}
                   placeholder="4 to 8 digit PIN"
-                  className="mt-1.5 w-full rounded-xl border border-[#B87333]/50 bg-[#0D0B0A] px-3.5 py-2.5 font-mono-docket text-base tracking-widest text-[#F5F2EB] focus:border-[#B87333] focus:outline-none"
+                  className="mt-1.5 w-full rounded-xl border border-[#B87333]/50 bg-[#0D0B0A] px-3.5 py-2.5 font-mono-docket text-base min-h-[44px] tracking-widest text-[#F5F2EB] focus:border-[#B87333] focus:outline-none"
                 />
                 <span className="mt-1 block font-mono-docket text-[10px] text-[#8E8074]">
                   Once claimed, your name is removed from the unclaimed list and locked to your
@@ -1436,7 +1437,7 @@ export const ClaimProfileModal: React.FC = () => {
                   value={tagline}
                   onChange={(e) => setTagline(e.target.value)}
                   placeholder="e.g. Never ordering Gin & Diet Coke again"
-                  className="mt-1.5 w-full rounded-xl border border-white/15 bg-[#0D0B0A] px-3.5 py-2.5 text-sm text-[#F5F2EB] focus:border-[#B87333] focus:outline-none"
+                  className="mt-1.5 w-full rounded-xl border border-white/15 bg-[#0D0B0A] px-3.5 py-2.5 text-base sm:text-sm min-h-[44px] text-[#F5F2EB] focus:border-[#B87333] focus:outline-none"
                 />
               </div>
             </div>

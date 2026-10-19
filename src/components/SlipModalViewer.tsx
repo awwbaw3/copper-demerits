@@ -84,26 +84,26 @@ export const SlipModalViewer: React.FC<SlipModalViewerProps> = ({ slip, onClose 
       ref={dialogRef}
       closedby="any"
       aria-labelledby="slipModalTitle"
-      className="m-auto w-[95vw] max-w-2xl rounded-2xl border border-[#B87333]/50 bg-[#181513] p-0 text-[#F5F2EB] shadow-[0_25px_70px_rgba(0,0,0,0.9)] open:flex open:flex-col"
+      className="m-auto w-[96vw] max-w-2xl rounded-3xl border-2 border-[#B87333]/60 bg-[#181513] p-0 text-[#F5F2EB] shadow-[0_25px_80px_rgba(0,0,0,0.95)] open:flex open:flex-col pt-[env(safe-area-inset-top,8px)] pb-[env(safe-area-inset-bottom,8px)]"
     >
       {slip && (
-        <div className="flex max-h-[90vh] flex-col overflow-hidden">
+        <div className="flex max-h-[88vh] flex-col overflow-hidden">
           {/* Modal Header */}
-          <div className="flex items-center justify-between border-b border-white/10 bg-[#1F1A17] px-4 sm:px-5 py-3.5">
-            <div className="min-w-0">
+          <div className="flex items-center justify-between border-b border-white/10 bg-[#1F1A17] px-4 sm:px-5 py-3">
+            <div className="min-w-0 pr-2">
               <div className="flex flex-wrap items-center gap-1.5">
-                <span className="inline-block rounded bg-[#B87333]/20 px-2 py-0.5 font-mono-docket text-[10px] font-bold uppercase text-[#E08A4E]">
+                <span className="inline-block rounded-lg bg-[#B87333]/20 px-2 py-0.5 font-mono-docket text-[10px] font-bold uppercase text-[#E08A4E]">
                   VERIFIED SLIP EVIDENCE
                 </span>
                 {slip.incident_time && (
-                  <span className="inline-block rounded bg-[#C86D51]/20 border border-[#C86D51]/40 px-2 py-0.5 font-mono-docket text-[10px] font-bold text-[#F5F2EB]">
+                  <span className="inline-block rounded-lg bg-[#C86D51]/20 border border-[#C86D51]/40 px-2 py-0.5 font-mono-docket text-[10px] font-bold text-[#F5F2EB]">
                     {formatTime12h(slip.incident_time)}
                   </span>
                 )}
               </div>
               <h2
                 id="slipModalTitle"
-                className="mt-1 truncate font-athletic text-xl sm:text-2xl font-bold uppercase tracking-wide text-[#F5F2EB]"
+                className="mt-1 truncate font-sans text-lg sm:text-xl font-black uppercase tracking-tight text-[#F5F2EB]"
               >
                 {slip.patronDisplayName} · +{slip.demerit_count}{' '}
                 {slip.demerit_count === 1 ? 'Demerit' : 'Demerits'} ({slip.location_area})
@@ -114,7 +114,7 @@ export const SlipModalViewer: React.FC<SlipModalViewerProps> = ({ slip, onClose 
               <button
                 type="submit"
                 aria-label="Close slip viewer"
-                className="rounded-xl border border-white/10 bg-white/5 p-2.5 text-[#B5A99D] transition hover:border-[#B87333] hover:text-white"
+                className="flex items-center justify-center min-h-[44px] min-w-[44px] rounded-xl border border-white/15 bg-white/5 p-2 text-[#D6C7B8] transition hover:border-[#B87333] hover:text-white active:scale-95 touch-manipulation cursor-pointer"
               >
                 <X className="h-5 w-5" />
               </button>
@@ -125,17 +125,17 @@ export const SlipModalViewer: React.FC<SlipModalViewerProps> = ({ slip, onClose 
           <div className="overflow-y-auto p-4 sm:p-6 space-y-4">
             {/* Multi-Capture / Source Photo Switcher */}
             {(slip.secondary_image_url || slip.source_image_url) && (
-              <div className="flex flex-wrap items-center gap-1.5 rounded-xl border border-[#B87333]/30 bg-[#121212] p-1.5">
+              <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-[#B87333]/40 bg-[#121212] p-1.5">
                 <button
                   type="button"
                   onClick={() => setActivePhotoTab('primary')}
-                  className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 font-mono-docket text-[11px] font-bold transition ${
+                  className={`flex items-center justify-center gap-1.5 rounded-xl px-3.5 py-2 min-h-[44px] font-sans text-xs font-bold uppercase tracking-tight transition touch-manipulation active:scale-95 cursor-pointer ${
                     activePhotoTab === 'primary'
-                      ? 'bg-[#B87333] text-[#121212]'
-                      : 'text-[#C4B8AC] hover:text-white'
+                      ? 'bg-[#B87333] text-[#121212] font-black'
+                      : 'text-[#D6C7B8] hover:text-white'
                   }`}
                 >
-                  <ImageIcon className="h-3.5 w-3.5" />
+                  <ImageIcon className="h-4 w-4" />
                   <span>
                     {slip.secondary_image_url ? 'Scan View (9:23 PM)' : 'Individual Slip Crop'}
                   </span>
@@ -145,13 +145,13 @@ export const SlipModalViewer: React.FC<SlipModalViewerProps> = ({ slip, onClose 
                   <button
                     type="button"
                     onClick={() => setActivePhotoTab('secondary')}
-                    className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 font-mono-docket text-[11px] font-bold transition ${
+                    className={`flex items-center justify-center gap-1.5 rounded-xl px-3.5 py-2 min-h-[44px] font-sans text-xs font-bold uppercase tracking-tight transition touch-manipulation active:scale-95 cursor-pointer ${
                       activePhotoTab === 'secondary'
-                        ? 'bg-[#B87333] text-[#121212]'
-                        : 'text-[#C4B8AC] hover:text-white'
+                        ? 'bg-[#B87333] text-[#121212] font-black'
+                        : 'text-[#D6C7B8] hover:text-white'
                     }`}
                   >
-                    <Layers className="h-3.5 w-3.5" />
+                    <Layers className="h-4 w-4" />
                     <span>Bar Photo Crop (9:13 PM)</span>
                   </button>
                 )}
@@ -160,14 +160,14 @@ export const SlipModalViewer: React.FC<SlipModalViewerProps> = ({ slip, onClose 
                   <button
                     type="button"
                     onClick={() => setActivePhotoTab('source')}
-                    className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 font-mono-docket text-[11px] font-bold transition ${
+                    className={`flex items-center justify-center gap-1.5 rounded-xl px-3.5 py-2 min-h-[44px] font-sans text-xs font-bold uppercase tracking-tight transition touch-manipulation active:scale-95 cursor-pointer ${
                       activePhotoTab === 'source'
-                        ? 'bg-[#B87333] text-[#121212]'
-                        : 'text-[#C4B8AC] hover:text-white'
+                        ? 'bg-[#B87333] text-[#121212] font-black'
+                        : 'text-[#D6C7B8] hover:text-white'
                     }`}
                   >
-                    <Layers className="h-3.5 w-3.5" />
-                    <span>Full 3-Slip Bar Photo (20261017_211324.jpg)</span>
+                    <Layers className="h-4 w-4" />
+                    <span>Full 3-Slip Bar Photo</span>
                   </button>
                 )}
               </div>

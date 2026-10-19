@@ -55,7 +55,7 @@ export const App: React.FC = () => {
                 <div className="flex flex-wrap items-center justify-center sm:justify-end gap-3">
                   <a
                     href="/share"
-                    className="font-bold text-[#DFC15E] hover:text-[#E8B888] transition underline decoration-[#DFC15E]/50"
+                    className="font-bold text-[#DFC15E] hover:text-[#E8B888] transition underline decoration-[#DFC15E]/50 min-h-[44px] inline-flex items-center touch-manipulation active:scale-95"
                   >
                     📱 Share App &amp; Backbar QR Code
                   </a>
@@ -64,7 +64,7 @@ export const App: React.FC = () => {
                     href="https://copperac.com"
                     target="_blank"
                     rel="noopener"
-                    className="font-bold text-[#E8B888] hover:text-[#DFC15E] transition underline decoration-[#B87333]/50"
+                    className="font-bold text-[#E8B888] hover:text-[#DFC15E] transition underline decoration-[#B87333]/50 min-h-[44px] inline-flex items-center touch-manipulation"
                   >
                     Official Menus, Tap List &amp; Hours: Copper Athletic Club (copperac.com) — Marshall, MI ↗
                   </a>
@@ -73,12 +73,12 @@ export const App: React.FC = () => {
                     href="https://drit.ninja"
                     target="_blank"
                     rel="noopener"
-                    className="text-[#9E8F82] hover:text-[#DFC15E] transition underline decoration-[#9E8F82]/30"
+                    className="text-[#9E8F82] hover:text-[#DFC15E] transition underline decoration-[#9E8F82]/30 min-h-[44px] inline-flex items-center touch-manipulation"
                   >
                     DR IT - The IT Ninjas
                   </a>
                   <span>·</span>
-                  <span>PWA v1.6.16</span>
+                  <span className="min-h-[44px] inline-flex items-center">PWA v1.6.17</span>
                 </div>
               </div>
             </div>

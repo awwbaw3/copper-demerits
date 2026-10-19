@@ -142,89 +142,99 @@ export const LeaderboardPage: React.FC = () => {
               </div>
             </div>
 
-            {/* Big Glowing Jumbotron Score Counter */}
-            <div className="flex items-center gap-3 sm:gap-4 rounded-2xl border-2 border-[#B87333]/50 bg-[#0D0B0A]/90 px-4 sm:px-6 py-3.5 shadow-[inset_0_0_25px_rgba(184,115,51,0.2)]">
-              <div className="text-center px-2">
-                <span className="block font-display-tall text-4xl sm:text-5xl font-black text-[#E8B888] leading-none">
-                  {totalPeriodPoints}
-                </span>
-                <span className="text-[10px] font-mono-docket uppercase tracking-widest text-[#A3968A]">
-                  DEMERIT PTS
-                </span>
+            {/* Big Glowing Jumbotron Score Counter - Responsive Mobile Grid */}
+            <div className="w-full lg:w-auto flex flex-col sm:flex-row items-stretch sm:items-center gap-3 sm:gap-4 rounded-2xl border-2 border-[#B87333]/50 bg-[#0D0B0A]/95 p-3 sm:px-6 sm:py-3.5 shadow-[inset_0_0_25px_rgba(184,115,51,0.2)]">
+              {/* Score Digits (2 columns on mobile) */}
+              <div className="grid grid-cols-2 gap-2 sm:flex sm:items-center sm:gap-4">
+                <div className="text-center px-2 py-2 sm:py-0 rounded-xl bg-white/5 sm:bg-transparent">
+                  <span className="block font-display-tall text-4xl sm:text-5xl font-black text-[#E8B888] leading-none">
+                    {totalPeriodPoints}
+                  </span>
+                  <span className="text-[10px] font-mono-docket uppercase tracking-widest text-[#D6C7B8]">
+                    DEMERIT PTS
+                  </span>
+                </div>
+                <div className="hidden sm:block h-10 w-px bg-[#B87333]/30" />
+                <div className="text-center px-2 py-2 sm:py-0 rounded-xl bg-white/5 sm:bg-transparent">
+                  <span className="block font-display-tall text-4xl sm:text-5xl font-black text-[#F5F2EB] leading-none">
+                    {periodSlips.length}
+                  </span>
+                  <span className="text-[10px] font-mono-docket uppercase tracking-widest text-[#D6C7B8]">
+                    SLIPS ON WALL
+                  </span>
+                </div>
               </div>
-              <div className="h-10 w-px bg-[#B87333]/30" />
-              <div className="text-center px-2">
-                <span className="block font-display-tall text-4xl sm:text-5xl font-black text-[#F5F2EB] leading-none">
-                  {periodSlips.length}
-                </span>
-                <span className="text-[10px] font-mono-docket uppercase tracking-widest text-[#A3968A]">
-                  SLIPS ON WALL
-                </span>
+
+              <div className="hidden sm:block h-10 w-px bg-[#B87333]/30" />
+
+              {/* Action Buttons (2 columns on mobile, min-h-[48px] touch targets) */}
+              <div className="grid grid-cols-2 sm:flex sm:items-center gap-2">
+                <Link
+                  to="/submit"
+                  className="group flex flex-col items-center justify-center min-h-[48px] rounded-xl bg-gradient-to-b from-[#E08A4E] to-[#B87333] px-3 sm:px-4 py-2 text-[#121212] font-sans font-black uppercase tracking-tight shadow-[0_0_20px_rgba(184,115,51,0.5)] active:scale-95 touch-manipulation transition"
+                >
+                  <Camera className="h-5 w-5 mb-0.5" />
+                  <span className="text-xs leading-none">ADD DEMERIT</span>
+                </Link>
+                <div className="hidden sm:block h-10 w-px bg-[#B87333]/30" />
+                <Link
+                  to="/share"
+                  className="group flex flex-col items-center justify-center min-h-[48px] rounded-xl border border-[#DFC15E]/60 bg-[#DFC15E]/15 px-3 py-2 text-[#DFC15E] font-sans font-extrabold uppercase tracking-tight hover:bg-[#DFC15E] hover:text-[#121212] active:scale-95 touch-manipulation transition"
+                  title="Share Scoreboard & Backbar QR Code"
+                >
+                  <QrCode className="h-5 w-5 mb-0.5" />
+                  <span className="text-xs leading-none">SHARE QR</span>
+                </Link>
               </div>
-              <div className="h-10 w-px bg-[#B87333]/30" />
-              <Link
-                to="/submit"
-                className="group flex flex-col items-center justify-center rounded-xl bg-gradient-to-b from-[#E08A4E] to-[#B87333] px-3 sm:px-4 py-2 text-[#121212] font-athletic font-black uppercase tracking-wider shadow-[0_0_20px_rgba(184,115,51,0.5)] hover:scale-105 transition"
-              >
-                <Camera className="h-5 w-5 mb-0.5" />
-                <span className="text-xs leading-none">ADD YOUR DEMERIT</span>
-              </Link>
-              <div className="h-10 w-px bg-[#B87333]/30" />
-              <Link
-                to="/share"
-                className="group flex flex-col items-center justify-center rounded-xl border border-[#DFC15E]/60 bg-[#DFC15E]/15 px-3 py-2 text-[#DFC15E] font-athletic font-bold uppercase tracking-wider hover:bg-[#DFC15E] hover:text-[#121212] transition"
-                title="Share Scoreboard & Backbar QR Code"
-              >
-                <QrCode className="h-5 w-5 mb-0.5" />
-                <span className="text-[11px] leading-none">SHARE QR</span>
-              </Link>
             </div>
           </div>
 
           {/* Period Selector Pills */}
           <div className="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-white/10 pt-4">
-            <div className="flex flex-wrap items-center gap-1.5">
-              <span className="inline-flex items-center gap-1.5 mr-2 text-xs font-athletic uppercase tracking-wider text-[#DFC15E]">
-                <Calendar className="h-3.5 w-3.5" />
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="inline-flex items-center gap-1.5 mr-1 text-xs font-sans font-bold uppercase tracking-wider text-[#DFC15E]">
+                <Calendar className="h-4 w-4" />
                 Season / Period:
               </span>
-              {periodOptions.map((opt) => (
-                <button
-                  key={opt.key}
-                  type="button"
-                  onClick={() => setPeriodKey(opt.key)}
-                  className={`rounded-xl px-3.5 py-1.5 font-athletic text-xs uppercase tracking-wider transition-all cursor-pointer ${
-                    periodKey === opt.key
-                      ? 'bg-[#B87333] text-[#121212] font-black shadow-[0_0_15px_rgba(184,115,51,0.5)] scale-105'
-                      : 'bg-white/5 text-[#D6C7B8] border border-white/10 hover:bg-white/10'
-                  }`}
-                >
-                  {opt.label}
-                </button>
-              ))}
+              <div className="flex flex-wrap items-center gap-1.5">
+                {periodOptions.map((opt) => (
+                  <button
+                    key={opt.key}
+                    type="button"
+                    onClick={() => setPeriodKey(opt.key)}
+                    className={`rounded-xl px-3.5 py-2 min-h-[44px] font-sans text-xs font-bold uppercase tracking-tight transition-all cursor-pointer touch-manipulation active:scale-95 ${
+                      periodKey === opt.key
+                        ? 'bg-[#B87333] text-[#121212] font-black shadow-[0_0_15px_rgba(184,115,51,0.5)] scale-105'
+                        : 'bg-white/5 text-[#D6C7B8] border border-white/10 hover:bg-white/10'
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
             </div>
 
             {selectedDemeritType && (
               <button
                 type="button"
                 onClick={() => setSelectedDemeritType(null)}
-                className="inline-flex items-center gap-1.5 rounded-xl border border-[#E8B888] bg-[#B87333]/25 px-3 py-1 text-xs font-mono-docket text-[#E8B888] hover:bg-[#B87333]/40 cursor-pointer"
+                className="inline-flex items-center gap-1.5 rounded-xl border border-[#E8B888] bg-[#B87333]/25 px-3.5 py-2 min-h-[44px] text-xs font-mono-docket text-[#E8B888] hover:bg-[#B87333]/40 cursor-pointer touch-manipulation active:scale-95"
               >
                 <span>Filter: {selectedDemeritType}</span>
-                <X className="h-3.5 w-3.5" />
+                <X className="h-4 w-4" />
               </button>
             )}
           </div>
 
           {periodKey === 'custom' && (
-            <div className="mt-3 flex flex-wrap items-center gap-3 rounded-2xl border border-[#B87333]/30 bg-black/50 p-3">
+            <div className="mt-3 flex flex-wrap items-center gap-3 rounded-2xl border border-[#B87333]/30 bg-black/50 p-3 sm:p-4">
               <label className="flex items-center gap-2 text-xs font-mono-docket text-[#D6C7B8]">
                 <span>FROM:</span>
                 <input
                   type="date"
                   value={customStartDate}
                   onChange={(e) => setCustomStartDate(e.target.value)}
-                  className="rounded-lg border border-[#B87333]/40 bg-[#181412] px-2.5 py-1 text-xs text-white"
+                  className="rounded-xl border border-[#B87333]/40 bg-[#181412] px-3 py-2 min-h-[44px] text-base sm:text-xs text-white"
                 />
               </label>
               <label className="flex items-center gap-2 text-xs font-mono-docket text-[#D6C7B8]">
@@ -233,7 +243,7 @@ export const LeaderboardPage: React.FC = () => {
                   type="date"
                   value={customEndDate}
                   onChange={(e) => setCustomEndDate(e.target.value)}
-                  className="rounded-lg border border-[#B87333]/40 bg-[#181412] px-2.5 py-1 text-xs text-white"
+                  className="rounded-xl border border-[#B87333]/40 bg-[#181412] px-3 py-2 min-h-[44px] text-base sm:text-xs text-white"
                 />
               </label>
             </div>
@@ -300,7 +310,7 @@ export const LeaderboardPage: React.FC = () => {
                               <button
                                 type="button"
                                 onClick={() => setIsProfileModalOpen(true)}
-                                className={`inline-flex items-center gap-1 rounded-lg border px-2 py-0.5 font-mono-docket text-[10px] font-bold uppercase transition cursor-pointer ${
+                                className={`inline-flex items-center gap-1 rounded-xl border px-3 py-1.5 min-h-[40px] font-sans text-xs font-bold uppercase transition cursor-pointer touch-manipulation active:scale-95 ${
                                   isMe
                                     ? 'border-emerald-400/60 bg-emerald-500/20 text-emerald-200'
                                     : memberRecord?.is_claimed
@@ -320,7 +330,7 @@ export const LeaderboardPage: React.FC = () => {
                         <h3 className="mt-2 font-display-tall text-4xl sm:text-5xl font-black uppercase tracking-wider text-[#F5F2EB] leading-none">
                           {patron.displayName}
                         </h3>
-                        <p className="font-mono-docket text-[11px] font-bold text-[#DFC15E] mt-0.5">
+                        <p className="font-mono-docket text-xs font-bold text-[#DFC15E] mt-0.5">
                           {memberRecordTagline(members, patron.memberId, theme.nickname)}
                         </p>
                       </div>
@@ -330,7 +340,7 @@ export const LeaderboardPage: React.FC = () => {
                         <span className="font-display-tall text-5xl font-black leading-none text-[#E8B888]">
                           {patron.totalDemerits}
                         </span>
-                        <span className="text-[9px] font-mono-docket uppercase tracking-widest text-[#A3968A]">
+                        <span className="text-[9px] font-mono-docket uppercase tracking-widest text-[#D6C7B8]">
                           DEMERITS
                         </span>
                       </div>
@@ -354,12 +364,12 @@ export const LeaderboardPage: React.FC = () => {
                             key={`${item.slip.id}-${i}`}
                             type="button"
                             onClick={() => setActiveSlipModal(item.slip)}
-                            className={`w-full flex items-center justify-between gap-2.5 rounded-2xl border bg-gradient-to-r ${meta.bgGradient} ${meta.borderGlow} p-2.5 text-left transition hover:scale-[1.02] cursor-pointer`}
+                            className={`w-full flex items-center justify-between gap-2.5 rounded-2xl border bg-gradient-to-r ${meta.bgGradient} ${meta.borderGlow} p-2.5 min-h-[48px] text-left transition hover:scale-[1.02] active:scale-98 touch-manipulation cursor-pointer`}
                           >
                             <div className="flex items-center gap-2.5 min-w-0">
                               <MichiganTeamEmblem iconType={meta.iconType} size="sm" />
                               <div className="min-w-0">
-                                <span className="block font-athletic text-xs font-bold uppercase tracking-wider text-[#E8B888] truncate">
+                                <span className="block font-sans text-xs font-black uppercase tracking-wider text-[#E8B888] truncate">
                                   {meta.shortTitle}
                                 </span>
                                 <span className="block font-handwriting text-base text-[#F5F2EB] leading-tight truncate">
@@ -384,7 +394,8 @@ export const LeaderboardPage: React.FC = () => {
                           key={slip.id}
                           type="button"
                           onClick={() => setActiveSlipModal(slip)}
-                          className="group/thumb relative h-12 w-16 overflow-hidden rounded-xl border border-[#B87333]/60 bg-black shadow hover:scale-110 transition cursor-pointer"
+                          className="group/thumb relative h-12 w-16 min-h-[44px] overflow-hidden rounded-xl border border-[#B87333]/60 bg-black shadow hover:scale-110 active:scale-95 touch-manipulation transition cursor-pointer"
+                          aria-label={`View ${patron.displayName}'s ${slip.incident_time || ''} slip`}
                           title={`View ${patron.displayName}'s ${slip.incident_time || ''} slip`}
                         >
                           <img
@@ -402,9 +413,9 @@ export const LeaderboardPage: React.FC = () => {
                       <button
                         type="button"
                         onClick={() => setActiveSlipModal(patron.slips[0])}
-                        className="inline-flex items-center gap-1 rounded-xl border border-[#B87333]/50 bg-[#B87333]/15 px-3 py-1.5 font-athletic text-xs uppercase tracking-wider text-[#E8B888] hover:bg-[#B87333] hover:text-[#121212] transition cursor-pointer"
+                        className="inline-flex items-center gap-1.5 rounded-xl border border-[#B87333]/50 bg-[#B87333]/15 px-3.5 py-2 min-h-[44px] font-sans font-bold text-xs uppercase tracking-tight text-[#E8B888] hover:bg-[#B87333] hover:text-[#121212] active:scale-95 touch-manipulation transition cursor-pointer"
                       >
-                        <Eye className="h-3.5 w-3.5" />
+                        <Eye className="h-4 w-4" />
                         <span>Inspect Slip</span>
                       </button>
                     )}

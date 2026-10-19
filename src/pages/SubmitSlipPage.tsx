@@ -786,7 +786,7 @@ export const SubmitSlipPage: React.FC = () => {
                 type="button"
                 onClick={() => cameraInputRef.current?.click()}
                 disabled={uploadingPhoto || submitting}
-                className="flex flex-col items-center justify-center gap-2.5 rounded-2xl border-2 border-dashed border-[#DFC15E]/70 bg-gradient-to-b from-[#241C14] to-[#121212] p-7 text-center transition hover:border-[#DFC15E] hover:brightness-110 cursor-pointer"
+                className="flex flex-col items-center justify-center gap-2.5 rounded-2xl border-2 border-dashed border-[#DFC15E]/70 bg-gradient-to-b from-[#241C14] to-[#121212] p-6 sm:p-7 text-center transition hover:border-[#DFC15E] hover:brightness-110 active:scale-95 touch-manipulation cursor-pointer"
               >
                 <Camera className="h-9 w-9 text-[#DFC15E]" />
                 <span className="font-athletic text-xl font-black uppercase tracking-wider text-[#F5F2EB]">
@@ -794,7 +794,7 @@ export const SubmitSlipPage: React.FC = () => {
                     ? 'AI Reading & Logging Slip...'
                     : 'Take Camera Photo'}
                 </span>
-                <span className="font-mono-docket text-[11px] text-[#D6C7B8]">
+                <span className="font-mono-docket text-xs text-[#D6C7B8]">
                   Snap slip(s) — grabs all info &amp; saves automatically
                 </span>
               </button>
@@ -803,7 +803,7 @@ export const SubmitSlipPage: React.FC = () => {
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
                 disabled={uploadingPhoto || submitting}
-                className="flex flex-col items-center justify-center gap-2.5 rounded-2xl border-2 border-dashed border-[#B87333]/60 bg-[#121212] p-7 text-center transition hover:border-[#B87333] hover:bg-[#B87333]/10 cursor-pointer"
+                className="flex flex-col items-center justify-center gap-2.5 rounded-2xl border-2 border-dashed border-[#B87333]/60 bg-[#121212] p-6 sm:p-7 text-center transition hover:border-[#B87333] hover:bg-[#B87333]/10 active:scale-95 touch-manipulation cursor-pointer"
               >
                 <Upload className="h-9 w-9 text-[#B87333]" />
                 <span className="font-athletic text-xl font-black uppercase tracking-wider text-[#F5F2EB]">
@@ -811,25 +811,33 @@ export const SubmitSlipPage: React.FC = () => {
                     ? 'AI Reading & Logging Slip...'
                     : 'Choose Slip Photo'}
                 </span>
-                <span className="font-mono-docket text-[11px] text-[#9E8F82]">
+                <span className="font-mono-docket text-xs text-[#D6C7B8]">
                   Upload single scan or multi-slip bar photo
                 </span>
               </button>
             </div>
           )}
 
+          {/* Friendly Mobile Hint */}
+          <div className="rounded-xl border border-white/10 bg-white/5 px-3.5 py-2.5 flex items-center gap-2.5 text-xs font-mono-docket text-[#D6C7B8]">
+            <span className="text-base shrink-0">💡</span>
+            <span>
+              <strong className="text-[#DFC15E]">Pro-Tip:</strong> Lay slip flat in good bar lighting. Our AI reads handwriting, calculates demerit points, and logs to the scoreboard in seconds!
+            </span>
+          </div>
+
           {/* Optional Manual Override Toggle */}
-          <div className="flex items-center justify-between border-t border-white/10 pt-3">
-            <span className="font-mono-docket text-[11px] text-[#9E8F82]">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-t border-white/10 pt-3">
+            <span className="font-mono-docket text-xs text-[#D6C7B8]">
               ✨ AI Vision automatically grabs Student, Date, Time, Room, Offenses, Points &amp;
               Signature.
             </span>
             <button
               type="button"
               onClick={() => setShowManualEditor((prev) => !prev)}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-white/10 bg-[#121212] px-2.5 py-1 font-mono-docket text-[11px] text-[#E8B888] hover:border-[#B87333] cursor-pointer"
+              className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-white/15 bg-[#121212] px-3.5 py-2 min-h-[44px] font-sans font-bold text-xs uppercase tracking-tight text-[#E8B888] hover:border-[#B87333] active:scale-95 touch-manipulation cursor-pointer self-start sm:self-auto"
             >
-              <SlidersHorizontal className="h-3 w-3" />
+              <SlidersHorizontal className="h-4 w-4" />
               <span>{showManualEditor ? 'Hide Manual Editor' : 'Manual Override / Edit'}</span>
             </button>
           </div>
@@ -838,9 +846,9 @@ export const SubmitSlipPage: React.FC = () => {
         {/* Optional Manual Slip Editor (Collapsed by default since AI Vision auto-extracts & logs!) */}
         {showManualEditor && (
           <div className="space-y-4">
-            <div className="rounded-xl border border-white/10 bg-[#121212] p-3.5 space-y-2">
-              <span className="flex items-center gap-1.5 font-mono-docket text-xs font-bold uppercase text-[#E8B888]">
-                <Layers className="h-3.5 w-3.5 text-[#B87333]" />
+            <div className="rounded-2xl border border-white/10 bg-[#121212] p-4 space-y-2">
+              <span className="flex items-center gap-1.5 font-sans font-bold text-xs uppercase tracking-wider text-[#E8B888]">
+                <Layers className="h-4 w-4 text-[#B87333]" />
                 <span>HOW MANY PHYSICAL SLIPS ARE IN THIS IMAGE?</span>
               </span>
               <div className="grid grid-cols-4 gap-2">
@@ -849,9 +857,9 @@ export const SubmitSlipPage: React.FC = () => {
                     key={cnt}
                     type="button"
                     onClick={() => setSlipCountInPhoto(cnt)}
-                    className={`rounded-xl border py-2 font-athletic text-base font-bold uppercase transition ${
+                    className={`rounded-xl border py-2.5 min-h-[44px] font-sans text-xs sm:text-sm font-extrabold uppercase transition touch-manipulation active:scale-95 cursor-pointer ${
                       slipDrafts.length === cnt
-                        ? 'border-[#B87333] bg-[#B87333] text-[#121212]'
+                        ? 'border-[#B87333] bg-[#B87333] text-[#121212] shadow-md'
                         : 'border-white/15 bg-[#1A1715] text-[#D6C7B8] hover:border-[#B87333]/50'
                     }`}
                   >
@@ -913,7 +921,7 @@ export const SubmitSlipPage: React.FC = () => {
                       value={draft.rawStudent}
                       onChange={(e) => updateDraft(draftIdx, { rawStudent: e.target.value })}
                       placeholder="Rick, Burtis, Dave, or any linked Patron Nickname"
-                      className="mt-1.5 w-full rounded-xl border border-white/15 bg-[#121212] px-3.5 py-2.5 text-sm text-[#F5F2EB] focus:border-[#B87333] focus:outline-none"
+                      className="mt-1.5 w-full rounded-xl border border-white/15 bg-[#121212] px-3.5 py-2.5 min-h-[44px] text-base sm:text-sm text-[#F5F2EB] focus:border-[#B87333] focus:outline-none"
                     />
 
                     <div className="mt-2.5 rounded-xl border border-[#B87333]/30 bg-[#121212] p-3">
@@ -950,10 +958,10 @@ export const SubmitSlipPage: React.FC = () => {
                               key={m.id}
                               type="button"
                               onClick={() => updateDraft(draftIdx, { rawStudent: m.display_name })}
-                              className={`rounded-lg border px-2.5 py-1 font-mono-docket text-xs transition ${
+                              className={`rounded-xl border px-3 py-1.5 min-h-[38px] font-sans text-xs font-bold transition touch-manipulation active:scale-95 cursor-pointer ${
                                 resolvedPatron.member?.id === m.id
-                                  ? 'border-[#B87333] bg-[#B87333]/20 text-[#E8B888] font-bold'
-                                  : 'border-white/10 bg-[#1A1715] text-[#B5A99D] hover:border-[#B87333]/50'
+                                  ? 'border-[#B87333] bg-[#B87333]/25 text-[#E8B888]'
+                                  : 'border-white/10 bg-[#1A1715] text-[#D6C7B8] hover:border-[#B87333]/50'
                               }`}
                             >
                               {m.display_name}
@@ -974,7 +982,7 @@ export const SubmitSlipPage: React.FC = () => {
                         required
                         value={draft.incidentDate}
                         onChange={(e) => updateDraft(draftIdx, { incidentDate: e.target.value })}
-                        className="mt-1.5 w-full rounded-xl border border-white/15 bg-[#121212] px-3 py-2.5 font-mono-docket text-xs text-[#F5F2EB]"
+                        className="mt-1.5 w-full rounded-xl border border-white/15 bg-[#121212] px-3 py-2.5 min-h-[44px] font-mono-docket text-base sm:text-xs text-[#F5F2EB]"
                       />
                     </div>
 
@@ -987,7 +995,7 @@ export const SubmitSlipPage: React.FC = () => {
                         type="time"
                         value={draft.incidentTime}
                         onChange={(e) => updateDraft(draftIdx, { incidentTime: e.target.value })}
-                        className="mt-1.5 w-full rounded-xl border border-white/15 bg-[#121212] px-3 py-2.5 font-mono-docket text-xs text-[#F5F2EB]"
+                        className="mt-1.5 w-full rounded-xl border border-white/15 bg-[#121212] px-3 py-2.5 min-h-[44px] font-mono-docket text-base sm:text-xs text-[#F5F2EB]"
                       />
                     </div>
 
@@ -1000,7 +1008,7 @@ export const SubmitSlipPage: React.FC = () => {
                         value={draft.locationArea}
                         onChange={(e) => updateDraft(draftIdx, { locationArea: e.target.value })}
                         placeholder="Copper Bar, Copper, Copper A.C."
-                        className="mt-1.5 w-full rounded-xl border border-white/15 bg-[#121212] px-3.5 py-2 text-sm text-[#F5F2EB]"
+                        className="mt-1.5 w-full rounded-xl border border-white/15 bg-[#121212] px-3.5 py-2 min-h-[44px] text-base sm:text-sm text-[#F5F2EB]"
                       />
                     </div>
                   </div>
@@ -1015,9 +1023,9 @@ export const SubmitSlipPage: React.FC = () => {
                       <button
                         type="button"
                         onClick={() => addDraftLineItem(draftIdx)}
-                        className="inline-flex items-center gap-1 font-mono-docket text-xs font-bold text-[#E08A4E]"
+                        className="inline-flex items-center gap-1 min-h-[44px] px-3 py-1.5 font-sans text-xs font-bold uppercase text-[#E08A4E] hover:text-[#DFC15E] touch-manipulation active:scale-95 cursor-pointer"
                       >
-                        <Plus className="h-3.5 w-3.5" />
+                        <Plus className="h-4 w-4" />
                         <span>Add Demerit Offense</span>
                       </button>
                     </div>
@@ -1026,7 +1034,7 @@ export const SubmitSlipPage: React.FC = () => {
                       {draft.items.map((item, itemIdx) => (
                         <div
                           key={itemIdx}
-                          className="rounded-xl border border-white/10 bg-[#121212] p-3 space-y-2.5"
+                          className="rounded-2xl border border-white/10 bg-[#121212] p-3.5 space-y-2.5"
                         >
                           <div className="flex flex-wrap items-center justify-between gap-2">
                             <div className="flex items-center gap-2 flex-1 min-w-[200px]">
@@ -1039,7 +1047,7 @@ export const SubmitSlipPage: React.FC = () => {
                                   updateDraftLineItem(draftIdx, itemIdx, { type: e.target.value })
                                 }
                                 aria-label="Demerit Type"
-                                className="flex-1 rounded-lg border border-white/15 bg-[#1A1715] px-2.5 py-1.5 font-mono-docket text-xs text-[#E8B888]"
+                                className="flex-1 rounded-xl border border-white/15 bg-[#1A1715] px-3 py-2 min-h-[44px] font-sans text-base sm:text-xs text-[#E8B888]"
                               >
                                 {DEMERIT_CATEGORIES.map((cat) => (
                                   <option key={cat} value={cat}>
@@ -1050,7 +1058,7 @@ export const SubmitSlipPage: React.FC = () => {
                             </div>
 
                             <div className="flex items-center gap-1.5">
-                              <span className="font-mono-docket text-[10px] text-[#9E8F82]">
+                              <span className="font-mono-docket text-[10px] text-[#D6C7B8]">
                                 POINTS:
                               </span>
                               {[1, 2, 3].map((pts) => (
@@ -1060,9 +1068,9 @@ export const SubmitSlipPage: React.FC = () => {
                                   onClick={() =>
                                     updateDraftLineItem(draftIdx, itemIdx, { points: pts })
                                   }
-                                  className={`rounded-lg border px-2.5 py-1 font-mono-docket text-xs font-bold transition ${
+                                  className={`rounded-xl border min-h-[44px] min-w-[44px] flex items-center justify-center font-sans text-sm font-black transition touch-manipulation active:scale-95 cursor-pointer ${
                                     item.points === pts
-                                      ? 'border-[#B87333] bg-[#B87333] text-[#121212]'
+                                      ? 'border-[#B87333] bg-[#B87333] text-[#121212] shadow-md'
                                       : 'border-white/15 bg-[#1A1715] text-[#D6C7B8]'
                                   }`}
                                 >
@@ -1074,9 +1082,9 @@ export const SubmitSlipPage: React.FC = () => {
                                   type="button"
                                   onClick={() => removeDraftLineItem(draftIdx, itemIdx)}
                                   aria-label="Remove offense"
-                                  className="rounded-lg border border-white/10 p-1.5 text-[#9E8F82] hover:text-rose-400"
+                                  className="flex items-center justify-center min-h-[44px] min-w-[44px] rounded-xl border border-white/10 p-2 text-[#D6C7B8] hover:text-rose-400 active:scale-95 touch-manipulation cursor-pointer"
                                 >
-                                  <Trash2 className="h-3.5 w-3.5" />
+                                  <Trash2 className="h-4 w-4" />
                                 </button>
                               )}
                             </div>
@@ -1091,7 +1099,7 @@ export const SubmitSlipPage: React.FC = () => {
                               })
                             }
                             placeholder="Reason written on slip (e.g. Too many seat moves)..."
-                            className="w-full rounded-lg border border-white/15 bg-[#1A1715] px-3 py-2 text-sm text-[#F5F2EB]"
+                            className="w-full rounded-xl border border-white/15 bg-[#1A1715] px-3.5 py-2.5 min-h-[44px] text-base sm:text-sm text-[#F5F2EB]"
                           />
                         </div>
                       ))}
@@ -1109,7 +1117,7 @@ export const SubmitSlipPage: React.FC = () => {
                       value={draft.rawSignature}
                       onChange={(e) => updateDraft(draftIdx, { rawSignature: e.target.value })}
                       placeholder='e.g. "YOUR BOSS!", "The Boss - AKA Sarah", "Sarah (Cursive Signature)"'
-                      className="mt-1.5 w-full rounded-xl border border-white/15 bg-[#121212] px-3.5 py-2.5 text-sm text-[#F5F2EB] focus:border-[#B87333] focus:outline-none"
+                      className="mt-1.5 w-full rounded-xl border border-white/15 bg-[#121212] px-3.5 py-2.5 min-h-[44px] text-base sm:text-sm text-[#F5F2EB] focus:border-[#B87333] focus:outline-none"
                     />
 
                     <div className="mt-2.5 rounded-xl border border-[#B87333]/30 bg-[#121212] p-3">
@@ -1136,7 +1144,7 @@ export const SubmitSlipPage: React.FC = () => {
                             key={a.id}
                             type="button"
                             onClick={() => updateDraft(draftIdx, { rawSignature: a.alias })}
-                            className="rounded border border-white/10 bg-[#1A1715] px-2 py-1 font-mono-docket text-[10px] text-[#B5A99D] hover:border-[#B87333] hover:text-white"
+                            className="rounded-xl border border-white/10 bg-[#1A1715] px-3 py-1.5 min-h-[38px] font-sans text-xs font-bold text-[#D6C7B8] hover:border-[#B87333] hover:text-white touch-manipulation active:scale-95 cursor-pointer"
                           >
                             &ldquo;{a.alias}&rdquo;
                           </button>
@@ -1151,7 +1159,7 @@ export const SubmitSlipPage: React.FC = () => {
             <button
               type="submit"
               disabled={submitting || !imageUrl}
-              className="flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-[#B87333] to-[#C86D51] px-6 py-4 font-athletic text-xl font-bold uppercase tracking-wider text-[#121212] shadow-[0_0_25px_rgba(184,115,51,0.4)] transition hover:brightness-110 disabled:opacity-40 cursor-pointer"
+              className="flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-[#B87333] to-[#C86D51] px-6 py-4 min-h-[54px] font-sans font-black text-lg uppercase tracking-tight text-[#121212] shadow-[0_0_25px_rgba(184,115,51,0.4)] transition hover:brightness-110 active:scale-95 touch-manipulation disabled:opacity-40 cursor-pointer"
             >
               <span>
                 {submitting

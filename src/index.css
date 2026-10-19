@@ -40,6 +40,26 @@
   .font-handwriting {
     font-family: 'Caveat', cursive;
   }
+
+  /* Accessible Focus Rings */
+  :focus-visible {
+    outline: 2px solid #DFC15E;
+    outline-offset: 2px;
+  }
+
+  /* Apple HIG / WCAG: Disables double-tap zoom delay on interactive elements */
+  button, a, input, select, textarea {
+    touch-action: manipulation;
+  }
+}
+
+/* Accessible Horizontal Scrolling for Mobile Pill Lists */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
 }
 
 /* Compositor-friendly sports ticker & animations */

@@ -347,30 +347,31 @@ export const Navbar: React.FC = () => {
           <div className="relative border-t border-[#DFC15E]/40 bg-gradient-to-r from-[#2B1A12] via-[#1A1411] to-[#2B1A12] px-3 sm:px-4 py-2 sm:py-2.5 shadow-md">
             <div className="mx-auto flex max-w-6xl items-center justify-between gap-3">
               <div className="flex items-center gap-2.5 min-w-0">
-                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[#DFC15E]/20 text-[#DFC15E] border border-[#DFC15E]/40">
-                  <Smartphone className="h-4 w-4" />
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#DFC15E]/20 text-[#DFC15E] border border-[#DFC15E]/40">
+                  <Smartphone className="h-5 w-5" />
                 </div>
-                <div className="min-w-0 text-xs">
-                  <span className="block font-athletic font-bold uppercase tracking-wider text-[#DFC15E]">
+                <div className="min-w-0">
+                  <span className="block font-sans font-black text-xs uppercase tracking-tight text-[#DFC15E]">
                     Get The Official Backbar App
                   </span>
-                  <p className="truncate text-[11px] text-[#E8B888]/80 font-mono-docket">
-                    Install on your Home Screen for instant 1-tap live scoreboard &amp; demerit alerts.
+                  <p className="truncate text-[11px] text-[#E8B888] font-mono-docket">
+                    Install for instant 1-tap live scoreboard &amp; demerit alerts.
                   </p>
                 </div>
               </div>
-              <div className="flex items-center gap-2 shrink-0">
+              <div className="flex items-center gap-1.5 shrink-0">
                 <button
                   type="button"
                   onClick={handleInstallClick}
-                  className="rounded-lg bg-[#DFC15E] px-3 py-1 text-xs font-athletic font-black uppercase tracking-wider text-[#121212] hover:bg-[#E8B888] shadow-[0_0_12px_rgba(223,193,94,0.4)] transition cursor-pointer"
+                  className="rounded-xl bg-[#DFC15E] px-3.5 py-2 min-h-[44px] text-xs font-sans font-black uppercase tracking-tight text-[#121212] hover:bg-[#E8B888] shadow-[0_0_12px_rgba(223,193,94,0.4)] active:scale-95 touch-manipulation transition cursor-pointer"
                 >
                   Install Now
                 </button>
                 <button
                   type="button"
                   onClick={handleDismissBanner}
-                  className="rounded-md p-1 text-[#B5A99D] hover:bg-white/10 hover:text-[#F5F2EB] transition cursor-pointer"
+                  aria-label="Dismiss install banner"
+                  className="flex items-center justify-center min-h-[44px] min-w-[44px] rounded-xl text-[#D6C7B8] hover:bg-white/10 hover:text-[#F5F2EB] active:scale-95 touch-manipulation transition cursor-pointer"
                   title="Dismiss banner"
                 >
                   <X className="h-4 w-4" />
@@ -384,7 +385,7 @@ export const Navbar: React.FC = () => {
       {/* Mobile Fixed Bottom Navigation Bar */}
       <nav
         aria-label="Mobile Navigation"
-        className="fixed bottom-0 inset-x-0 z-40 grid grid-cols-5 border-t border-[#B87333]/30 bg-[#14110F]/95 backdrop-blur-lg pb-[env(safe-area-inset-bottom,0px)] pr-[env(safe-area-inset-right,0px)] pl-[env(safe-area-inset-left,0px)] md:hidden shadow-[0_-8px_25px_rgba(0,0,0,0.7)]"
+        className="fixed bottom-0 inset-x-0 z-40 grid grid-cols-5 border-t border-[#B87333]/40 bg-[#120F0D]/95 backdrop-blur-xl pt-1 pb-[max(env(safe-area-inset-bottom,0px),8px)] pr-[env(safe-area-inset-right,0px)] pl-[env(safe-area-inset-left,0px)] md:hidden shadow-[0_-10px_30px_rgba(0,0,0,0.85)]"
       >
         {mobileNavItems.map(({ to, label, icon: Icon, badge }) => (
           <NavLink
@@ -392,19 +393,31 @@ export const Navbar: React.FC = () => {
             to={to}
             end={to === '/'}
             className={({ isActive }) =>
-              `relative flex flex-col items-center justify-center gap-1 py-2 min-h-[54px] text-[11px] font-sans font-bold tracking-tight transition-all active:scale-95 touch-manipulation cursor-pointer ${
+              `relative flex flex-col items-center justify-center gap-1 py-1.5 min-h-[58px] text-[11px] font-sans font-bold tracking-tight transition-all active:scale-90 touch-manipulation cursor-pointer select-none ${
                 isActive
-                  ? 'text-[#DFC15E] bg-[#DFC15E]/15 font-black'
-                  : 'text-[#B5A99D] active:bg-white/5'
+                  ? 'text-[#DFC15E] font-black'
+                  : 'text-[#D6C7B8] hover:text-white active:bg-white/5'
               }`
             }
           >
-            <Icon className="h-5 w-5 shrink-0" />
-            <span className="leading-tight truncate max-w-full px-0.5">{label}</span>
-            {typeof badge === 'number' && badge > 0 && (
-              <span className="absolute top-1.5 right-3 rounded-full bg-[#C86D51] px-1.5 text-[9px] font-sans font-black text-[#121212]">
-                {badge}
-              </span>
+            {({ isActive }) => (
+              <>
+                <div
+                  className={`flex items-center justify-center h-8 w-12 rounded-full transition-all ${
+                    isActive
+                      ? 'bg-[#DFC15E]/20 border border-[#DFC15E]/50 shadow-[0_0_12px_rgba(223,193,94,0.3)]'
+                      : ''
+                  }`}
+                >
+                  <Icon className={`h-5 w-5 shrink-0 ${isActive ? 'stroke-[2.4]' : 'stroke-[1.8]'}`} />
+                </div>
+                <span className="leading-tight truncate max-w-full px-0.5">{label}</span>
+                {typeof badge === 'number' && badge > 0 && (
+                  <span className="absolute top-1 right-2 rounded-full bg-[#C86D51] px-1.5 py-0.2 text-[9px] font-sans font-black text-[#121212] shadow-md">
+                    {badge}
+                  </span>
+                )}
+              </>
             )}
           </NavLink>
         ))}
@@ -536,26 +549,26 @@ export const Navbar: React.FC = () => {
             </div>
 
             {/* QR Code Container */}
-            <div className="mx-auto rounded-2xl bg-white p-3.5 shadow-2xl inline-block border-2 border-[#B87333]/40">
+            <div className="mx-auto rounded-2xl bg-white p-3 sm:p-3.5 shadow-2xl inline-block border-2 border-[#B87333]/40 max-w-full">
               {quickQrDataUrl ? (
                 <img
                   src={quickQrDataUrl}
                   alt="Scan to open Copper Demerits"
-                  className="h-52 w-52 sm:h-60 sm:w-60 object-contain mx-auto"
+                  className="w-48 h-48 sm:w-56 sm:h-56 object-contain mx-auto"
                 />
               ) : (
-                <div className="h-52 w-52 flex items-center justify-center font-mono-docket text-xs text-[#121212]">
+                <div className="w-48 h-48 sm:w-56 sm:h-56 flex items-center justify-center font-mono-docket text-xs text-[#121212]">
                   Generating QR...
                 </div>
               )}
             </div>
 
             <div>
-              <p className="font-sans font-extrabold text-sm text-[#DFC15E]">
+              <p className="font-sans font-extrabold text-sm sm:text-base text-[#DFC15E]">
                 copperdemerits.com
               </p>
-              <p className="font-mono-docket text-[11px] text-[#9E8F82] mt-0.5">
-                Point any smartphone camera to open live scoreboard &amp; drop demerits!
+              <p className="font-mono-docket text-xs text-[#D6C7B8] mt-1 leading-snug">
+                Point any phone camera to view live scoreboard &amp; drop demerits!
               </p>
             </div>
 
@@ -564,7 +577,7 @@ export const Navbar: React.FC = () => {
               <button
                 type="button"
                 onClick={handleQuickShare}
-                className="flex items-center justify-center gap-1.5 rounded-xl bg-gradient-to-r from-[#B87333] to-[#C86D51] py-2.5 px-3 min-h-[44px] font-sans font-bold text-xs uppercase tracking-tight text-[#121212] hover:brightness-110 active:scale-95 touch-manipulation cursor-pointer shadow-md"
+                className="flex items-center justify-center gap-1.5 rounded-xl bg-gradient-to-r from-[#B87333] to-[#C86D51] py-3 px-3 min-h-[48px] font-sans font-bold text-xs uppercase tracking-tight text-[#121212] hover:brightness-110 active:scale-95 touch-manipulation cursor-pointer shadow-md"
               >
                 <Share2 className="h-4 w-4 shrink-0" />
                 <span>Text / Share</span>
@@ -573,7 +586,7 @@ export const Navbar: React.FC = () => {
               <button
                 type="button"
                 onClick={handleQuickCopy}
-                className="flex items-center justify-center gap-1.5 rounded-xl border border-white/15 bg-white/5 py-2.5 px-3 min-h-[44px] font-sans font-bold text-xs uppercase tracking-tight text-[#F5F2EB] hover:bg-white/10 active:scale-95 touch-manipulation cursor-pointer"
+                className="flex items-center justify-center gap-1.5 rounded-xl border border-white/20 bg-white/5 py-3 px-3 min-h-[48px] font-sans font-bold text-xs uppercase tracking-tight text-[#F5F2EB] hover:bg-white/10 active:scale-95 touch-manipulation cursor-pointer"
               >
                 {copiedQuickLink ? (
                   <>
@@ -594,9 +607,9 @@ export const Navbar: React.FC = () => {
               <Link
                 to="/share"
                 onClick={() => setShowQuickQrModal(false)}
-                className="inline-flex items-center gap-1.5 font-sans font-bold text-xs text-[#DFC15E] hover:text-[#E8B888] underline decoration-[#DFC15E]/40"
+                className="inline-flex items-center justify-center min-h-[44px] gap-1.5 font-sans font-bold text-xs text-[#DFC15E] hover:text-[#E8B888] underline decoration-[#DFC15E]/40 touch-manipulation active:scale-95"
               >
-                <QrCode className="h-3.5 w-3.5" />
+                <QrCode className="h-4 w-4" />
                 <span>Open Printable Tabletop Placards &amp; Flyers (/share) →</span>
               </Link>
             </div>

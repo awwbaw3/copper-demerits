@@ -212,19 +212,19 @@ export const SharePage: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setSelectedPath('/')}
-                className={`w-full flex items-center justify-between rounded-xl border p-2.5 text-left transition cursor-pointer ${
+                className={`w-full flex items-center justify-between rounded-xl border p-3 min-h-[52px] text-left transition touch-manipulation active:scale-98 cursor-pointer ${
                   selectedPath === '/'
                     ? 'border-[#DFC15E] bg-[#DFC15E]/15 text-[#F5F2EB]'
-                    : 'border-white/5 bg-white/5 text-[#A3968A] hover:bg-white/10 hover:text-[#F5F2EB]'
+                    : 'border-white/5 bg-white/5 text-[#D6C7B8] hover:bg-white/10 hover:text-[#F5F2EB]'
                 }`}
               >
                 <div className="flex items-center gap-2.5">
                   <Trophy className={`h-4 w-4 ${selectedPath === '/' ? 'text-[#DFC15E]' : ''}`} />
                   <div>
-                    <span className="block font-athletic text-xs font-bold uppercase">
+                    <span className="block font-sans text-xs font-bold uppercase tracking-tight">
                       Live Scoreboard &amp; Standings
                     </span>
-                    <span className="text-[10px] font-mono-docket text-[#A3968A]">copperdemerits.com/</span>
+                    <span className="text-[10px] font-mono-docket text-[#D6C7B8]">copperdemerits.com/</span>
                   </div>
                 </div>
                 {selectedPath === '/' && <Check className="h-4 w-4 text-[#DFC15E]" />}
@@ -233,19 +233,19 @@ export const SharePage: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setSelectedPath('/submit')}
-                className={`w-full flex items-center justify-between rounded-xl border p-2.5 text-left transition cursor-pointer ${
+                className={`w-full flex items-center justify-between rounded-xl border p-3 min-h-[52px] text-left transition touch-manipulation active:scale-98 cursor-pointer ${
                   selectedPath === '/submit'
                     ? 'border-[#DFC15E] bg-[#DFC15E]/15 text-[#F5F2EB]'
-                    : 'border-white/5 bg-white/5 text-[#A3968A] hover:bg-white/10 hover:text-[#F5F2EB]'
+                    : 'border-white/5 bg-white/5 text-[#D6C7B8] hover:bg-white/10 hover:text-[#F5F2EB]'
                 }`}
               >
                 <div className="flex items-center gap-2.5">
                   <Camera className={`h-4 w-4 ${selectedPath === '/submit' ? 'text-[#DFC15E]' : ''}`} />
                   <div>
-                    <span className="block font-athletic text-xs font-bold uppercase">
+                    <span className="block font-sans text-xs font-bold uppercase tracking-tight">
                       Drop A Demerit Slip (Camera)
                     </span>
-                    <span className="text-[10px] font-mono-docket text-[#A3968A]">copperdemerits.com/submit</span>
+                    <span className="text-[10px] font-mono-docket text-[#D6C7B8]">copperdemerits.com/submit</span>
                   </div>
                 </div>
                 {selectedPath === '/submit' && <Check className="h-4 w-4 text-[#DFC15E]" />}
@@ -254,19 +254,19 @@ export const SharePage: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setSelectedPath('/docket')}
-                className={`w-full flex items-center justify-between rounded-xl border p-2.5 text-left transition cursor-pointer ${
+                className={`w-full flex items-center justify-between rounded-xl border p-3 min-h-[52px] text-left transition touch-manipulation active:scale-98 cursor-pointer ${
                   selectedPath === '/docket'
                     ? 'border-[#DFC15E] bg-[#DFC15E]/15 text-[#F5F2EB]'
-                    : 'border-white/5 bg-white/5 text-[#A3968A] hover:bg-white/10 hover:text-[#F5F2EB]'
+                    : 'border-white/5 bg-white/5 text-[#D6C7B8] hover:bg-white/10 hover:text-[#F5F2EB]'
                 }`}
               >
                 <div className="flex items-center gap-2.5">
                   <FileText className={`h-4 w-4 ${selectedPath === '/docket' ? 'text-[#DFC15E]' : ''}`} />
                   <div>
-                    <span className="block font-athletic text-xs font-bold uppercase">
+                    <span className="block font-sans text-xs font-bold uppercase tracking-tight">
                       The Docket (Wall of Slips)
                     </span>
-                    <span className="text-[10px] font-mono-docket text-[#A3968A]">copperdemerits.com/docket</span>
+                    <span className="text-[10px] font-mono-docket text-[#D6C7B8]">copperdemerits.com/docket</span>
                   </div>
                 </div>
                 {selectedPath === '/docket' && <Check className="h-4 w-4 text-[#DFC15E]" />}
@@ -276,7 +276,7 @@ export const SharePage: React.FC = () => {
 
           {/* Quick 1-Tap Share Actions */}
           <div className="rounded-2xl border border-[#B87333]/40 bg-[#151210] p-4 space-y-3">
-            <h2 className="font-athletic text-xs font-bold uppercase tracking-wider text-[#DFC15E]">
+            <h2 className="font-sans text-xs font-black uppercase tracking-wider text-[#DFC15E]">
               2. Share With Patrons &amp; Friends
             </h2>
 
@@ -286,7 +286,7 @@ export const SharePage: React.FC = () => {
                 <button
                   type="button"
                   onClick={handleNativeShare}
-                  className="w-full flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#DFC15E] via-[#E8B888] to-[#B87333] px-4 py-3 font-athletic text-xs font-black uppercase tracking-wider text-[#121212] shadow-[0_0_20px_rgba(223,193,94,0.35)] hover:brightness-110 active:scale-98 transition cursor-pointer"
+                  className="w-full flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#DFC15E] via-[#E8B888] to-[#B87333] px-4 py-3 min-h-[48px] font-sans text-xs font-black uppercase tracking-tight text-[#121212] shadow-[0_0_20px_rgba(223,193,94,0.35)] hover:brightness-110 active:scale-95 touch-manipulation transition cursor-pointer"
                 >
                   <Share2 className="h-4 w-4 stroke-[2.5]" />
                   <span>{shareSuccess ? 'Shared!' : 'Share via Text / Message'}</span>
@@ -297,7 +297,7 @@ export const SharePage: React.FC = () => {
               <button
                 type="button"
                 onClick={handleCopyLink}
-                className="w-full flex items-center justify-center gap-2 rounded-xl border border-[#B87333]/60 bg-[#B87333]/20 px-4 py-2.5 font-athletic text-xs font-bold uppercase tracking-wider text-[#E8B888] hover:bg-[#B87333] hover:text-[#121212] transition cursor-pointer"
+                className="w-full flex items-center justify-center gap-2 rounded-xl border border-[#B87333]/60 bg-[#B87333]/20 px-4 py-3 min-h-[48px] font-sans text-xs font-bold uppercase tracking-tight text-[#E8B888] hover:bg-[#B87333] hover:text-[#121212] active:scale-95 touch-manipulation transition cursor-pointer"
               >
                 {copied ? (
                   <>
@@ -316,7 +316,7 @@ export const SharePage: React.FC = () => {
               <button
                 type="button"
                 onClick={handleDownloadQr}
-                className="w-full flex items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-2 font-athletic text-xs font-semibold uppercase tracking-wider text-[#D6C7B8] hover:bg-white/10 hover:text-white transition cursor-pointer"
+                className="w-full flex items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-3 min-h-[48px] font-sans text-xs font-semibold uppercase tracking-tight text-[#D6C7B8] hover:bg-white/10 hover:text-white active:scale-95 touch-manipulation transition cursor-pointer"
               >
                 <Download className="h-4 w-4" />
                 <span>Save QR Image (.PNG)</span>
@@ -326,7 +326,7 @@ export const SharePage: React.FC = () => {
               <button
                 type="button"
                 onClick={handlePrintSign}
-                className="w-full flex items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-2 font-athletic text-xs font-semibold uppercase tracking-wider text-[#D6C7B8] hover:bg-white/10 hover:text-white transition cursor-pointer"
+                className="w-full flex items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-3 min-h-[48px] font-sans text-xs font-semibold uppercase tracking-tight text-[#D6C7B8] hover:bg-white/10 hover:text-white active:scale-95 touch-manipulation transition cursor-pointer"
               >
                 <Printer className="h-4 w-4" />
                 <span>Print Tabletop Placard / Backbar Card</span>
@@ -336,11 +336,11 @@ export const SharePage: React.FC = () => {
 
           {/* Tips for Bar Staff & Regulars */}
           <div className="rounded-2xl border border-white/10 bg-white/5 p-4 space-y-2 text-xs">
-            <div className="flex items-center gap-1.5 font-athletic font-bold uppercase text-[#DFC15E]">
-              <Smartphone className="h-3.5 w-3.5" />
+            <div className="flex items-center gap-1.5 font-sans font-bold uppercase text-[#DFC15E]">
+              <Smartphone className="h-4 w-4" />
               <span>How To Use At The Bar</span>
             </div>
-            <ul className="list-disc list-inside space-y-1 text-[#A3968A] text-[11px] font-mono-docket leading-relaxed">
+            <ul className="list-disc list-inside space-y-1.5 text-[#D6C7B8] text-xs font-mono-docket leading-relaxed">
               <li>Open any smartphone camera and aim at the QR code.</li>
               <li>Tap the pop-up link to open the live Ring of Honor.</li>
               <li>Tap <strong className="text-white">Install App</strong> to add the 1-tap app to your home screen!</li>

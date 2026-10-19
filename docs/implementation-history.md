@@ -2,6 +2,27 @@
 
 Chronological log of architectural decisions, database migrations, and infrastructure deployments.
 
+## 2026-10-18 — v1.6.17 Mobile Accessibility & Friendly UX Overhaul
+- **iOS Safari Auto-Zoom Eradication (Apple HIG / WCAG Standards)**:
+  - Systematically audited and converted all inputs, selects, and textareas across `LeaderboardPage`, `DocketPage`, `SubmitSlipPage`, `ClaimProfileModal`, and `AdminPage` to `text-base sm:text-sm` or `text-base sm:text-xs` (>= 16px font-size on mobile viewports).
+  - Eliminates automatic iOS Safari viewport zooming on input focus, preserving seamless orientation and layout on iPhone and iPad devices.
+- **Apple HIG 44×44px Touch Targets & 300ms Mobile Delay Elimination**:
+  - Enforced minimum 44px tap target heights (`min-h-[44px]`) on buttons, filter tabs, date pickers, thumbnail inspectors, and reaction toggles.
+  - Added global `touch-action: manipulation` across `button, a, input, select, textarea` to eliminate mobile browser 300ms double-tap delay.
+  - Added tactile depression feedback (`active:scale-95`) across primary interactive buttons, reaction chips, modal dismiss triggers, and navigation tabs.
+- **Responsive Sports Bar Hero Jumbotron**:
+  - Converted the Hero Jumbotron scoreboard on `LeaderboardPage` from a cramped horizontal row into a mobile-first 2×2 grid layout on screens < 640px, giving scores prominent focus and dedicating full 48px thumb buttons to `[ADD DEMERIT]` and `[SHARE QR]`.
+  - Added horizontally scrollable period selectors with `.no-scrollbar` styling and full 44px touch targets.
+- **Enhanced Visual Accessibility & Text Contrast**:
+  - Elevated secondary text contrast from low-contrast brown `#8E8074` to WCAG AA/AAA compliant `#D6C7B8`, `#E8B888`, and `#DFC15E`.
+  - Added global `:focus-visible` golden ring indicators (`2px solid #DFC15E`, offset `2px`) for keyboard and assistive tech accessibility.
+  - Added explicit `aria-label` attributes to icon-only buttons, reaction chips, slip thumbnails, and modal close buttons.
+- **Friendly Jovial Sports Bar Polish**:
+  - Added friendly pro-tips and empty-state handling with 1-tap "Clear Search Filter" button in `DocketPage`.
+  - Added safe-area padding for mobile modals (`SlipModalViewer`, `ClaimProfileModal`) and navigation footer links.
+
+---
+
 ## 2026-10-18 — v1.6.16 Instant Quick QR Modal & Backbar QR Visibility
 - **Instant Quick QR Modal (`src/components/Navbar.tsx`)**:
   - Integrated `qrcode` dynamically inside the sticky navigation header so tapping **`[QR Code]`** or **`[Share QR]`** immediately displays an instant, full-screen high-contrast modal.
