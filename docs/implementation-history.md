@@ -2,6 +2,22 @@
 
 Chronological log of architectural decisions, database migrations, and infrastructure deployments.
 
+## 2026-10-18 — v1.6.18 Ref Booth Gating & Role Separation
+- **Ref Booth Navigation Gating (`src/components/Navbar.tsx`)**:
+  - Gated the **"Ref Booth"** navigation link on both desktop header and mobile bottom navigation bar strictly to authenticated users with admin/staff privileges (`isAdminOrStaff`).
+  - Unauthenticated visitors and regular patrons now see a clean 4-item public navigation set (`Scoreboard`, `Wall of Slips`, `Drop Slip`, `Share QR`).
+  - Mobile bottom navigation dynamically switches between `grid-cols-4` (for patrons/visitors) and `grid-cols-5` (for referees/admins), maintaining 100% balanced tap targets across all device widths.
+- **Ticker Alert Privacy (`src/components/Navbar.tsx`)**:
+  - Internal Ref Booth review alerts (`⚖️ REF BOOTH ALERT: ... PENDING OFFICIAL REVIEW`) are now strictly displayed to authenticated staff/admins and excluded from public patrons' ticker feed.
+- **Admin Quick Access in Profile Drawer (`src/components/ClaimProfileModal.tsx`)**:
+  - Added a direct **"Ref Booth"** button inside the active session banner for authenticated administrators and referees, enabling immediate 1-tap transit to the queue upon PIN login.
+- **Lock Screen "Return to Scoreboard" Escape Route (`src/pages/AdminPage.tsx`)**:
+  - Added a high-contrast **"Return to Scoreboard"** navigation button on the `/admin` lock screen so accidental direct navigation offers an immediate 1-tap path back to public standings.
+- **Auto-Blurred Slip Redirection Guard (`src/pages/SubmitSlipPage.tsx`)**:
+  - Guarded post-upload routing so only signed-in administrators/staff are redirected to `/admin` if a slip triggers the Referee blur queue; public patrons are gracefully routed to `/docket`.
+
+---
+
 ## 2026-10-18 — v1.6.17 Mobile Accessibility & Friendly UX Overhaul
 - **iOS Safari Auto-Zoom Eradication (Apple HIG / WCAG Standards)**:
   - Systematically audited and converted all inputs, selects, and textareas across `LeaderboardPage`, `DocketPage`, `SubmitSlipPage`, `ClaimProfileModal`, and `AdminPage` to `text-base sm:text-sm` or `text-base sm:text-xs` (>= 16px font-size on mobile viewports).

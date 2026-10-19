@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useDemerits } from '../context/DemeritsContext';
 import { EnrichedDemeritSlip } from '../types/demerits';
 import { SlipModalViewer } from '../components/SlipModalViewer';
@@ -19,6 +20,7 @@ import {
   Lock,
   Beer,
   Send,
+  Trophy,
 } from 'lucide-react';
 
 export const AdminPage: React.FC = () => {
@@ -90,15 +92,22 @@ export const AdminPage: React.FC = () => {
             </p>
           </div>
 
-          <div className="pt-2">
+          <div className="pt-2 flex flex-col sm:flex-row items-center justify-center gap-3">
             <button
               type="button"
               onClick={() => setIsProfileModalOpen(true)}
-              className="inline-flex items-center gap-2 rounded-2xl bg-gradient-to-r from-[#DFC15E] to-[#B87333] px-6 py-3.5 min-h-[48px] touch-manipulation active:scale-95 font-athletic text-lg font-black uppercase tracking-wider text-[#121212] shadow-[0_0_25px_rgba(223,193,94,0.35)] hover:brightness-110 cursor-pointer"
+              className="inline-flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-[#DFC15E] to-[#B87333] px-6 py-3.5 min-h-[48px] touch-manipulation active:scale-95 font-athletic text-base sm:text-lg font-black uppercase tracking-wider text-[#121212] shadow-[0_0_25px_rgba(223,193,94,0.35)] hover:brightness-110 cursor-pointer w-full sm:w-auto"
             >
               <KeyRound className="h-5 w-5" />
               <span>Sign In as Rick (Admin) or Sarah (Ref)</span>
             </button>
+            <Link
+              to="/"
+              className="inline-flex items-center justify-center gap-2 rounded-2xl border border-white/20 bg-white/5 hover:bg-white/10 px-6 py-3.5 min-h-[48px] touch-manipulation active:scale-95 font-athletic text-base sm:text-lg font-black uppercase tracking-wider text-[#F5F2EB] cursor-pointer w-full sm:w-auto"
+            >
+              <Trophy className="h-5 w-5 text-[#DFC15E]" />
+              <span>Return to Scoreboard</span>
+            </Link>
           </div>
         </div>
       </div>

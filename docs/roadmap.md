@@ -112,5 +112,12 @@
 - [x] Added friendly jovial bar copy and empty-state filter reset button.
 - [x] Pushed all updates to both `dev` and `main` branches.
 
-
-
+## Phase 19: Ref Booth Gating & Role Separation (Completed — v1.6.18)
+- [x] Gated "Ref Booth" navigation link in desktop header to authenticated admins and staff (`isAdminOrStaff`).
+- [x] Gated "Ref Booth" navigation link in mobile bottom navigation bar to authenticated admins and staff (`isAdminOrStaff`).
+- [x] Dynamically switched mobile bottom navigation grid between `grid-cols-4` (public) and `grid-cols-5` (admin) for balanced touch targets.
+- [x] Gated pending review alerts on the animated backbar ticker to authenticated staff/admins only.
+- [x] Added direct "Ref Booth" navigation link in signed-in active session banner (`ClaimProfileModal.tsx`).
+- [x] Added high-contrast "Return to Scoreboard" exit button on `/admin` access-denied lock screen.
+- [x] Guarded auto-blurred slip post-submission routing to only redirect to `/admin` if signed in as admin/staff, otherwise gracefully navigating to `/docket`.
+- [x] Maintained strict zero Netlify production deployments.

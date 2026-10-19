@@ -69,6 +69,7 @@ export const SubmitSlipPage: React.FC = () => {
     members,
     aliases,
     currentMember,
+    isAdminOrStaff,
     setIsProfileModalOpen,
     resolveStaffSignature,
     resolvePatronNickname,
@@ -267,7 +268,7 @@ export const SubmitSlipPage: React.FC = () => {
       setAutoLoggedSlips(draftsToSave);
       setSubmittedSummary({ newCount, mergedCount, blurredQueueCount });
       setTimeout(() => {
-        navigate(blurredQueueCount > 0 ? '/admin' : '/docket');
+        navigate(blurredQueueCount > 0 && isAdminOrStaff ? '/admin' : '/docket');
       }, 2400);
     } catch (err) {
       setErrorMsg(err instanceof Error ? err.message : 'Could not save slip.');

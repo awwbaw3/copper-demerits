@@ -78,7 +78,7 @@ export const App: React.FC = () => {
                     DR IT - The IT Ninjas
                   </a>
                   <span>·</span>
-                  <span className="min-h-[44px] inline-flex items-center">PWA v1.6.17</span>
+                  <span className="min-h-[44px] inline-flex items-center">PWA v1.6.18</span>
                 </div>
               </div>
             </div>

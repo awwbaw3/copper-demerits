@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { useDemerits } from '../context/DemeritsContext';
 import { MichiganTeamBadge, TeamBadgeMeta } from './MichiganSportsGraphics';
 import { moderateTextInstant } from '../lib/moderation';
@@ -11,6 +12,7 @@ import {
   X,
   KeyRound,
   ShieldCheck,
+  ShieldAlert,
   UserCheck,
   Sparkles,
   LogOut,
@@ -100,6 +102,7 @@ export const ClaimProfileModal: React.FC = () => {
     members,
     aliases,
     currentMember,
+    isAdminOrStaff,
     activePin,
     isProfileModalOpen,
     setIsProfileModalOpen,
@@ -588,19 +591,31 @@ export const ClaimProfileModal: React.FC = () => {
               </div>
             </div>
 
-            <button
-              type="button"
-              onClick={() => {
-                logoutProfile();
-                setMode('login');
-                setPin('');
-                setSuccessMsg(null);
-              }}
-              className="inline-flex items-center gap-1.5 rounded-xl border border-rose-500/40 bg-rose-500/15 px-3 py-2 min-h-[44px] touch-manipulation active:scale-95 font-sans font-bold text-xs text-rose-300 hover:bg-rose-500/25 cursor-pointer"
-            >
-              <LogOut className="h-3.5 w-3.5" />
-              <span>Sign Out</span>
-            </button>
+            <div className="flex items-center gap-2">
+              {isAdminOrStaff && (
+                <Link
+                  to="/admin"
+                  onClick={() => setIsProfileModalOpen(false)}
+                  className="inline-flex items-center gap-1.5 rounded-xl border border-[#B87333]/50 bg-[#B87333]/20 px-3 py-2 min-h-[44px] touch-manipulation active:scale-95 font-sans font-bold text-xs text-[#DFC15E] hover:bg-[#B87333]/30 cursor-pointer"
+                >
+                  <ShieldAlert className="h-3.5 w-3.5" />
+                  <span>Ref Booth</span>
+                </Link>
+              )}
+              <button
+                type="button"
+                onClick={() => {
+                  logoutProfile();
+                  setMode('login');
+                  setPin('');
+                  setSuccessMsg(null);
+                }}
+                className="inline-flex items-center gap-1.5 rounded-xl border border-rose-500/40 bg-rose-500/15 px-3 py-2 min-h-[44px] touch-manipulation active:scale-95 font-sans font-bold text-xs text-rose-300 hover:bg-rose-500/25 cursor-pointer"
+              >
+                <LogOut className="h-3.5 w-3.5" />
+                <span>Sign Out</span>
+              </button>
+            </div>
           </div>
         )}
 

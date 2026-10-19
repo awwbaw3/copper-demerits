@@ -27,8 +27,22 @@ interface BeforeInstallPromptEvent extends Event {
   userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>;
 }
 
+interface NavItem {
+  to: string;
+  label: string;
+  icon: React.ComponentType<{ className?: string }>;
+  highlight?: boolean;
+  badge?: number;
+}
+
 export const Navbar: React.FC = () => {
-  const { demerits, currentMember, setIsProfileModalOpen, computeStandings } = useDemerits();
+  const {
+    demerits,
+    currentMember,
+    setIsProfileModalOpen,
+    computeStandings,
+    isAdminOrStaff,
+  } = useDemerits();
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [isStandalone, setIsStandalone] = useState<boolean>(() => {
     if (typeof window === 'undefined') return false;
@@ -117,21 +131,31 @@ export const Navbar: React.FC = () => {
     [demerits]
   );
 
-  const desktopNavItems = [
-    { to: '/', label: 'Scoreboard', icon: Trophy },
-    { to: '/docket', label: 'Wall of Slips', icon: FileText },
-    { to: '/submit', label: 'Drop A Slip', icon: Camera, highlight: true },
-    { to: '/share', label: 'Share QR', icon: QrCode },
-    { to: '/admin', label: 'Ref Booth', icon: ShieldAlert, badge: pendingCount },
-  ];
+  const desktopNavItems = useMemo((): NavItem[] => {
+    const items: NavItem[] = [
+      { to: '/', label: 'Scoreboard', icon: Trophy },
+      { to: '/docket', label: 'Wall of Slips', icon: FileText },
+      { to: '/submit', label: 'Drop A Slip', icon: Camera, highlight: true },
+      { to: '/share', label: 'Share QR', icon: QrCode },
+    ];
+    if (isAdminOrStaff) {
+      items.push({ to: '/admin', label: 'Ref Booth', icon: ShieldAlert, badge: pendingCount });
+    }
+    return items;
+  }, [isAdminOrStaff, pendingCount]);
 
-  const mobileNavItems = [
-    { to: '/', label: 'Scoreboard', icon: Trophy },
-    { to: '/docket', label: 'Wall of Slips', icon: FileText },
-    { to: '/submit', label: 'Drop Slip', icon: Camera, highlight: true },
-    { to: '/share', label: 'Share QR', icon: QrCode },
-    { to: '/admin', label: 'Ref Booth', icon: ShieldAlert, badge: pendingCount },
-  ];
+  const mobileNavItems = useMemo((): NavItem[] => {
+    const items: NavItem[] = [
+      { to: '/', label: 'Scoreboard', icon: Trophy },
+      { to: '/docket', label: 'Wall of Slips', icon: FileText },
+      { to: '/submit', label: 'Drop Slip', icon: Camera, highlight: true },
+      { to: '/share', label: 'Share QR', icon: QrCode },
+    ];
+    if (isAdminOrStaff) {
+      items.push({ to: '/admin', label: 'Ref Booth', icon: ShieldAlert, badge: pendingCount });
+    }
+    return items;
+  }, [isAdminOrStaff, pendingCount]);
 
   useEffect(() => {
     const origin = typeof window !== 'undefined' ? window.location.origin : 'https://copperdemerits.com';
@@ -222,7 +246,7 @@ export const Navbar: React.FC = () => {
       }
     });
 
-    if (pendingCount > 0) {
+    if (pendingCount > 0 && isAdminOrStaff) {
       items.push(`⚖️ REF BOOTH ALERT: ${pendingCount} CITATION${pendingCount === 1 ? '' : 'S'} PENDING OFFICIAL REVIEW`);
     }
 
@@ -231,7 +255,7 @@ export const Navbar: React.FC = () => {
     }
 
     return items;
-  }, [computeStandings, approvedSlips, totalDemeritPoints, pendingCount]);
+  }, [computeStandings, approvedSlips, totalDemeritPoints, pendingCount, isAdminOrStaff]);
 
   return (
     <>
@@ -385,7 +409,9 @@ export const Navbar: React.FC = () => {
       {/* Mobile Fixed Bottom Navigation Bar */}
       <nav
         aria-label="Mobile Navigation"
-        className="fixed bottom-0 inset-x-0 z-40 grid grid-cols-5 border-t border-[#B87333]/40 bg-[#120F0D]/95 backdrop-blur-xl pt-1 pb-[max(env(safe-area-inset-bottom,0px),8px)] pr-[env(safe-area-inset-right,0px)] pl-[env(safe-area-inset-left,0px)] md:hidden shadow-[0_-10px_30px_rgba(0,0,0,0.85)]"
+        className={`fixed bottom-0 inset-x-0 z-40 grid ${
+          mobileNavItems.length === 5 ? 'grid-cols-5' : 'grid-cols-4'
+        } border-t border-[#B87333]/40 bg-[#120F0D]/95 backdrop-blur-xl pt-1 pb-[max(env(safe-area-inset-bottom,0px),8px)] pr-[env(safe-area-inset-right,0px)] pl-[env(safe-area-inset-left,0px)] md:hidden shadow-[0_-10px_30px_rgba(0,0,0,0.85)]`}
       >
         {mobileNavItems.map(({ to, label, icon: Icon, badge }) => (
           <NavLink

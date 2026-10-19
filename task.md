@@ -1,6 +1,18 @@
 # Task Tracker — Copper Demerits (`copperdemerits.com`)
 
-## Active Sprint — v1.6.17 (Mobile Accessibility & Friendly UX Overhaul)
+## Active Sprint — v1.6.18 (Ref Booth Gating & Role Separation)
+- [x] Gate "Ref Booth" navigation link in desktop header to authenticated admins/staff (`isAdminOrStaff`)
+- [x] Gate "Ref Booth" navigation link in mobile bottom nav to authenticated admins/staff (`isAdminOrStaff`)
+- [x] Dynamically switch mobile navigation grid between `grid-cols-4` (public) and `grid-cols-5` (admin)
+- [x] Gate Ref Booth pending review ticker alerts to authenticated admins/staff only
+- [x] Add direct "Ref Booth" link button in signed-in active session banner (`ClaimProfileModal.tsx`)
+- [x] Add "Return to Scoreboard" exit button on `/admin` access-denied lock screen
+- [x] Guard auto-blurred slip post-submission routing to only redirect to `/admin` if signed in as admin/staff
+- [x] Pass `npm run build` and `npm run lint` cleanly
+- [x] Honor user directive: Do NOT publish to Netlify production
+
+## Completed Sprints
+### v1.6.17 (Mobile Accessibility & Friendly UX Overhaul)
 - [x] Prevent iOS Safari auto-zoom by enforcing `text-base sm:text-sm` / `text-base sm:text-xs` (>= 16px) across all inputs and selects
 - [x] Enforce Apple HIG 44×44px minimum touch targets across buttons, filters, date pickers, thumbnails, and modal actions
 - [x] Add global `touch-action: manipulation` across all buttons, inputs, and links to eliminate 300ms mobile tap delay
@@ -12,8 +24,6 @@
 - [x] Pass `npm run build` and `npm run lint` cleanly
 - [x] Verified zero Netlify deployment
 - [x] Merge and push to both `dev` and `main`
-
-## Completed Sprints
 ### v1.6.16 (Instant Quick QR Modal & Backbar QR Visibility)
 - [x] Integrate instant 1-tap Quick QR Modal into header `[QR Code]` / `[Share QR]` button (`src/components/Navbar.tsx`)
 - [x] Fix mobile header button label visibility by replacing non-standard `xs:` Tailwind classes with responsive `<span className="sm:hidden font-extrabold">QR Code</span>`
