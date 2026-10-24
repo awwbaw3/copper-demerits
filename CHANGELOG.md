@@ -2,6 +2,32 @@
 
 All notable changes to the **Copper Athletic Club — Ring of Honor** web application are documented in this file.
 
+## [1.6.20] - 2026-10-24
+
+### Security & Gating — Demerit Correction Access Control
+- **Strict Patron & Referee Ownership Enforcement (`cloudflare/worker.js`)**:
+  - Gated `PATCH /api/demerits/:id` with mandatory actor authentication and PIN verification.
+  - Enforced that claimed patrons can **only correct mistakes on their own demerits** (`existing.patron_id === actor.id`).
+  - Non-admin patrons cannot reassign demerits to someone else, nor can they alter review or blur status.
+  - Gated `DELETE /api/demerits/:id` strictly to authenticated Referees in the Ref Booth.
+  - Deployed worker version `ecb65c91-ef43-46fe-b6fc-24b70bda3f59` live to `api.copperdemerits.com`.
+- **UI Gating & Read-Only Lock (`src/components/SlipModalViewer.tsx` & `src/components/CorrectSlipMistakeModal.tsx`)**:
+  - `[Correct Mistake]` button is only rendered for the cited patron (when logged in with their PIN) or an authenticated Referee.
+  - Non-logged-in users see a prompt to log into their locker to edit their own demerits.
+  - For patrons, the matched roster profile is securely locked to their own account so demerits cannot be shifted onto others.
+
+### Added — Full User-Oriented About Page & PWA Help Hub
+- **Interactive About Page (`src/pages/AboutPage.tsx` on `/about`)**:
+  - **Bar Lore & Story**: The history of handwritten receipt demerits, "The Boss Lady" Sarah, and the Hall of Fame fouls (Pulling a Deb Jarvis, Ordering Gin & Diet Coke, Red Wings no-shows, flying chairs).
+  - **PWA & Mobile Superpower Guide**: Illustrated guide detailing Home Screen installation, offline-ready local caching, 1-tap camera capture with <82KB auto-compression, and 4-digit locker PINs.
+  - **Full User-Oriented Changelog**: Humorous, patron-friendly chronological log of every platform milestone.
+  - **Code of Conduct**: Friendly reminder of the good-natured humor standards and sportsmanship rules.
+- **Contextual PWA Tooltips (`src/components/PwaTooltip.tsx`)**:
+  - Lightweight, accessible tooltip and help icon components matching the dark mahogany and warm copper speakeasy palette.
+  - Highlights PWA capabilities across the header, period selector, category filters, and photo capture surfaces.
+- **Discreet Athletic Version Indicators**:
+  - Classy docket version badge (`v1.6.20`) added in the header and footer linking directly to `/about` without cluttering the brand aesthetic.
+
 ## [1.6.19] - 2026-10-23
 
 ### Added & Enhanced — Profile Merging & Rule-Abiding Slip Mistake Correction Engine

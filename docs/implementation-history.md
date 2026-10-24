@@ -2,6 +2,29 @@
 
 Chronological log of architectural decisions, database migrations, and infrastructure deployments.
 
+## 2026-10-24 — v1.6.20 Demerit Correction Auth Gating & User-Oriented About / PWA Help Hub
+- **Demerit Correction Access Control Enforcement**:
+  - Updated `PATCH /api/demerits/:id` on Cloudflare Worker to enforce strict role-based access control.
+  - Required actor authentication: requests must provide valid `actor_member_id` and matching `actor_pin`.
+  - Enforced that claimed patrons can only correct mistakes on their own citations (`existing.patron_id === actor.id`).
+  - Barred patrons from reassigning citations to other members (`body.patron_id`) or modifying review status (`body.status`).
+  - Restricted `DELETE /api/demerits/:id` strictly to authenticated Referees in the Ref Booth.
+  - Deployed worker version `ecb65c91-ef43-46fe-b6fc-24b70bda3f59` to `api.copperdemerits.com`.
+- **Frontend Permission Gating & Roster Lock**:
+  - Updated `SlipModalViewer.tsx` so `[Correct Mistake]` only appears for the cited patron when logged in with their PIN, or for official Referees. Unauthenticated users see a `[Log In to Edit]` button.
+  - In `CorrectSlipMistakeModal.tsx`, locked the roster selection card to the patron's own claimed profile when editing as a patron.
+- **Full User-Oriented About Page & PWA Help Section (`/about`)**:
+  - Created `src/pages/AboutPage.tsx` with three tabs: **PWA & Mobile Guide**, **What's New (User Changelog)**, and **Bar Lore & Rules**.
+  - Documented features that excel on PWA: Add to Home Screen (full-screen native mode), offline-ready edge caching, instant camera slip capture with <82KB auto-compression, and 4-digit locker PINs.
+  - Created a chronological user-friendly changelog recounting every update from a patron's viewpoint.
+- **Contextual PWA Tooltips**:
+  - Created `src/components/PwaTooltip.tsx` featuring mobile tap toggle, desktop hover, and sports bar dark speakeasy styling.
+  - Injected tooltips into Navbar, Leaderboard, and Submit pages.
+- **Aesthetic Version Badge**:
+  - Added subtle, discreet `v1.6.20` pills in desktop/mobile headers and footer linking directly to `/about`.
+
+---
+
 ## 2026-10-23 — v1.6.19 Profile Merging & Rule-Abiding Slip Mistake Correction Engine
 - **Unified Ziggie & David Lee in Live Cloudflare D1 (`copper-demerits-db`)**:
   - Reassigned David Lee's verified citation (`a4444444-4444-4444-8444-444444444444`, Oct 17 6:27 PM, `+1 PT`) to Ziggie's claimed account (`bd28ef26-f7c7-4eaf-96c1-f621ba3a7feb`).

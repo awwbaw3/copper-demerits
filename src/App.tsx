@@ -1,5 +1,5 @@
 import React from 'react';
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Link } from 'react-router-dom';
 import { DemeritsProvider } from './context/DemeritsContext';
 import { Navbar } from './components/Navbar';
 import { LeaderboardPage } from './pages/LeaderboardPage';
@@ -7,6 +7,7 @@ import { DocketPage } from './pages/DocketPage';
 import { SubmitSlipPage } from './pages/SubmitSlipPage';
 import { AdminPage } from './pages/AdminPage';
 import { SharePage } from './pages/SharePage';
+import { AboutPage } from './pages/AboutPage';
 
 export const App: React.FC = () => {
   return (
@@ -20,6 +21,7 @@ export const App: React.FC = () => {
               <Route path="/docket" element={<DocketPage />} />
               <Route path="/submit" element={<SubmitSlipPage />} />
               <Route path="/share" element={<SharePage />} />
+              <Route path="/about" element={<AboutPage />} />
               <Route path="/admin" element={<AdminPage />} />
             </Routes>
           </main>
@@ -53,6 +55,14 @@ export const App: React.FC = () => {
                   MARSHALL, MI · RING OF HONOR
                 </div>
                 <div className="flex flex-wrap items-center justify-center sm:justify-end gap-3">
+                  <Link
+                    to="/about"
+                    className="font-bold text-[#DFC15E] hover:text-[#E8B888] transition underline decoration-[#DFC15E]/50 min-h-[44px] inline-flex items-center touch-manipulation active:scale-95"
+                    title="View user-oriented changelog, PWA feature guide, and bar rules"
+                  >
+                    ℹ️ About &amp; What&rsquo;s New
+                  </Link>
+                  <span>·</span>
                   <a
                     href="/share"
                     className="font-bold text-[#DFC15E] hover:text-[#E8B888] transition underline decoration-[#DFC15E]/50 min-h-[44px] inline-flex items-center touch-manipulation active:scale-95"
@@ -66,7 +76,7 @@ export const App: React.FC = () => {
                     rel="noopener"
                     className="font-bold text-[#E8B888] hover:text-[#DFC15E] transition underline decoration-[#B87333]/50 min-h-[44px] inline-flex items-center touch-manipulation"
                   >
-                    Official Menus, Tap List &amp; Hours: Copper Athletic Club (copperac.com) — Marshall, MI ↗
+                    Copper Athletic Club (copperac.com) ↗
                   </a>
                   <span>·</span>
                   <a
@@ -78,7 +88,13 @@ export const App: React.FC = () => {
                     DR IT - The IT Ninjas
                   </a>
                   <span>·</span>
-                  <span className="min-h-[44px] inline-flex items-center">PWA v1.6.19</span>
+                  <Link
+                    to="/about"
+                    className="inline-flex items-center gap-1 rounded border border-[#DFC15E]/30 bg-[#DFC15E]/10 px-2 py-0.5 font-mono-docket text-[10px] font-bold text-[#DFC15E] hover:bg-[#DFC15E]/20 transition"
+                    title="Current App Version"
+                  >
+                    <span>v1.6.20</span>
+                  </Link>
                 </div>
               </div>
             </div>

@@ -16,6 +16,7 @@ import {
   Image as ImageIcon,
   Tag,
   Edit3,
+  KeyRound,
 } from 'lucide-react';
 
 interface SlipModalViewerProps {
@@ -24,7 +25,7 @@ interface SlipModalViewerProps {
 }
 
 export const SlipModalViewer: React.FC<SlipModalViewerProps> = ({ slip, onClose }) => {
-  const { currentMember, isAdminOrStaff } = useDemerits();
+  const { currentMember, isAdminOrStaff, activePin, setIsProfileModalOpen } = useDemerits();
   const dialogRef = useRef<HTMLDialogElement | null>(null);
   const [activePhotoTab, setActivePhotoTab] = useState<'primary' | 'secondary' | 'source'>('primary');
   const [isCorrecting, setIsCorrecting] = useState(false);
@@ -34,12 +35,21 @@ export const SlipModalViewer: React.FC<SlipModalViewerProps> = ({ slip, onClose 
     setActiveSlip(slip);
   }, [slip]);
 
-  const canEdit = Boolean(
-    isAdminOrStaff ||
-      (currentMember &&
-        (currentMember.id === activeSlip?.submitted_by_member_id ||
-          currentMember.id === activeSlip?.patron_id))
+  const isClaimedAndLoggedIn = Boolean(
+    currentMember &&
+      (currentMember.is_claimed ?? true) &&
+      Boolean(activePin)
   );
+
+  const isOwnDemerit = Boolean(
+    isClaimedAndLoggedIn &&
+      (currentMember?.id === activeSlip?.patron_id ||
+        (activeSlip?.raw_student &&
+          currentMember?.display_name?.trim().toLowerCase() ===
+            activeSlip.raw_student.trim().toLowerCase()))
+  );
+
+  const canEdit = Boolean(isAdminOrStaff || isOwnDemerit);
 
   useEffect(() => {
     setActivePhotoTab('primary');
@@ -129,7 +139,7 @@ export const SlipModalViewer: React.FC<SlipModalViewerProps> = ({ slip, onClose 
             </div>
 
             <div className="flex items-center gap-2">
-              {canEdit && (
+              {canEdit ? (
                 <button
                   type="button"
                   onClick={() => setIsCorrecting(true)}
@@ -140,7 +150,20 @@ export const SlipModalViewer: React.FC<SlipModalViewerProps> = ({ slip, onClose 
                   <span className="hidden sm:inline">Correct Mistake</span>
                   <span className="sm:hidden">Edit</span>
                 </button>
-              )}
+              ) : !currentMember ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsProfileModalOpen(true);
+                  }}
+                  className="inline-flex items-center gap-1.5 rounded-xl border border-white/20 bg-white/5 px-3 py-2 min-h-[44px] text-xs font-mono-docket text-[#D6C7B8] hover:text-[#DFC15E] hover:border-[#DFC15E]/40 active:scale-95 touch-manipulation cursor-pointer"
+                  title="Claim your locker or log in with your PIN to correct your own demerits"
+                >
+                  <KeyRound className="h-3.5 w-3.5 text-[#DFC15E]" />
+                  <span className="hidden sm:inline">Log In to Edit</span>
+                  <span className="sm:hidden">Log In</span>
+                </button>
+              ) : null}
 
               <form method="dialog">
                 <button

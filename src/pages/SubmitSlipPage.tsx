@@ -10,6 +10,7 @@ import {
   formatByteSize,
 } from '../lib/imageDedup';
 import { MichiganTeamBadge, TeamBadgeMeta } from '../components/MichiganSportsGraphics';
+import { PwaHelpIcon } from '../components/PwaTooltip';
 import {
   moderateTextInstant,
   scanWithRefereeMonitor,
@@ -700,9 +701,15 @@ export const SubmitSlipPage: React.FC = () => {
               <span className="font-mono-docket text-[10px] font-bold uppercase tracking-widest text-[#DFC15E]">
                 ONE-TAP CAMERA OR PHOTO UPLOAD · AUTO-EXTRACTS ALL FIELDS
               </span>
-              <h2 className="font-athletic text-2xl sm:text-3xl font-bold uppercase text-[#F5F2EB]">
-                SNAP OR UPLOAD SLIP PHOTO
-              </h2>
+              <div className="flex items-center gap-2">
+                <h2 className="font-athletic text-2xl sm:text-3xl font-bold uppercase text-[#F5F2EB]">
+                  SNAP OR UPLOAD SLIP PHOTO
+                </h2>
+                <PwaHelpIcon
+                  tag="MOBILE CAMERA"
+                  content="Take Camera Photo activates your phone's camera directly and auto-compresses the receipt to <82KB before edge upload."
+                />
+              </div>
               <p className="mt-0.5 font-mono-docket text-xs text-[#B5A99D]">
                 Works with 1 single slip or up to 4 slips in the same photo. Everything is read and
                 saved automatically!

@@ -24,6 +24,7 @@ import {
   getMichiganTeamMetaForType,
 } from '../components/MichiganSportsGraphics';
 import { normalizeSlipDemeritItems } from '../lib/defaultData';
+import { PwaHelpIcon } from '../components/PwaTooltip';
 
 function memberRecordTagline(members: Member[], memberId: string | null, fallback: string): string {
   if (!memberId) return fallback;
@@ -196,6 +197,10 @@ export const LeaderboardPage: React.FC = () => {
                 <Calendar className="h-4 w-4" />
                 Season / Period:
               </span>
+              <PwaHelpIcon
+                tag="OFFLINE READY"
+                content="Standings for all periods are cached locally in your browser so you can switch dates instantly without waiting."
+              />
               <div className="flex flex-wrap items-center gap-1.5">
                 {periodOptions.map((opt) => (
                   <button

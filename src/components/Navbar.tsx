@@ -17,10 +17,12 @@ import {
   QrCode,
   Copy,
   Check,
+  HelpCircle,
 } from 'lucide-react';
 import { useDemerits } from '../context/DemeritsContext';
 import { ClaimProfileModal } from './ClaimProfileModal';
 import { MichiganTeamBadge, TeamBadgeMeta } from './MichiganSportsGraphics';
+import { PwaTooltip } from './PwaTooltip';
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>;
@@ -137,6 +139,7 @@ export const Navbar: React.FC = () => {
       { to: '/docket', label: 'Wall of Slips', icon: FileText },
       { to: '/submit', label: 'Drop A Slip', icon: Camera, highlight: true },
       { to: '/share', label: 'Share QR', icon: QrCode },
+      { to: '/about', label: 'About & Help', icon: HelpCircle },
     ];
     if (isAdminOrStaff) {
       items.push({ to: '/admin', label: 'Ref Booth', icon: ShieldAlert, badge: pendingCount });
@@ -281,9 +284,14 @@ export const Navbar: React.FC = () => {
               className="h-10 sm:h-12 w-auto object-contain drop-shadow-[0_0_12px_rgba(184,115,51,0.4)] transition-transform duration-300 group-hover:scale-105"
             />
             <div className="border-l border-[#B87333]/35 pl-2.5 sm:pl-3">
-              <span className="block font-athletic text-base sm:text-xl font-black tracking-wider uppercase text-[#F5F2EB] leading-none">
-                RING OF <span className="text-[#B87333]">DEMERITS</span>
-              </span>
+              <div className="flex items-center gap-1.5">
+                <span className="block font-athletic text-base sm:text-xl font-black tracking-wider uppercase text-[#F5F2EB] leading-none">
+                  RING OF <span className="text-[#B87333]">DEMERITS</span>
+                </span>
+                <span className="hidden sm:inline-block rounded border border-[#B87333]/40 bg-[#161210] px-1 py-0.2 font-mono-docket text-[9px] font-bold text-[#DFC15E]">
+                  v1.6.20
+                </span>
+              </div>
               <span className="inline-flex items-center gap-1.5 font-sans font-bold text-[11px] tracking-wide uppercase text-[#DFC15E] mt-0.5">
                 <Flame className="h-3 w-3 text-[#C86D51]" />
                 {totalDemeritPoints} PTS · {approvedSlips.length} SLIPS
@@ -293,16 +301,37 @@ export const Navbar: React.FC = () => {
 
           <div className="flex items-center gap-2 sm:gap-2.5">
             {/* Prominent Instant Backbar QR Code Button in Header */}
-            <button
-              type="button"
-              onClick={() => setShowQuickQrModal(true)}
-              className="inline-flex items-center justify-center gap-1.5 rounded-xl border min-h-[44px] px-3 sm:px-3.5 py-2 font-sans text-xs sm:text-sm font-bold tracking-normal transition-all active:scale-95 touch-manipulation cursor-pointer select-none border-[#DFC15E] bg-gradient-to-r from-[#DFC15E]/20 via-[#B87333]/30 to-[#DFC15E]/20 text-[#DFC15E] hover:bg-[#DFC15E] hover:text-[#121212] shadow-[0_0_14px_rgba(223,193,94,0.3)]"
-              title="Open Backbar QR Code to Scan & Share"
+            <PwaTooltip
+              pwaTag="PWA SHARING"
+              content="Display the high-res backbar QR code to pass around the bar or print out as a table tent poster."
             >
-              <QrCode className="h-4 w-4 stroke-[2.2] shrink-0" />
-              <span className="hidden sm:inline font-bold">Share QR</span>
-              <span className="sm:hidden font-extrabold">QR Code</span>
-            </button>
+              <button
+                type="button"
+                onClick={() => setShowQuickQrModal(true)}
+                className="inline-flex items-center justify-center gap-1.5 rounded-xl border min-h-[44px] px-3 sm:px-3.5 py-2 font-sans text-xs sm:text-sm font-bold tracking-normal transition-all active:scale-95 touch-manipulation cursor-pointer select-none border-[#DFC15E] bg-gradient-to-r from-[#DFC15E]/20 via-[#B87333]/30 to-[#DFC15E]/20 text-[#DFC15E] hover:bg-[#DFC15E] hover:text-[#121212] shadow-[0_0_14px_rgba(223,193,94,0.3)]"
+                title="Open Backbar QR Code to Scan & Share"
+              >
+                <QrCode className="h-4 w-4 stroke-[2.2] shrink-0" />
+                <span className="hidden sm:inline font-bold">Share QR</span>
+                <span className="sm:hidden font-extrabold">QR Code</span>
+              </button>
+            </PwaTooltip>
+
+            {/* Mobile About & Help Quick Link */}
+            <NavLink
+              to="/about"
+              className={({ isActive }) =>
+                `flex md:hidden items-center justify-center min-h-[44px] min-w-[44px] rounded-xl border transition-all active:scale-95 touch-manipulation cursor-pointer ${
+                  isActive
+                    ? 'border-[#DFC15E] bg-[#DFC15E]/20 text-[#DFC15E]'
+                    : 'border-white/15 bg-white/5 text-[#D6C7B8] hover:text-[#DFC15E] hover:border-[#DFC15E]/40'
+                }`
+              }
+              title="About, PWA Features & What's New"
+              aria-label="About and Help Guide"
+            >
+              <HelpCircle className="h-4 w-4" />
+            </NavLink>
 
             {/* Desktop Nav Links */}
             <nav className="hidden md:flex items-center gap-1.5">

@@ -1789,6 +1789,25 @@ export const DemeritsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         return { ok: false, error: 'Slip not found.' };
       }
 
+      const isClaimedAndLoggedIn = Boolean(
+        currentMember && (currentMember.is_claimed ?? true) && activePin
+      );
+      const isOwnDemerit = Boolean(
+        isClaimedAndLoggedIn &&
+          (existingSlip.patron_id === currentMember?.id ||
+            (existingSlip.raw_student &&
+              currentMember?.display_name?.trim().toLowerCase() ===
+                existingSlip.raw_student.trim().toLowerCase()))
+      );
+
+      if (!isAdminOrStaff && !isOwnDemerit) {
+        return {
+          ok: false,
+          error:
+            'You can only correct mistakes on your own demerits after claiming and logging in with your PIN, or as an admin in the Ref Booth.',
+        };
+      }
+
       if (isCloudflareConnected) {
         try {
           const res = await cloudflareFetch<{
@@ -1797,9 +1816,13 @@ export const DemeritsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
             error?: string;
           }>(`/api/demerits/${encodeURIComponent(slipId)}`, {
             method: 'PATCH',
+            headers: {
+              'X-Member-Id': currentMember?.id || '',
+              'X-Member-Pin': activePin || '',
+            },
             body: JSON.stringify({
               raw_student: payload.rawStudent,
-              patron_id: payload.patronId,
+              patron_id: !isAdminOrStaff ? currentMember?.id : payload.patronId,
               raw_signature: payload.rawSignature,
               issuer_id: payload.issuerId,
               infractions: payload.infractions,
