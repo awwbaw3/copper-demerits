@@ -176,3 +176,10 @@
 - [x] Updated Vision OCR and Referee Monitor prompts in `cloudflare/worker.js` to distinguish lighthearted bar banter/gestures (giving the finger / flipping off bartender, pulling a Deb Jarvis, lingering/bickering) from inappropriate content.
 - [x] Deployed Cloudflare Worker (`v1.6.19`) with version ID `770805e5-5b1c-4b05-9e0c-2d28015d56d9` to `api.copperdemerits.com`.
 - [x] Verified zero Netlify production deployment.
+
+## Phase 25: Universal Infraction Masking & Single Database Integrity (Completed — v1.6.26)
+- [x] Eliminated unmasked infraction description leaks on Top 3 Leaderboard Jumbotron cards and Docket penalty badges.
+- [x] Verified single authoritative Cloudflare D1 database (`copper-demerits-db`) and R2 bucket (`copper-demerits-slips`) powering all leaderboard, docket, and referee surfaces identically.
+- [x] Upgraded `maskSensitiveInfraction` to cover all grammatical tenses and plurals.
+- [x] Masked original offenses evidence label in `CorrectSlipMistakeModal`.
+- [x] Documented user changelog and updated PWA version indicator to `v1.6.26`.

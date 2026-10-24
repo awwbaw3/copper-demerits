@@ -2,6 +2,22 @@
 
 Chronological log of architectural decisions, database migrations, and infrastructure deployments.
 
+## 2026-10-24 — v1.6.26 Universal Infraction Masking Across Leaderboard Podium & Docket
+- **Leaderboard Podium Masking**:
+  - Resolved frontend leak on `src/pages/LeaderboardPage.tsx` line 382 where `item.description` was rendered as unmasked raw text inside the Top 3 Podium Jumbotron cards under the "Graphical Team Penalty Badges".
+  - Applied `maskSensitiveInfraction(item.description)` to consistently render `“F***ering the bartender”` on public displays.
+- **Docket Penalty Badges Masking**:
+  - Resolved frontend leak on `src/pages/DocketPage.tsx` line 204 where `item.description` was rendered as unmasked raw text inside itemized team penalty badges.
+  - Applied `maskSensitiveInfraction(item.description)` across all docket cards for unauthenticated visitors.
+- **Mistake Correction Modal Masking**:
+  - Applied `maskSensitiveInfraction` to the original offense preview label in `src/components/CorrectSlipMistakeModal.tsx`.
+- **Expanded Infraction Tense & Plural Masking**:
+  - Upgraded `maskSensitiveInfraction` regex in `src/lib/moderation.ts` to dynamic stem matching (`/\bfinger(?:ing|ed|s)?\b/gi`) supporting all grammatical tenses and plurals.
+- **Single Database Architectural Verification**:
+  - Re-verified that the entire application operates off a single authoritative Cloudflare D1 database (`copper-demerits-db`) and R2 bucket (`copper-demerits-slips`) through `GET /api/bootstrap`.
+
+---
+
 ## 2026-10-24 — v1.6.25 Complete Historical Slip Orientation Normalization & Countertop Cropping
 - **Historical Sideways Slip Orientation Fix**:
   - Audited all 11 demerit slips on the live site and identified historical sideways orientation on Kristi's slip (Oct 18) and Ziggie's slip (Oct 22).

@@ -54,8 +54,8 @@ const CLIENT_OBJECTIONABLE_PATTERNS: RegExp[] = [
  */
 export function maskSensitiveInfraction(text: string, isRevealed: boolean = false): string {
   if (!text || isRevealed) return text;
-  return text.replace(/\bfingering\b/gi, (match) => {
-    return match[0] === 'F' ? 'F***ering' : 'f***ering';
+  return text.replace(/\bfinger(?:ing|ed|s)?\b/gi, (match) => {
+    return match[0] === 'F' ? 'F***' + match.slice(4) : 'f***' + match.slice(4);
   });
 }
 

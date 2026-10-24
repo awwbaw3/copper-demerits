@@ -11,6 +11,7 @@ import { useDemerits } from '../context/DemeritsContext';
 import { EnrichedDemeritSlip, SlipReactions } from '../types/demerits';
 import { SlipModalViewer } from '../components/SlipModalViewer';
 import { normalizeSlipDemeritItems } from '../lib/defaultData';
+import { maskSensitiveInfraction } from '../lib/moderation';
 import {
   MichiganTeamEmblem,
   getMichiganTeamMetaForType,
@@ -201,7 +202,7 @@ export const DocketPage: React.FC = () => {
                               {meta.teamName}
                             </span>
                             <span className="block font-handwriting text-xl text-[#F5F2EB] leading-tight">
-                              “{item.description}”
+                              “{maskSensitiveInfraction(item.description)}”
                             </span>
                           </div>
                         </div>

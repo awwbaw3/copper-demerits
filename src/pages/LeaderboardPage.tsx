@@ -379,7 +379,7 @@ export const LeaderboardPage: React.FC = () => {
                                   {meta.shortTitle}
                                 </span>
                                 <span className="block font-handwriting text-base text-[#F5F2EB] leading-tight truncate">
-                                  “{item.description}”
+                                  “{maskSensitiveInfraction(item.description)}”
                                 </span>
                               </div>
                             </div>

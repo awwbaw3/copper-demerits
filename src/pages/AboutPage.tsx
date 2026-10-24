@@ -33,9 +33,23 @@ interface ChangelogEntry {
 
 const USER_CHANGELOG: ChangelogEntry[] = [
   {
-    version: 'v1.6.25',
+    version: 'v1.6.26',
     date: 'October 24, 2026',
     badge: 'LATEST RELEASE',
+    title: 'Universal Infraction Masking Across Leaderboard Podium & Docket',
+    summary:
+      'Fixed unmasked infraction description leaks on Top 3 Leaderboard Jumbotron cards and Docket penalty badges. Clarified single-database architecture (Cloudflare D1 copper-demerits-db) across all views.',
+    highlights: [
+      'Masked raw item.description in Leaderboard Top 3 Podium graphical team penalty badges so sensitive bar banter is consistently masked (F***ering the bartender) for unauthenticated visitors.',
+      'Masked item.description in Docket itemized team penalty badges.',
+      'Masked recorded offenses preview in CorrectSlipMistakeModal.',
+      'Expanded maskSensitiveInfraction pattern matcher to dynamically handle all grammatical tenses and plurals (finger, fingers, fingering, fingered).',
+      'Verified single authoritative Cloudflare D1 database powering all leaderboard, docket, and referee surfaces identically.',
+    ],
+  },
+  {
+    version: 'v1.6.25',
+    date: 'October 24, 2026',
     title: 'Complete Historical Slip Orientation Normalization & Countertop Cropping',
     summary:
       'Audited all 11 demerit slips on the live site and resolved historical sideways orientations on Kristi\'s slip (Oct 18) and Ziggie\'s slip (Oct 22). Cropped excess countertop background across all legacy uploads, rotated sideways slips 270° upright, uploaded new high-res upright assets to Cloudflare R2, and updated Cloudflare D1 records so 100% of slips across the Docket, Leaderboard, and Evidence Viewer display crisp, landscape, and upright.',
@@ -289,7 +303,7 @@ export const AboutPage: React.FC = () => {
         {/* Discreet Aesthetic Version Pill */}
         <div className="inline-flex items-center gap-2 rounded-xl border border-[#DFC15E]/40 bg-[#1A1513] px-3 py-1.5 shadow-[0_0_15px_rgba(223,193,94,0.15)]">
           <span className="flex h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
-          <span className="font-mono-docket text-xs font-bold text-[#DFC15E]">PWA v1.6.25</span>
+          <span className="font-mono-docket text-xs font-bold text-[#DFC15E]">PWA v1.6.26</span>
           <span className="text-[10px] font-mono-docket text-[#A8988B] hidden sm:inline">
             · Marshall, MI
           </span>

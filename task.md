@@ -1,6 +1,23 @@
 # Task Tracker — Copper Demerits (`copperdemerits.com`)
 
-## Active Sprint — v1.6.24 (Receipt Auto-Crop, Auto-Rotate & 4-Layer Duplicate Prevention Engine)
+## Active Sprint — v1.6.26 (Universal Infraction Masking Across Leaderboard Podium & Docket)
+- [x] Investigate why "fingering" was appearing on leaderboard when unauthenticated
+- [x] Clarify single database architecture (Cloudflare D1 copper-demerits-db) to user
+- [x] Fix unmasked `item.description` on Leaderboard Top 3 Podium cards in `src/pages/LeaderboardPage.tsx`
+- [x] Fix unmasked `item.description` on Docket itemized cards in `src/pages/DocketPage.tsx`
+- [x] Fix unmasked offenses preview in `src/components/CorrectSlipMistakeModal.tsx`
+- [x] Enhance `maskSensitiveInfraction` regex to handle all grammatical tenses and plurals in `src/lib/moderation.ts`
+- [x] Version bump to v1.6.26 across `package.json`, `App.tsx`, `Navbar.tsx`, `AboutPage.tsx`, and `cloudflare/worker.js`
+- [x] Pass all lint and build checks (`npm run lint`, `npm run build`)
+- [ ] Commit and push to both `dev` and `main` per user rules
+
+### v1.6.25 (Historical Slip Orientation Normalization & Countertop Cropping)
+- [x] Audited all 11 slips in Cloudflare D1 and R2
+- [x] Rotated Kristi (Oct 18) and Ziggie (Oct 22) sideways portrait slips 270° to upright landscape
+- [x] Cropped countertop margins on 4 legacy receipts
+- [x] Uploaded 6 optimized assets to Cloudflare R2 and updated live D1 database records
+
+### v1.6.24 (Receipt Auto-Crop, Auto-Rotate & 4-Layer Duplicate Prevention Engine)
 - [x] Investigate duplicate slip upload for Rick and why uploaded photos were not cropped or rotated
 - [x] Delete duplicate slip row (`78b68933-9c65-48cf-83ba-567d13471bd0`) from Cloudflare D1 (`copper-demerits-db`)
 - [x] Re-architect paper boundary detection with row/column density histograms and neutral chroma profiling in `src/lib/imageAutoCrop.ts`

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { EnrichedDemeritSlip, DemeritLineItem } from '../types/demerits';
 import { useDemerits } from '../context/DemeritsContext';
 import { DEMERIT_CATEGORIES } from '../lib/defaultData';
+import { maskSensitiveInfraction } from '../lib/moderation';
 import {
   X,
   Edit3,
@@ -291,7 +292,7 @@ export const CorrectSlipMistakeModal: React.FC<CorrectSlipMistakeModalProps> = (
                   Original Text: &ldquo;{slip.raw_student}&rdquo; · Signed &ldquo;{slip.raw_signature}&rdquo;
                 </p>
                 <p className="font-mono-docket text-[11px] text-[#A8988B] line-clamp-2">
-                  Recorded Offenses: {slip.infractions.join(' · ')}
+                  Recorded Offenses: {slip.infractions.map((i) => maskSensitiveInfraction(i)).join(' · ')}
                 </p>
               </div>
             </div>
