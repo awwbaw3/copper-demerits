@@ -378,6 +378,15 @@ function sanitizeExtractedSlips(rawSlips, fallbackDate) {
     }
     const finalCount = cleanedItems.reduce((acc, it) => acc + it.points, 0);
 
+    let cropBox = null;
+    if (s.crop_box && typeof s.crop_box === 'object') {
+      cropBox = {
+        x_min: Math.max(0, Math.min(1, Number(s.crop_box.x_min ?? s.crop_box.xmin ?? 0))),
+        y_min: Math.max(0, Math.min(1, Number(s.crop_box.y_min ?? s.crop_box.ymin ?? 0))),
+        x_max: Math.max(0, Math.min(1, Number(s.crop_box.x_max ?? s.crop_box.xmax ?? 1))),
+        y_max: Math.max(0, Math.min(1, Number(s.crop_box.y_max ?? s.crop_box.ymax ?? 1))),
+      };
+    }
     return {
       raw_student: rawStudent,
       raw_signature: rawSignature,
@@ -387,6 +396,7 @@ function sanitizeExtractedSlips(rawSlips, fallbackDate) {
       demerit_count: finalCount,
       infractions: cleanedItems.map((it) => it.description),
       demerit_items: cleanedItems,
+      crop_box: cropBox,
     };
   });
 }
@@ -426,8 +436,11 @@ ${rosterHint}
   - "type": One of ["Attendance / No-Show", "Insubordination / Defiance", "Bar Etiquette / Seating", "Drink Crime / Order Foul", "Attire / Headgear Foul", "Sports / Fantasy Foul", "Party Foul / Conduct"]
   - "points": Integer points for this offense so the items sum to "demerit_count"
 
+- "rotation_needed": integer degrees clockwise (0, 90, 180, 270) needed to make the slip upright so handwriting reads from left-to-right, top-to-bottom. If already upright, 0; if sideways to the right, 270; if sideways to the left, 90; if upside-down, 180.
+- "crop_box": normalized bounding box of this paper slip as {"x_min": 0.05, "y_min": 0.05, "x_max": 0.95, "y_max": 0.95} with values 0.0 to 1.0 excluding bar counter background.
+
 Respond ONLY with valid JSON in this exact structure (no markdown fences, no extra commentary):
-{"is_demerit_slip": true, "slips": [{"raw_student": "...", "incident_date": "YYYY-MM-DD", "incident_time": "HH:MM", "location_area": "...", "demerit_count": 1, "raw_signature": "...", "demerit_items": [{"type": "...", "description": "...", "points": 1}]}]}`;
+{"is_demerit_slip": true, "rotation_needed": 0, "slips": [{"raw_student": "...", "incident_date": "YYYY-MM-DD", "incident_time": "HH:MM", "location_area": "...", "demerit_count": 1, "raw_signature": "...", "crop_box": {"x_min": 0.05, "y_min": 0.05, "x_max": 0.95, "y_max": 0.95}, "demerit_items": [{"type": "...", "description": "...", "points": 1}]}]}`;
 
   const dataUrl = imageBase64.startsWith('data:')
     ? imageBase64
@@ -471,7 +484,7 @@ Respond ONLY with valid JSON in this exact structure (no markdown fences, no ext
         }
         const slips = sanitizeExtractedSlips(parsed?.slips || (Array.isArray(parsed) ? parsed : []), fallbackDate);
         if (slips.length > 0) {
-          return { ok: true, isDemeritSlip: true, model: 'gemini-2.5-flash', slips };
+          return { ok: true, isDemeritSlip: true, model: 'gemini-2.5-flash', rotation_needed: Number(parsed?.rotation_needed) || 0, slips };
         }
       }
     } catch {
@@ -562,7 +575,7 @@ Respond ONLY with valid JSON in this exact structure (no markdown fences, no ext
             fallbackDate
           );
           if (slips.length > 0) {
-            return { ok: true, isDemeritSlip: true, model: modelName, slips };
+            return { ok: true, isDemeritSlip: true, model: modelName, rotation_needed: Number(parsed?.rotation_needed) || 0, slips };
           }
         }
       } catch {
@@ -2634,36 +2647,84 @@ export default {
             return jsonResponse({ ok: false, error: 'Slip not found' }, 404);
           }
 
-          // Authenticate actor if provided
+          // Authenticate actor: required to correct mistakes or update slips
           const actorMemberId = body.actor_member_id || request.headers.get('X-Member-Id');
           const actorPin = (body.actor_pin || request.headers.get('X-Member-Pin') || '').trim();
 
-          let actor = null;
-          if (actorMemberId) {
-            actor = await env.DB.prepare('SELECT * FROM members WHERE id = ?').bind(actorMemberId).first();
-            if (actor && actor.claimed_pin && actorPin && actor.claimed_pin !== actorPin) {
-              return jsonResponse({ ok: false, error: 'Incorrect Bar PIN.' }, 403);
-            }
+          if (!actorMemberId) {
+            return jsonResponse(
+              {
+                ok: false,
+                error: 'Authentication required. You must claim your profile and log in with your PIN, or be an admin in the Ref Booth.',
+              },
+              401
+            );
           }
 
-          // RBAC: If updating content (student name, infractions, items, date, points), verify permission
-          const isModifyingContent =
-            body.raw_student !== undefined ||
-            body.infractions !== undefined ||
-            body.demerit_items !== undefined ||
-            body.demerit_count !== undefined ||
-            body.incident_date !== undefined ||
-            body.incident_time !== undefined;
+          const actor = await env.DB.prepare('SELECT * FROM members WHERE id = ?').bind(actorMemberId).first();
+          if (!actor) {
+            return jsonResponse({ ok: false, error: 'Member profile not found.' }, 404);
+          }
 
-          if (isModifyingContent && actor) {
-            const isAdminOrStaff = Boolean(actor.is_admin || actor.is_staff);
-            const isSubmitter = existing.submitted_by_member_id === actor.id;
-            const isCitedPatron = existing.patron_id === actor.id;
-            if (!isAdminOrStaff && !isSubmitter && !isCitedPatron) {
+          const isAdminOrStaff = Boolean(actor.is_admin || actor.is_staff);
+
+          // Verify PIN authentication
+          if (actor.claimed_pin) {
+            if (!actorPin || actor.claimed_pin !== actorPin) {
+              return jsonResponse({ ok: false, error: 'Incorrect Bar PIN. Please log in to your locker.' }, 403);
+            }
+          } else if (!isAdminOrStaff) {
+            return jsonResponse(
+              {
+                ok: false,
+                error: 'You must claim your profile in My Locker and set a PIN before you can correct demerits.',
+              },
+              403
+            );
+          }
+
+          // Strict Authorization Check:
+          // - Official Referees/Admins can correct any demerits and reassign patrons in the Ref Booth.
+          // - Claimed patrons can ONLY correct their OWN demerits (existing.patron_id === actor.id).
+          if (!isAdminOrStaff) {
+            const isOwnDemerit = existing.patron_id === actor.id;
+            if (!isOwnDemerit) {
               return jsonResponse(
                 {
                   ok: false,
-                  error: 'Only Referees, the submitter, or the cited patron can correct mistakes on this slip.',
+                  error: "Referee Whistle: You can only correct mistakes on your own demerits after claiming and logging in. To adjust another patron's slip, consult a referee in the Ref Booth.",
+                },
+                403
+              );
+            }
+
+            // Non-admin patrons cannot reassign demerits to someone else
+            if (body.patron_id !== undefined && body.patron_id !== existing.patron_id) {
+              return jsonResponse(
+                {
+                  ok: false,
+                  error: 'Only official referees in the Ref Booth can reassign demerits to another patron.',
+                },
+                403
+              );
+            }
+
+            // Non-admin patrons cannot alter official review status or blur state
+            if (body.status !== undefined && body.status !== existing.status) {
+              return jsonResponse(
+                {
+                  ok: false,
+                  error: 'Only official referees in the Ref Booth can approve or dismiss slips.',
+                },
+                403
+              );
+            }
+
+            if (body.is_blurred !== undefined && (body.is_blurred ? 1 : 0) !== existing.is_blurred) {
+              return jsonResponse(
+                {
+                  ok: false,
+                  error: 'Only official referees in the Ref Booth can adjust blur status.',
                 },
                 403
               );
@@ -2716,18 +2777,23 @@ export default {
           let nextRawStudent = body.raw_student !== undefined ? String(body.raw_student).trim() : existing.raw_student;
 
           if (body.raw_student !== undefined && body.patron_id === undefined) {
-            const [membersRes, aliasesRes] = await Promise.all([
-              env.DB.prepare('SELECT * FROM members').all(),
-              env.DB.prepare('SELECT * FROM staff_aliases').all(),
-            ]);
-            const matched = matchMemberFromAliases(
-              nextRawStudent,
-              membersRes.results || [],
-              aliasesRes.results || [],
-              'patron'
-            );
-            if (matched) {
-              nextPatronId = matched;
+            if (!isAdminOrStaff) {
+              // Patrons cannot reassign demerits away from their own claimed profile
+              nextPatronId = actor.id;
+            } else {
+              const [membersRes, aliasesRes] = await Promise.all([
+                env.DB.prepare('SELECT * FROM members').all(),
+                env.DB.prepare('SELECT * FROM staff_aliases').all(),
+              ]);
+              const matched = matchMemberFromAliases(
+                nextRawStudent,
+                membersRes.results || [],
+                aliasesRes.results || [],
+                'patron'
+              );
+              if (matched) {
+                nextPatronId = matched;
+              }
             }
           }
 
@@ -2798,6 +2864,18 @@ export default {
         }
 
         if (request.method === 'DELETE') {
+          const actorMemberId = request.headers.get('X-Member-Id');
+          const actorPin = (request.headers.get('X-Member-Pin') || '').trim();
+          if (!actorMemberId) {
+            return jsonResponse({ ok: false, error: 'Referee authentication required to delete slips.' }, 401);
+          }
+          const actor = await env.DB.prepare('SELECT * FROM members WHERE id = ?').bind(actorMemberId).first();
+          if (!actor || (!actor.is_admin && !actor.is_staff)) {
+            return jsonResponse({ ok: false, error: 'Only referees in the Ref Booth can delete slips.' }, 403);
+          }
+          if (actor.claimed_pin && actor.claimed_pin !== actorPin) {
+            return jsonResponse({ ok: false, error: 'Incorrect Bar PIN.' }, 403);
+          }
           await env.DB.prepare('DELETE FROM demerits WHERE id = ?').bind(id).run();
           return jsonResponse({ ok: true });
         }

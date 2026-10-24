@@ -36,6 +36,18 @@
 - [x] Removed `copper_demerits` schema from `Supabase5` (`iqbpnkttwtugxkospdqt`).
 - [x] Added **Staff & Patron Profile Claiming** (`src/components/ClaimProfileModal.tsx` + `POST /api/claim-profile`) with 4-digit Bar PINs and Detroit/Michigan team badges, and required profile sign-in before uploading slips on `/submit`.
 
+## Phase 11: Slip Auto-Crop, Auto-Rotate & Orientation Engine (Completed — v1.6.21)
+- [x] Automated slip paper cropping (`src/lib/imageAutoCrop.ts`): edge-contrast and luminance detection isolating paper slips from dark wood/copper/slate surfaces.
+- [x] Automated slip orientation rotation: auto-detects landscape orientation and rotates 90° clockwise/upright before OCR and R2 upload.
+- [x] Interactive 1-tap `[Rotate 90°]` and `[Rotate -90°]` buttons in `SubmitSlipPage.tsx`.
+- [x] Interactive in-place viewer rotation in `SlipModalViewer.tsx` for all historical slip viewings.
+- [x] Corrected Ziggie's newest slip in Cloudflare D1 and R2 with upright cropped photo and authentic infraction `"Fingering the bartender"`.
+
+## Phase 10: Demerit Correction Auth Gating, PWA Superpowers & Public About Hub (Completed — v1.6.20)
+- [x] Restricted demerit correction strictly to the cited patron (after claiming and logging in) or Referees in the Ref Booth.
+- [x] Created `/about` page with complete bar lore, PWA installation instructions, and user-oriented changelog.
+- [x] Added contextual PWA tooltips and discreet athletic version badges.
+
 ## Phase 9: AI Referee Auto-Blur, Zero-Touch Vision OCR Slip Capture, Adaptive Smartphone Image Compression, Profile Editor, Claimed Nickname Stat Merging, Email/Phone Login & Complementary Local SEO (Completed — v1.6.6)
 - [x] Purged `Matt Barnes` and all non-authentic / negative aliases from Cloudflare D1, Worker seed data, and UI placeholders.
 - [x] Added **Zero-Touch AI Vision Slip OCR (`POST /api/extract-slip` via `@cf/mistralai/mistral-small-3.1-24b-instruct`)** so snapping or choosing a slip photo automatically verifies it is a genuine Demerit Slip, extracts all fields (single or multi-slip), and logs them to Cloudflare R2 & D1 with zero manual typing required.

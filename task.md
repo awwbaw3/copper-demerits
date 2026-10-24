@@ -1,6 +1,28 @@
 # Task Tracker — Copper Demerits (`copperdemerits.com`)
 
-## Active Sprint — v1.6.19 (Profile Merging & Rule-Abiding Slip Mistake Correction)
+## Active Sprint — v1.6.21 (Slip Auto-Crop, Auto-Rotate & Orientation Engine)
+- [x] Investigate and diagnose why "Fingering the bartender" was not detected in Ziggie's newest slip (`ab378631-2ba0-4bb6-9e67-9e4315b50a37`)
+  - Identified root cause: slip was photographed sideways (90° CCW / landscape orientation) on dark copper table, confusing horizontal OCR into reading cursive vertical text as "Flying chair"
+- [x] Build automated slip cropping and boundary isolation engine (`src/lib/imageAutoCrop.ts`) isolating paper slips from dark bar counters
+- [x] Implement automated slip upright orientation detection and 90° rotation in `fingerprintImageFile` (`src/lib/imageDedup.ts`)
+- [x] Add interactive 1-tap `[Rotate 90°]` and `[Rotate -90°]` controls on `src/pages/SubmitSlipPage.tsx` with auto-crop/rotate indicators
+- [x] Add interactive in-place viewer rotation button in `src/components/SlipModalViewer.tsx` for all historical slip viewings
+- [x] Enhance AI Vision OCR worker prompt to detect slip orientation and bounding boxes, returning `rotation_needed` and `crop_box`
+- [x] Deploy updated Cloudflare Worker version `b58fdd9a-5da2-4669-9d4d-20e0eb4c76d9` to `api.copperdemerits.com`
+- [x] Crop and rotate Ziggie's slip photo upright, upload to Cloudflare R2 (`e8f1897461da81475adc2e96_upright.jpg`), and correct D1 record to infraction `"Fingering the bartender"`
+- [x] Pass `npm run lint` and `npm run build` with zero errors
+- [x] Merge PR #2 and all changes to `dev` and `main` per user request
+
+## Completed Sprints
+### v1.6.20 (Demerit Correction Auth Gating & User-Oriented About / PWA Help Hub)
+- [x] Gated demerit editing (`PATCH /api/demerits/:id`) strictly to authenticated claimed patrons (for their own citations only) and Referees in Ref Booth
+- [x] Prevented patrons from reassigning citations to other members or altering review/blur status
+- [x] Restricted `DELETE /api/demerits/:id` strictly to authenticated Referees in the Ref Booth
+- [x] Created comprehensive interactive About Page (`src/pages/AboutPage.tsx` at `/about`) with PWA Guide, user changelog, and authentic bar lore
+- [x] Created contextual PWA tooltips (`src/components/PwaTooltip.tsx`) highlighting offline caching, camera drops, and PIN locker security
+- [x] Added subtle, discreet docket-styled `v1.6.20` version pill in header and footer linking to `/about`
+
+### v1.6.19 (Profile Merging & Rule-Abiding Slip Mistake Correction)
 - [x] Merge Ziggie and David Lee in live Cloudflare D1 (`copper-demerits-db`): unified all 4 citations under single claimed account (`bd28ef26-f7c7-4eaf-96c1-f621ba3a7feb`), mapped both "david lee" and "ziggie" as slip aliases, and purged duplicate unclaimed roster entry
 - [x] Correct slip `0d181001-765f-4314-ba70-e4a8e7cc0495` from OCR misread "Pulling a Deb Taco" to authentic bar infraction "Pulling a Deb Jarvis"
 - [x] Implement backend endpoint `POST /api/profiles/merge` in Cloudflare Worker (`cloudflare/worker.js`) supporting both Referee Ref Booth merging and patron self-service merging (with PIN verification)

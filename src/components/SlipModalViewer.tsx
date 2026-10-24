@@ -16,6 +16,8 @@ import {
   Image as ImageIcon,
   Tag,
   Edit3,
+  KeyRound,
+  RotateCw,
 } from 'lucide-react';
 
 interface SlipModalViewerProps {
@@ -24,22 +26,33 @@ interface SlipModalViewerProps {
 }
 
 export const SlipModalViewer: React.FC<SlipModalViewerProps> = ({ slip, onClose }) => {
-  const { currentMember, isAdminOrStaff } = useDemerits();
+  const { currentMember, isAdminOrStaff, activePin, setIsProfileModalOpen } = useDemerits();
   const dialogRef = useRef<HTMLDialogElement | null>(null);
   const [activePhotoTab, setActivePhotoTab] = useState<'primary' | 'secondary' | 'source'>('primary');
   const [isCorrecting, setIsCorrecting] = useState(false);
   const [activeSlip, setActiveSlip] = useState<EnrichedDemeritSlip | null>(slip);
+  const [viewerRotation, setViewerRotation] = useState<number>(0);
 
   useEffect(() => {
     setActiveSlip(slip);
+    setViewerRotation(0);
   }, [slip]);
 
-  const canEdit = Boolean(
-    isAdminOrStaff ||
-      (currentMember &&
-        (currentMember.id === activeSlip?.submitted_by_member_id ||
-          currentMember.id === activeSlip?.patron_id))
+  const isClaimedAndLoggedIn = Boolean(
+    currentMember &&
+      (currentMember.is_claimed ?? true) &&
+      Boolean(activePin)
   );
+
+  const isOwnDemerit = Boolean(
+    isClaimedAndLoggedIn &&
+      (currentMember?.id === activeSlip?.patron_id ||
+        (activeSlip?.raw_student &&
+          currentMember?.display_name?.trim().toLowerCase() ===
+            activeSlip.raw_student.trim().toLowerCase()))
+  );
+
+  const canEdit = Boolean(isAdminOrStaff || isOwnDemerit);
 
   useEffect(() => {
     setActivePhotoTab('primary');
@@ -129,7 +142,7 @@ export const SlipModalViewer: React.FC<SlipModalViewerProps> = ({ slip, onClose 
             </div>
 
             <div className="flex items-center gap-2">
-              {canEdit && (
+              {canEdit ? (
                 <button
                   type="button"
                   onClick={() => setIsCorrecting(true)}
@@ -140,7 +153,20 @@ export const SlipModalViewer: React.FC<SlipModalViewerProps> = ({ slip, onClose 
                   <span className="hidden sm:inline">Correct Mistake</span>
                   <span className="sm:hidden">Edit</span>
                 </button>
-              )}
+              ) : !currentMember ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsProfileModalOpen(true);
+                  }}
+                  className="inline-flex items-center gap-1.5 rounded-xl border border-white/20 bg-white/5 px-3 py-2 min-h-[44px] text-xs font-mono-docket text-[#D6C7B8] hover:text-[#DFC15E] hover:border-[#DFC15E]/40 active:scale-95 touch-manipulation cursor-pointer"
+                  title="Claim your locker or log in with your PIN to correct your own demerits"
+                >
+                  <KeyRound className="h-3.5 w-3.5 text-[#DFC15E]" />
+                  <span className="hidden sm:inline">Log In to Edit</span>
+                  <span className="sm:hidden">Log In</span>
+                </button>
+              ) : null}
 
               <form method="dialog">
                 <button
@@ -220,10 +246,25 @@ export const SlipModalViewer: React.FC<SlipModalViewerProps> = ({ slip, onClose 
             )}
 
             {currentImageUrl && (
-              <div className="relative overflow-hidden rounded-xl border-2 border-[#B87333]/40 bg-black">
+              <div className="relative overflow-hidden rounded-xl border-2 border-[#B87333]/40 bg-black min-h-[220px] flex items-center justify-center p-2">
+                <div className="absolute top-2 right-2 z-10 flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => setViewerRotation((prev) => (prev + 90) % 360)}
+                    className="inline-flex items-center gap-1 rounded-lg border border-white/20 bg-black/80 backdrop-blur-md px-2.5 py-1.5 min-h-[38px] font-mono-docket text-xs font-bold text-[#DFC15E] hover:bg-black hover:border-[#DFC15E]/60 active:scale-95 touch-manipulation cursor-pointer shadow-lg transition"
+                    title="Rotate slip image 90° clockwise"
+                  >
+                    <RotateCw className="h-3.5 w-3.5 text-[#DFC15E]" />
+                    <span>{viewerRotation !== 0 ? `Rotated ${viewerRotation}°` : 'Rotate 90°'}</span>
+                  </button>
+                </div>
                 <img
                   src={currentImageUrl}
                   alt={`Uploaded demerit slip for ${slip.patronDisplayName}`}
+                  style={{
+                    transform: viewerRotation ? `rotate(${viewerRotation}deg)` : undefined,
+                    transition: 'transform 0.25s ease-in-out',
+                  }}
                   className={`mx-auto max-h-[52vh] w-auto object-contain ${
                     slip.is_blurred ? 'blur-md' : ''
                   }`}

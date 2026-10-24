@@ -12,6 +12,8 @@ import {
   Trash2,
   Calendar,
   Clock,
+  Lock,
+  KeyRound,
 } from 'lucide-react';
 
 interface CorrectSlipMistakeModalProps {
@@ -38,7 +40,7 @@ export const CorrectSlipMistakeModal: React.FC<CorrectSlipMistakeModalProps> = (
   onClose,
   onSuccess,
 }) => {
-  const { members, correctSlipMistake } = useDemerits();
+  const { members, currentMember, isAdminOrStaff, activePin, setIsProfileModalOpen, correctSlipMistake } = useDemerits();
   const dialogRef = useRef<HTMLDialogElement | null>(null);
 
   const [rawStudent, setRawStudent] = useState('');
@@ -51,6 +53,22 @@ export const CorrectSlipMistakeModal: React.FC<CorrectSlipMistakeModalProps> = (
   const [submitting, setSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
+
+  const isClaimedAndLoggedIn = Boolean(
+    currentMember &&
+      (currentMember.is_claimed ?? true) &&
+      Boolean(activePin)
+  );
+
+  const isOwnDemerit = Boolean(
+    isClaimedAndLoggedIn &&
+      (currentMember?.id === slip?.patron_id ||
+        (slip?.raw_student &&
+          currentMember?.display_name?.trim().toLowerCase() ===
+            slip.raw_student.trim().toLowerCase()))
+  );
+
+  const canEdit = Boolean(isAdminOrStaff || isOwnDemerit);
 
   // Sync state when slip opens
   useEffect(() => {
@@ -120,6 +138,13 @@ export const CorrectSlipMistakeModal: React.FC<CorrectSlipMistakeModalProps> = (
     e.preventDefault();
     if (!slip) return;
 
+    if (!canEdit) {
+      setErrorMsg(
+        'Referee Whistle: You can only correct your own demerits after claiming and logging in, or if you are an admin in the Ref Booth.'
+      );
+      return;
+    }
+
     if (items.length === 0 || items.some((i) => !i.description.trim())) {
       setErrorMsg('Please specify at least one valid infraction description.');
       return;
@@ -133,7 +158,7 @@ export const CorrectSlipMistakeModal: React.FC<CorrectSlipMistakeModalProps> = (
       const infractions = items.map((i) => i.description.trim());
       const res = await correctSlipMistake(slip.id, {
         rawStudent: rawStudent.trim() || undefined,
-        patronId: selectedPatronId || null,
+        patronId: !isAdminOrStaff ? currentMember?.id : (selectedPatronId || null),
         infractions,
         demeritItems: items.map((it) => ({
           type: it.type,
@@ -207,6 +232,35 @@ export const CorrectSlipMistakeModal: React.FC<CorrectSlipMistakeModalProps> = (
 
         {/* Content Form */}
         <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 text-xs sm:text-sm">
+          {!canEdit && (
+            <div className="rounded-2xl border border-amber-500/40 bg-amber-950/40 p-4 text-xs text-amber-200 space-y-2.5">
+              <div className="flex items-center gap-2 font-bold text-amber-300">
+                <Lock className="h-4 w-4 text-amber-400" />
+                <span>CORRECTION ACCESS RESTRICTED</span>
+              </div>
+              <p className="font-mono-docket text-[11px] leading-relaxed text-[#D6C7B8]">
+                Per Copper Athletic Club rules, you can only correct your own demerits after claiming your locker profile and logging in with your 4-digit PIN, or if you are an official referee in the Ref Booth.
+              </p>
+              {!currentMember ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    onClose();
+                    setIsProfileModalOpen(true);
+                  }}
+                  className="inline-flex items-center gap-1.5 rounded-xl bg-[#DFC15E] px-4 py-2 font-athletic text-xs font-black uppercase tracking-wider text-[#121212] hover:bg-[#E8B888] active:scale-95 transition"
+                >
+                  <KeyRound className="h-3.5 w-3.5" />
+                  <span>Claim / Log In to My Locker</span>
+                </button>
+              ) : (
+                <p className="font-mono-docket text-[11px] text-rose-300">
+                  You are logged in as <strong>{currentMember.display_name}</strong>. This slip belongs to another patron, so you cannot edit it.
+                </p>
+              )}
+            </div>
+          )}
+
           {errorMsg && (
             <div className="flex items-start gap-2.5 rounded-xl border border-rose-500/40 bg-rose-950/40 p-3.5 text-xs text-rose-300">
               <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5 text-rose-400" />
@@ -263,20 +317,31 @@ export const CorrectSlipMistakeModal: React.FC<CorrectSlipMistakeModalProps> = (
               <label className="block font-mono-docket text-xs font-bold uppercase text-[#D6C7B8]">
                 MATCHED ROSTER PROFILE (STATS LINK)
               </label>
-              <select
-                value={selectedPatronId}
-                onChange={(e) => setSelectedPatronId(e.target.value)}
-                className="mt-1.5 w-full rounded-xl border border-white/15 bg-[#0D0B0A] px-3.5 py-2.5 text-base sm:text-sm min-h-[44px] text-[#F5F2EB] focus:border-[#DFC15E] focus:outline-none"
-              >
-                <option value="">Auto-resolve from name or alias</option>
-                {members
-                  .filter((m) => m.is_patron)
-                  .map((m) => (
-                    <option key={m.id} value={m.id}>
-                      {m.display_name} {m.is_claimed ? '✓ Claimed' : '(Unclaimed)'}
-                    </option>
-                  ))}
-              </select>
+              {isAdminOrStaff ? (
+                <select
+                  value={selectedPatronId}
+                  onChange={(e) => setSelectedPatronId(e.target.value)}
+                  className="mt-1.5 w-full rounded-xl border border-white/15 bg-[#0D0B0A] px-3.5 py-2.5 text-base sm:text-sm min-h-[44px] text-[#F5F2EB] focus:border-[#DFC15E] focus:outline-none"
+                >
+                  <option value="">Auto-resolve from name or alias</option>
+                  {members
+                    .filter((m) => m.is_patron)
+                    .map((m) => (
+                      <option key={m.id} value={m.id}>
+                        {m.display_name} {m.is_claimed ? '✓ Claimed' : '(Unclaimed)'}
+                      </option>
+                    ))}
+                </select>
+              ) : (
+                <div className="mt-1.5 flex items-center justify-between rounded-xl border border-[#DFC15E]/30 bg-[#161210] px-3.5 py-2.5 min-h-[44px] text-base sm:text-sm text-[#F5F2EB]">
+                  <span className="font-bold text-[#E8B888]">
+                    {currentMember?.display_name || slip?.patronDisplayName || 'Your Locker Profile'}
+                  </span>
+                  <span className="inline-flex items-center gap-1 rounded bg-[#DFC15E]/20 px-2 py-0.5 font-mono-docket text-[10px] font-bold text-[#DFC15E]">
+                    <Lock className="h-3 w-3" /> LOCKED (OWN DEMERIT)
+                  </span>
+                </div>
+              )}
             </div>
           </div>
 
@@ -452,8 +517,8 @@ export const CorrectSlipMistakeModal: React.FC<CorrectSlipMistakeModalProps> = (
             </button>
             <button
               type="submit"
-              disabled={submitting}
-              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#DFC15E] via-[#E8B888] to-[#DFC15E] px-6 py-3 min-h-[48px] touch-manipulation active:scale-95 font-athletic text-sm font-black uppercase tracking-wider text-[#121212] hover:brightness-110 disabled:opacity-50 cursor-pointer shadow-[0_0_20px_rgba(223,193,94,0.3)]"
+              disabled={submitting || !canEdit}
+              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#DFC15E] via-[#E8B888] to-[#DFC15E] px-6 py-3 min-h-[48px] touch-manipulation active:scale-95 font-athletic text-sm font-black uppercase tracking-wider text-[#121212] hover:brightness-110 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer shadow-[0_0_20px_rgba(223,193,94,0.3)]"
             >
               <CheckCircle2 className="h-4 w-4" />
               <span>{submitting ? 'Saving Correction...' : 'Save Slip Correction'}</span>

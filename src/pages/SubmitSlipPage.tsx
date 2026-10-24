@@ -10,6 +10,8 @@ import {
   formatByteSize,
 } from '../lib/imageDedup';
 import { MichiganTeamBadge, TeamBadgeMeta } from '../components/MichiganSportsGraphics';
+import { PwaHelpIcon } from '../components/PwaTooltip';
+import { rotateImageClockwise } from '../lib/imageAutoCrop';
 import {
   moderateTextInstant,
   scanWithRefereeMonitor,
@@ -35,6 +37,8 @@ import {
   EyeOff,
   Wand2,
   SlidersHorizontal,
+  RotateCw,
+  RotateCcw,
 } from 'lucide-react';
 
 interface SlipDraftItem {
@@ -93,6 +97,8 @@ export const SubmitSlipPage: React.FC = () => {
   const [duplicateAlert, setDuplicateAlert] = useState<DuplicateCheckResult | null>(null);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [uploadStatusMsg, setUploadStatusMsg] = useState<string | null>(null);
+  const [wasAutoCropped, setWasAutoCropped] = useState<boolean>(false);
+  const [rotationDeg, setRotationDeg] = useState<number>(0);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [showManualEditor, setShowManualEditor] = useState(false);
@@ -284,6 +290,29 @@ export const SubmitSlipPage: React.FC = () => {
    * 2. Verifies via AI Vision (`/api/extract-slip`) that the photo is INDEED a physical Demerit Slip and extracts all handwritten fields BEFORE storing anything in R2.
    * 3. Only after confirming it is a genuine Demerit Slip, uploads the reduced (<82KB) image to Cloudflare R2 (`copper-demerits-slips`) and logs to Cloudflare D1.
    */
+  const handleManualRotate = async (additionalDeg: number) => {
+    if (!imageUrl) return;
+    try {
+      setUploadingPhoto(true);
+      setUploadStatusMsg(`Rotating slip ${additionalDeg > 0 ? '+' : ''}${additionalDeg}° upright...`);
+      const rotated = await rotateImageClockwise(imageUrl, additionalDeg);
+      setImageUrl(rotated);
+      setRawDataUrl(rotated);
+      setRotationDeg((prev) => ((prev + additionalDeg) % 360 + 360) % 360);
+      if (imageSha256) {
+        const filename = `${imageSha256.slice(0, 24)}_rot${Date.now() % 10000}.jpg`;
+        const uploaded = await uploadCompressedSlipToR2(rotated, filename);
+        setImageUrl(uploaded.url);
+      }
+      setUploadStatusMsg('Slip rotated upright successfully!');
+      setTimeout(() => setUploadStatusMsg(null), 2000);
+    } catch (err) {
+      console.error('Failed to rotate image:', err);
+    } finally {
+      setUploadingPhoto(false);
+    }
+  };
+
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -307,6 +336,8 @@ export const SubmitSlipPage: React.FC = () => {
     try {
       // 1. Accept any size smartphone image, reduce it in-browser to ~45KB-82KB, and check duplicates FIRST (0 bytes uploaded)
       const fingerprint = await fingerprintImageFile(file, 960, 0.74, 82 * 1024);
+      setWasAutoCropped(Boolean(fingerprint.wasCropped));
+      setRotationDeg(fingerprint.rotationApplied || 0);
       const dupCheck = checkImageDuplicate(fingerprint);
 
       if (dupCheck.isDuplicate) {
@@ -342,6 +373,19 @@ export const SubmitSlipPage: React.FC = () => {
       const todayStr = new Date().toISOString().slice(0, 10);
       const aiResult = await extractSlipsFromPhotoAI(fingerprint.dataUrl, todayStr);
 
+      // If AI detects the photo still needs rotation to be upright, apply it automatically
+      let finalWorkingImageUrl = fingerprint.dataUrl;
+      if (aiResult.rotation_needed && aiResult.rotation_needed !== 0) {
+        try {
+          finalWorkingImageUrl = await rotateImageClockwise(fingerprint.dataUrl, aiResult.rotation_needed);
+          setImageUrl(finalWorkingImageUrl);
+          setRawDataUrl(finalWorkingImageUrl);
+          setRotationDeg((prev) => (prev + (aiResult.rotation_needed || 0)) % 360);
+        } catch {
+          // Keep current image
+        }
+      }
+
       // 2. If AI Vision detects this is NOT a Demerit Slip (e.g., random selfie, drink, pet), block it BEFORE ever storing in Cloudflare R2!
       if (aiResult.isDemeritSlip === false) {
         setImageUrl(null);
@@ -361,7 +405,7 @@ export const SubmitSlipPage: React.FC = () => {
 
       // 3. Verified as a Demerit Slip! Now store the reduced (<82KB) image in Cloudflare R2
       const filename = `${fingerprint.sha256.slice(0, 24)}.jpg`;
-      const uploaded = await uploadCompressedSlipToR2(fingerprint.dataUrl, filename);
+      const uploaded = await uploadCompressedSlipToR2(finalWorkingImageUrl, filename);
       setImageUrl(uploaded.url);
 
       if (aiResult.ok && aiResult.slips && aiResult.slips.length > 0) {
@@ -700,9 +744,15 @@ export const SubmitSlipPage: React.FC = () => {
               <span className="font-mono-docket text-[10px] font-bold uppercase tracking-widest text-[#DFC15E]">
                 ONE-TAP CAMERA OR PHOTO UPLOAD · AUTO-EXTRACTS ALL FIELDS
               </span>
-              <h2 className="font-athletic text-2xl sm:text-3xl font-bold uppercase text-[#F5F2EB]">
-                SNAP OR UPLOAD SLIP PHOTO
-              </h2>
+              <div className="flex items-center gap-2">
+                <h2 className="font-athletic text-2xl sm:text-3xl font-bold uppercase text-[#F5F2EB]">
+                  SNAP OR UPLOAD SLIP PHOTO
+                </h2>
+                <PwaHelpIcon
+                  tag="MOBILE CAMERA"
+                  content="Take Camera Photo activates your phone's camera directly and auto-compresses the receipt to <82KB before edge upload."
+                />
+              </div>
               <p className="mt-0.5 font-mono-docket text-xs text-[#B5A99D]">
                 Works with 1 single slip or up to 4 slips in the same photo. Everything is read and
                 saved automatically!
@@ -747,12 +797,48 @@ export const SubmitSlipPage: React.FC = () => {
 
           {imageUrl ? (
             <div className="space-y-3">
-              <div className="overflow-hidden rounded-xl border-2 border-[#B87333]/50 bg-black p-2">
+              <div className="overflow-hidden rounded-xl border-2 border-[#B87333]/50 bg-black p-2 space-y-2">
                 <img
                   src={imageUrl}
                   alt="Uploaded physical slip"
                   className="mx-auto max-h-80 w-auto rounded object-contain"
                 />
+                <div className="flex flex-wrap items-center justify-between gap-2 border-t border-white/10 pt-2 px-1">
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    {wasAutoCropped && (
+                      <span className="inline-flex items-center gap-1 rounded bg-[#B87333]/25 border border-[#B87333]/50 px-2 py-0.5 font-mono-docket text-[10px] font-bold text-[#E8B888]">
+                        ✂️ AUTO-CROPPED TO RECEIPT
+                      </span>
+                    )}
+                    {rotationDeg > 0 && (
+                      <span className="inline-flex items-center gap-1 rounded bg-[#DFC15E]/20 border border-[#DFC15E]/40 px-2 py-0.5 font-mono-docket text-[10px] font-bold text-[#DFC15E]">
+                        ↻ ROTATED {rotationDeg}° UPRIGHT
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => handleManualRotate(90)}
+                      disabled={uploadingPhoto || submitting}
+                      className="inline-flex items-center gap-1 rounded-lg border border-white/20 bg-white/5 px-2.5 py-1.5 min-h-[38px] font-mono-docket text-xs font-bold text-[#D6C7B8] hover:text-[#DFC15E] hover:border-[#DFC15E]/50 active:scale-95 touch-manipulation cursor-pointer transition disabled:opacity-50"
+                      title="Rotate 90 degrees clockwise"
+                    >
+                      <RotateCw className="h-3.5 w-3.5 text-[#DFC15E]" />
+                      <span>Rotate 90°</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleManualRotate(-90)}
+                      disabled={uploadingPhoto || submitting}
+                      className="inline-flex items-center gap-1 rounded-lg border border-white/20 bg-white/5 px-2.5 py-1.5 min-h-[38px] font-mono-docket text-xs font-bold text-[#D6C7B8] hover:text-[#DFC15E] hover:border-[#DFC15E]/50 active:scale-95 touch-manipulation cursor-pointer transition disabled:opacity-50"
+                      title="Rotate 90 degrees counter-clockwise"
+                    >
+                      <RotateCcw className="h-3.5 w-3.5 text-[#DFC15E]" />
+                      <span>Rotate -90°</span>
+                    </button>
+                  </div>
+                </div>
               </div>
               <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-emerald-500/30 bg-emerald-950/30 px-3.5 py-2.5 text-xs font-mono-docket text-emerald-300">
                 <span className="flex items-center gap-1.5">
