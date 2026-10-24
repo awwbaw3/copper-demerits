@@ -263,9 +263,9 @@ export const Navbar: React.FC = () => {
 
   return (
     <>
-      <header className="sticky top-0 z-40 border-b border-[#B87333]/35 bg-[#0F0D0C]/95 backdrop-blur-md pt-[env(safe-area-inset-top,0px)] pr-[env(safe-area-inset-right,0px)] pl-[env(safe-area-inset-left,0px)]">
+      <header className="sticky top-0 z-40 border-b border-[#B87333]/35 bg-[#0F0D0C]/95 backdrop-blur-md pt-[env(safe-area-inset-top,0px)] pr-[env(safe-area-inset-right,0px)] pl-[env(safe-area-inset-left,0px)] w-full max-w-full overflow-x-clip">
         {/* Animated ESPN / Fox Sports Detroit Style Ticker */}
-        <div className="overflow-hidden border-b border-[#B87333]/25 bg-gradient-to-r from-[#1A120E] via-[#281A12] to-[#1A120E] py-1.5">
+        <div className="w-full max-w-full overflow-hidden border-b border-[#B87333]/25 bg-gradient-to-r from-[#1A120E] via-[#281A12] to-[#1A120E] py-1.5 contain-paint">
           <div className="animate-ticker flex items-center gap-8 text-xs font-sans font-bold uppercase tracking-wider text-[#E8B888]">
             {[...tickerItems, ...tickerItems].map((item, idx) => (
               <span key={idx} className="inline-flex items-center gap-2 whitespace-nowrap">
@@ -277,30 +277,30 @@ export const Navbar: React.FC = () => {
         </div>
 
         {/* Main Header with Official CopperAC Stag Logo */}
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-3 sm:px-4 py-2.5">
-          <NavLink to="/" className="group flex items-center gap-2.5 sm:gap-3 shrink-0">
+        <div className="mx-auto flex max-w-6xl items-center justify-between px-2.5 sm:px-4 py-2 sm:py-2.5 w-full min-w-0">
+          <NavLink to="/" className="group flex items-center gap-2 sm:gap-3 min-w-0 shrink">
             <img
               src="/brand/CopperLogo_Web.png"
               alt="Copper Athletic Club"
-              className="h-10 sm:h-12 w-auto object-contain drop-shadow-[0_0_12px_rgba(184,115,51,0.4)] transition-transform duration-300 group-hover:scale-105"
+              className="h-9 sm:h-12 w-auto object-contain drop-shadow-[0_0_12px_rgba(184,115,51,0.4)] transition-transform duration-300 group-hover:scale-105 shrink-0"
             />
-            <div className="border-l border-[#B87333]/35 pl-2.5 sm:pl-3">
-              <div className="flex items-center gap-1.5">
-                <span className="block font-athletic text-base sm:text-xl font-black tracking-wider uppercase text-[#F5F2EB] leading-none">
+            <div className="border-l border-[#B87333]/35 pl-2 sm:pl-3 min-w-0">
+              <div className="flex items-center gap-1.5 min-w-0">
+                <span className="block font-athletic text-sm sm:text-xl font-black tracking-wider uppercase text-[#F5F2EB] leading-none truncate">
                   RING OF <span className="text-[#B87333]">DEMERITS</span>
                 </span>
-                <span className="hidden sm:inline-block rounded border border-[#B87333]/40 bg-[#161210] px-1 py-0.2 font-mono-docket text-[9px] font-bold text-[#DFC15E]">
-                  v1.6.20
+                <span className="hidden sm:inline-block rounded border border-[#B87333]/40 bg-[#161210] px-1 py-0.2 font-mono-docket text-[9px] font-bold text-[#DFC15E] shrink-0">
+                  v1.6.23
                 </span>
               </div>
-              <span className="inline-flex items-center gap-1.5 font-sans font-bold text-[11px] tracking-wide uppercase text-[#DFC15E] mt-0.5">
-                <Flame className="h-3 w-3 text-[#C86D51]" />
-                {totalDemeritPoints} PTS · {approvedSlips.length} SLIPS
+              <span className="inline-flex items-center gap-1 font-sans font-bold text-[10px] sm:text-[11px] tracking-wide uppercase text-[#DFC15E] mt-0.5 truncate max-w-full">
+                <Flame className="h-2.5 w-2.5 sm:h-3 sm:w-3 text-[#C86D51] shrink-0" />
+                <span className="truncate">{totalDemeritPoints} PTS · {approvedSlips.length} SLIPS</span>
               </span>
             </div>
           </NavLink>
 
-          <div className="flex items-center gap-2 sm:gap-2.5">
+          <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0 ml-1.5 sm:ml-2">
             {/* Prominent Instant Backbar QR Code Button in Header */}
             <PwaTooltip
               pwaTag="PWA SHARING"
@@ -309,12 +309,12 @@ export const Navbar: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setShowQuickQrModal(true)}
-                className="inline-flex items-center justify-center gap-1.5 rounded-xl border min-h-[44px] px-3 sm:px-3.5 py-2 font-sans text-xs sm:text-sm font-bold tracking-normal transition-all active:scale-95 touch-manipulation cursor-pointer select-none border-[#DFC15E] bg-gradient-to-r from-[#DFC15E]/20 via-[#B87333]/30 to-[#DFC15E]/20 text-[#DFC15E] hover:bg-[#DFC15E] hover:text-[#121212] shadow-[0_0_14px_rgba(223,193,94,0.3)]"
+                className="inline-flex items-center justify-center gap-1.5 rounded-xl border min-h-[40px] sm:min-h-[44px] px-2.5 sm:px-3.5 py-1.5 sm:py-2 font-sans text-xs sm:text-sm font-bold tracking-normal transition-all active:scale-95 touch-manipulation cursor-pointer select-none border-[#DFC15E] bg-gradient-to-r from-[#DFC15E]/20 via-[#B87333]/30 to-[#DFC15E]/20 text-[#DFC15E] hover:bg-[#DFC15E] hover:text-[#121212] shadow-[0_0_14px_rgba(223,193,94,0.3)]"
                 title="Open Backbar QR Code to Scan & Share"
+                aria-label="Share Backbar QR Code"
               >
                 <QrCode className="h-4 w-4 stroke-[2.2] shrink-0" />
                 <span className="hidden sm:inline font-bold">Share QR</span>
-                <span className="sm:hidden font-extrabold">QR Code</span>
               </button>
             </PwaTooltip>
 
@@ -322,7 +322,7 @@ export const Navbar: React.FC = () => {
             <NavLink
               to="/about"
               className={({ isActive }) =>
-                `flex md:hidden items-center justify-center min-h-[44px] min-w-[44px] rounded-xl border transition-all active:scale-95 touch-manipulation cursor-pointer ${
+                `flex md:hidden items-center justify-center min-h-[40px] min-w-[40px] sm:min-h-[44px] sm:min-w-[44px] rounded-xl border transition-all active:scale-95 touch-manipulation cursor-pointer ${
                   isActive
                     ? 'border-[#DFC15E] bg-[#DFC15E]/20 text-[#DFC15E]'
                     : 'border-white/15 bg-white/5 text-[#D6C7B8] hover:text-[#DFC15E] hover:border-[#DFC15E]/40'
@@ -364,11 +364,11 @@ export const Navbar: React.FC = () => {
               ))}
             </nav>
 
-            {/* Claim / Login Bar Locker Pass Pill - Safe Zoned 44px+ for iPhone & High Legibility Font */}
+            {/* Claim / Login Bar Locker Pass Pill - Safe Zoned 40px+ on mobile & 44px+ on sm */}
             <button
               type="button"
               onClick={() => setIsProfileModalOpen(true)}
-              className={`inline-flex items-center justify-center gap-2 rounded-xl border min-h-[44px] px-3.5 sm:px-4 py-2 font-sans text-xs sm:text-sm font-bold tracking-normal transition-all active:scale-95 touch-manipulation cursor-pointer select-none shadow-md ${
+              className={`inline-flex items-center justify-center gap-1.5 sm:gap-2 rounded-xl border min-h-[40px] sm:min-h-[44px] px-2.5 sm:px-4 py-1.5 sm:py-2 font-sans text-xs sm:text-sm font-bold tracking-normal transition-all active:scale-95 touch-manipulation cursor-pointer select-none shadow-md ${
                 currentMember
                   ? 'border-emerald-500/60 bg-emerald-950/70 text-emerald-100 hover:border-emerald-400 hover:bg-emerald-900/60 shadow-[0_0_12px_rgba(16,185,129,0.25)]'
                   : 'border-[#DFC15E] bg-gradient-to-r from-[#DFC15E] via-[#E8B888] to-[#DFC15E] text-[#121212] hover:brightness-110 active:brightness-95 shadow-[0_0_16px_rgba(223,193,94,0.4)]'
@@ -383,13 +383,14 @@ export const Navbar: React.FC = () => {
                     }
                     size="sm"
                   />
-                  <span className="max-w-[105px] truncate font-sans font-extrabold text-xs sm:text-sm">{currentMember.display_name}</span>
-                  <UserCheck className="h-4 w-4 text-emerald-400 shrink-0" />
+                  <span className="max-w-[75px] sm:max-w-[120px] truncate font-sans font-extrabold text-xs sm:text-sm">{currentMember.display_name}</span>
+                  <UserCheck className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-emerald-400 shrink-0" />
                 </>
               ) : (
                 <>
-                  <KeyRound className="h-4 w-4 shrink-0 stroke-[2.5]" />
-                  <span className="font-sans font-black text-xs sm:text-sm tracking-tight whitespace-nowrap">Sign In / Claim</span>
+                  <KeyRound className="h-3.5 w-3.5 sm:h-4 sm:w-4 shrink-0 stroke-[2.5]" />
+                  <span className="hidden sm:inline font-sans font-black text-xs sm:text-sm tracking-tight whitespace-nowrap">Sign In / Claim</span>
+                  <span className="sm:hidden font-sans font-black text-xs tracking-tight whitespace-nowrap">Sign In</span>
                 </>
               )}
             </button>
@@ -398,7 +399,7 @@ export const Navbar: React.FC = () => {
 
         {/* Prominent PWA Install Callout Banner */}
         {!isStandalone && !isBannerDismissed && (
-          <div className="relative border-t border-[#DFC15E]/40 bg-gradient-to-r from-[#2B1A12] via-[#1A1411] to-[#2B1A12] px-3 sm:px-4 py-2 sm:py-2.5 shadow-md">
+          <div className="relative border-t border-[#DFC15E]/40 bg-gradient-to-r from-[#2B1A12] via-[#1A1411] to-[#2B1A12] px-2.5 sm:px-4 py-2 sm:py-2.5 shadow-md w-full max-w-full overflow-hidden">
             <div className="mx-auto flex max-w-6xl items-center justify-between gap-3">
               <div className="flex items-center gap-2.5 min-w-0">
                 <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#DFC15E]/20 text-[#DFC15E] border border-[#DFC15E]/40">
@@ -441,7 +442,7 @@ export const Navbar: React.FC = () => {
         aria-label="Mobile Navigation"
         className={`fixed bottom-0 inset-x-0 z-40 grid ${
           mobileNavItems.length === 5 ? 'grid-cols-5' : 'grid-cols-4'
-        } border-t border-[#B87333]/40 bg-[#120F0D]/95 backdrop-blur-xl pt-1 pb-[max(env(safe-area-inset-bottom,0px),8px)] pr-[env(safe-area-inset-right,0px)] pl-[env(safe-area-inset-left,0px)] md:hidden shadow-[0_-10px_30px_rgba(0,0,0,0.85)]`}
+        } border-t border-[#B87333]/40 bg-[#120F0D]/95 backdrop-blur-xl pt-1 pb-[max(env(safe-area-inset-bottom,0px),8px)] pr-[env(safe-area-inset-right,0px)] pl-[env(safe-area-inset-left,0px)] md:hidden shadow-[0_-10px_30px_rgba(0,0,0,0.85)] w-full max-w-full overflow-x-hidden`}
       >
         {mobileNavItems.map(({ to, label, icon: Icon, badge }) => (
           <NavLink

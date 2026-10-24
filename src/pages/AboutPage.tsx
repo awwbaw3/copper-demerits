@@ -33,9 +33,22 @@ interface ChangelogEntry {
 
 const USER_CHANGELOG: ChangelogEntry[] = [
   {
-    version: 'v1.6.22',
+    version: 'v1.6.23',
     date: 'October 24, 2026',
     badge: 'LATEST RELEASE',
+    title: 'Mobile Header Viewport & Horizontal Overflow Hardening',
+    summary:
+      'Completely eliminated mobile browser horizontal scrolling and header overflow across iOS Safari and Android Chrome. Clamped the header flex containers, added CSS paint containment to the sports ticker, and optimized mobile action button widths.',
+    highlights: [
+      'Viewport Overflow Containment: Added overflow-x: hidden to html, body and max-w-full to the app wrapper, preventing offscreen ticker or button blowout.',
+      'Compositor Paint Containment: Applied contain: paint and overflow-x: clip to the live animated marquee ticker, isolating it from document layout recalculations.',
+      'Compact Mobile Header Layout: Truncated brand titles safely on narrow displays, streamlined the Share QR header button to a compact icon button on mobile, and shortened "Sign In / Claim" to "Sign In" on small screens.',
+      'Safe Area Inset Harmony: Preserved Apple notch and home indicator touch boundaries while fitting cleanly into 320px–390px mobile viewports.',
+    ],
+  },
+  {
+    version: 'v1.6.22',
+    date: 'October 24, 2026',
     title: 'Word-Targeted Slip Blur & Dynamic Symbol Masking',
     summary:
       'Introduced word-targeted referee blur patches and dynamic symbol masking ("F***ering the bartender") across public scoreboards, tickers, and citation cards. Document integrity is 100% preserved with pristine underlying scans in R2, and claimed patrons logged into their locker can reveal unblurred slips with 1 tap.',
@@ -243,7 +256,7 @@ export const AboutPage: React.FC = () => {
         {/* Discreet Aesthetic Version Pill */}
         <div className="inline-flex items-center gap-2 rounded-xl border border-[#DFC15E]/40 bg-[#1A1513] px-3 py-1.5 shadow-[0_0_15px_rgba(223,193,94,0.15)]">
           <span className="flex h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
-          <span className="font-mono-docket text-xs font-bold text-[#DFC15E]">PWA v1.6.22</span>
+          <span className="font-mono-docket text-xs font-bold text-[#DFC15E]">PWA v1.6.23</span>
           <span className="text-[10px] font-mono-docket text-[#A8988B] hidden sm:inline">
             · Marshall, MI
           </span>

@@ -36,6 +36,11 @@
 - [x] Removed `copper_demerits` schema from `Supabase5` (`iqbpnkttwtugxkospdqt`).
 - [x] Added **Staff & Patron Profile Claiming** (`src/components/ClaimProfileModal.tsx` + `POST /api/claim-profile`) with 4-digit Bar PINs and Detroit/Michigan team badges, and required profile sign-in before uploading slips on `/submit`.
 
+## Phase 13: Mobile Header Viewport & Horizontal Overflow Hardening (Completed — v1.6.23)
+- [x] Zero-overflow viewport enforcement with overflow-x: hidden on html, body and w-full max-w-full on root container.
+- [x] Header horizontal containment: overflow-x-clip on header and contain: paint on ticker ribbon.
+- [x] Responsive button and label optimization for narrow mobile screens (320px–390px).
+
 ## Phase 12: Word-Targeted Slip Blur & Dynamic Symbol Masking Engine (Completed — v1.6.22)
 - [x] Responsive word-targeted frosted-glass blur patches with [🦓 REF BLUR] tag preserving full readability of student names, dates, and non-sensitive infractions.
 - [x] Guaranteed raw document integrity: original high-resolution physical scans in Cloudflare R2 remain untouched; blur is rendered non-destructively in client-side CSS.

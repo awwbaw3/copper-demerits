@@ -2,6 +2,20 @@
 
 All notable changes to the **Copper Athletic Club — Ring of Honor** web application are documented in this file.
 
+## [1.6.23] - 2026-10-24
+
+### Fixed — Mobile Browser Header Viewport & Horizontal Overflow Hardening
+- **Eliminated Horizontal Viewport Blowout on Mobile Browsers**:
+  - Enforced `overflow-x: hidden`, `max-width: 100vw`, and `width: 100%` globally on `html, body` in `src/index.css`.
+  - Added `w-full max-w-full overflow-x-hidden` to the root container in `src/App.tsx`.
+  - Added `overflow-x-clip` and `w-full max-w-full` to the sticky `<header>` container in `src/components/Navbar.tsx`.
+- **Compositor Paint Containment on Sports Ticker**:
+  - Applied `contain: paint` and `w-full max-w-full` to the live ticker marquee wrapper, isolating the `max-content` animated ribbon from the document layout tree.
+- **Mobile Header Action Button Width Optimization**:
+  - Streamlined the Backbar QR Code button on small screens (`< 640px`) to a clean icon-only button, saving 46px of horizontal space.
+  - Shortened the unauthenticated locker button text on mobile to `"Sign In"` (saving 50px) while maintaining full `"Sign In / Claim"` on desktop.
+  - Applied safe text truncation (`min-w-0` and `truncate`) to the brand title and total demerit points counter to prevent flex container blowout on narrow mobile devices (320px–390px).
+
 ## [1.6.22] - 2026-10-24
 
 ### Added & Enhanced — Word-Targeted Blur & Dynamic Symbol Masking Engine

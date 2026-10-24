@@ -10,6 +10,12 @@
     --charcoal-elevated: #24201E;
   }
 
+  html, body {
+    overflow-x: hidden;
+    max-width: 100vw;
+    width: 100%;
+  }
+
   body {
     background-color: #121212;
     color: #F5F2EB;

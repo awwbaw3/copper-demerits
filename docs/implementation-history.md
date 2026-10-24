@@ -2,6 +2,18 @@
 
 Chronological log of architectural decisions, database migrations, and infrastructure deployments.
 
+## 2026-10-24 — v1.6.23 Mobile Header Viewport & Horizontal Overflow Hardening
+- **Header Overflow & Viewport Hardening**:
+  - Diagnosed and resolved mobile browser horizontal scrolling where the sticky header container extended past the right viewport boundary on small screens (< 400px).
+  - Enforced `overflow-x: hidden`, `max-width: 100vw`, and `width: 100%` globally on `html, body` in `src/index.css` and `w-full max-w-full overflow-x-hidden` on root `src/App.tsx`.
+  - Added `overflow-x-clip` and `w-full max-w-full` to `<header>` and `contain: paint` to the live ticker wrapper in `src/components/Navbar.tsx`.
+- **Mobile Action Button & Brand Label Optimization**:
+  - Made the Backbar QR Code button icon-only on small displays (`< 640px`), saving 46px.
+  - Shortened the unauthenticated locker pass button on mobile from `"Sign In / Claim"` to `"Sign In"`, saving 50px.
+  - Added `min-w-0` and `truncate` to the brand title and total demerit points badge, ensuring zero horizontal blowout on narrow mobile devices (320px–390px).
+
+---
+
 ## 2026-10-24 — v1.6.22 Word-Targeted Blur & Dynamic Symbol Masking Engine
 - **Targeted Slip Photo Blur with Frosted Glass & Badge (`src/components/SlipModalViewer.tsx`)**:
   - Implemented responsive word-targeted frosted-glass blur patches that cover specifically flagged words (e.g. *"Fingering"*) on physical receipt photos rather than obscuring the full slip.

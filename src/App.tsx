@@ -13,7 +13,7 @@ export const App: React.FC = () => {
   return (
     <DemeritsProvider>
       <BrowserRouter>
-        <div className="min-h-screen flex flex-col bg-[#121212] text-[#F5F2EB] pb-20 md:pb-0">
+        <div className="min-h-screen flex flex-col bg-[#121212] text-[#F5F2EB] pb-20 md:pb-0 w-full max-w-full overflow-x-hidden">
           <Navbar />
           <main className="flex-1">
             <Routes>
@@ -93,7 +93,7 @@ export const App: React.FC = () => {
                     className="inline-flex items-center gap-1 rounded border border-[#DFC15E]/30 bg-[#DFC15E]/10 px-2 py-0.5 font-mono-docket text-[10px] font-bold text-[#DFC15E] hover:bg-[#DFC15E]/20 transition"
                     title="Current App Version"
                   >
-                    <span>v1.6.22</span>
+                    <span>v1.6.23</span>
                   </Link>
                 </div>
               </div>

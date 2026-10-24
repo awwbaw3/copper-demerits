@@ -1,6 +1,18 @@
 # Task Tracker — Copper Demerits (`copperdemerits.com`)
 
-## Active Sprint — v1.6.22 (Word-Targeted Slip Blur & Dynamic Symbol Masking)
+## Active Sprint — v1.6.23 (Mobile Header Viewport & Horizontal Overflow Hardening)
+- [x] Enforce `overflow-x: hidden`, `max-width: 100vw`, and `width: 100%` on `html, body` in `src/index.css`
+- [x] Add `w-full max-w-full overflow-x-hidden` to root container in `src/App.tsx`
+- [x] Add `overflow-x-clip` and `w-full max-w-full` to `<header>` in `src/components/Navbar.tsx`
+- [x] Apply CSS compositor paint containment (`contain: paint`) to the animated ticker wrapper
+- [x] Make Backbar QR Code button icon-only on small displays (`< 640px`), saving 46px
+- [x] Shorten unauthenticated locker button on mobile to `"Sign In"` (saving 50px)
+- [x] Add safe text truncation (`min-w-0` and `truncate`) to brand title and points badge
+- [x] Pass `npm run lint` and `npm run build` with zero errors
+- [x] Merge and push to both `dev` and `main`
+
+## Completed Sprints
+### v1.6.22 (Word-Targeted Slip Blur & Dynamic Symbol Masking)
 - [x] Implement word-targeted frosted-glass blur patch over "Fingering" on physical slip photo in `src/components/SlipModalViewer.tsx`
 - [x] Stamp frosted-glass patch with discreet `[🦓 REF BLUR]` tag while keeping patron name, date, signature, and other cited fouls crisp and legible
 - [x] Add dynamic symbol masking utility `maskSensitiveInfraction(text, isRevealed)` in `src/lib/moderation.ts`
@@ -11,10 +23,6 @@
 - [x] Added `blur_regions` column in Cloudflare D1 `demerits` table
 - [x] Updated Ziggie's record (`ab378631-2ba0-4bb6-9e67-9e4315b50a37`) to `is_blurred = 1` with targeted coordinate bounding box
 - [x] Deployed updated Cloudflare Worker version `3c58d588-b896-41f5-af09-b080776bf472` to `api.copperdemerits.com`
-- [x] Pass `npm run lint` and `npm run build` with zero errors
-- [x] Merge and push to both `dev` and `main` per user directive
-
-## Completed Sprints
 ### v1.6.21 (Slip Auto-Crop, Auto-Rotate & Orientation Engine)
 - [x] Investigate and diagnose why "Fingering the bartender" was not detected in Ziggie's newest slip (`ab378631-2ba0-4bb6-9e67-9e4315b50a37`)
 - [x] Build automated slip cropping and boundary isolation engine (`src/lib/imageAutoCrop.ts`) isolating paper slips from dark bar counters
