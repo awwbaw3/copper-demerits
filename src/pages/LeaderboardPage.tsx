@@ -17,6 +17,7 @@ import {
   PeriodMode,
 } from '../types/demerits';
 import { SlipModalViewer } from '../components/SlipModalViewer';
+import { maskSensitiveInfraction } from '../lib/moderation';
 import {
   MichiganTeamEmblem,
   CopperMugMeter,
@@ -606,7 +607,7 @@ export const LeaderboardPage: React.FC = () => {
                   {/* Minimal Handwritten Quote + Signature */}
                   <div className="mt-3 space-y-1.5 px-1">
                     <p className="font-handwriting text-lg text-[#F5F2EB] leading-snug line-clamp-2">
-                      “{slip.infractions.join(' • ')}”
+                      “{slip.infractions.map((i) => maskSensitiveInfraction(i)).join(' • ')}”
                     </p>
                     <div className="flex items-center justify-between text-[10px] font-mono-docket text-[#9E8F82] pt-1 border-t border-white/10">
                       <span>REF: {slip.issuerDisplayName.toUpperCase()}</span>

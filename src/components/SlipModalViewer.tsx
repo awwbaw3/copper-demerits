@@ -18,7 +18,10 @@ import {
   Edit3,
   KeyRound,
   RotateCw,
+  Eye,
+  EyeOff,
 } from 'lucide-react';
+import { maskSensitiveInfraction } from '../lib/moderation';
 
 interface SlipModalViewerProps {
   slip: EnrichedDemeritSlip | null;
@@ -32,10 +35,12 @@ export const SlipModalViewer: React.FC<SlipModalViewerProps> = ({ slip, onClose 
   const [isCorrecting, setIsCorrecting] = useState(false);
   const [activeSlip, setActiveSlip] = useState<EnrichedDemeritSlip | null>(slip);
   const [viewerRotation, setViewerRotation] = useState<number>(0);
+  const [isRevealed, setIsRevealed] = useState<boolean>(false);
 
   useEffect(() => {
     setActiveSlip(slip);
     setViewerRotation(0);
+    setIsRevealed(false);
   }, [slip]);
 
   const isClaimedAndLoggedIn = Boolean(
@@ -53,6 +58,7 @@ export const SlipModalViewer: React.FC<SlipModalViewerProps> = ({ slip, onClose 
   );
 
   const canEdit = Boolean(isAdminOrStaff || isOwnDemerit);
+  const canReveal = Boolean(isClaimedAndLoggedIn || isAdminOrStaff);
 
   useEffect(() => {
     setActivePhotoTab('primary');
@@ -245,39 +251,105 @@ export const SlipModalViewer: React.FC<SlipModalViewerProps> = ({ slip, onClose 
               </div>
             )}
 
-            {currentImageUrl && (
-              <div className="relative overflow-hidden rounded-xl border-2 border-[#B87333]/40 bg-black min-h-[220px] flex items-center justify-center p-2">
-                <div className="absolute top-2 right-2 z-10 flex items-center gap-1.5">
-                  <button
-                    type="button"
-                    onClick={() => setViewerRotation((prev) => (prev + 90) % 360)}
-                    className="inline-flex items-center gap-1 rounded-lg border border-white/20 bg-black/80 backdrop-blur-md px-2.5 py-1.5 min-h-[38px] font-mono-docket text-xs font-bold text-[#DFC15E] hover:bg-black hover:border-[#DFC15E]/60 active:scale-95 touch-manipulation cursor-pointer shadow-lg transition"
-                    title="Rotate slip image 90° clockwise"
-                  >
-                    <RotateCw className="h-3.5 w-3.5 text-[#DFC15E]" />
-                    <span>{viewerRotation !== 0 ? `Rotated ${viewerRotation}°` : 'Rotate 90°'}</span>
-                  </button>
-                </div>
-                <img
-                  src={currentImageUrl}
-                  alt={`Uploaded demerit slip for ${slip.patronDisplayName}`}
-                  style={{
-                    transform: viewerRotation ? `rotate(${viewerRotation}deg)` : undefined,
-                    transition: 'transform 0.25s ease-in-out',
-                  }}
-                  className={`mx-auto max-h-[52vh] w-auto object-contain ${
-                    slip.is_blurred ? 'blur-md' : ''
-                  }`}
-                />
-                {slip.is_blurred && (
-                  <div className="absolute inset-0 flex items-center justify-center bg-black/45 p-4 text-center">
-                    <span className="rounded-2xl border-2 border-amber-400 bg-black/90 px-4 py-2 font-athletic text-lg font-black uppercase tracking-wider text-amber-300">
-                      🦓 Referee Blurred — Friendly Vibes Only
-                    </span>
+            {currentImageUrl && (() => {
+              const isEffectivelyBlurred = Boolean(slip.is_blurred && !isRevealed);
+              const hasTargetedBlur = Boolean(
+                isEffectivelyBlurred &&
+                slip.blur_regions &&
+                slip.blur_regions.length > 0
+              );
+
+              return (
+                <div className="relative overflow-hidden rounded-xl border-2 border-[#B87333]/40 bg-black min-h-[220px] flex items-center justify-center p-2">
+                  {/* Top-Right Control Pills */}
+                  <div className="absolute top-2 right-2 z-20 flex flex-wrap items-center gap-1.5">
+                    {slip.is_blurred && (
+                      canReveal ? (
+                        <button
+                          type="button"
+                          onClick={() => setIsRevealed((prev) => !prev)}
+                          className={`inline-flex items-center gap-1 rounded-lg border px-2.5 py-1.5 min-h-[38px] font-mono-docket text-xs font-bold active:scale-95 touch-manipulation cursor-pointer shadow-lg transition backdrop-blur-md ${
+                            isRevealed
+                              ? 'border-emerald-500/50 bg-emerald-950/80 text-emerald-300 hover:bg-emerald-900/80'
+                              : 'border-amber-400/50 bg-black/80 text-amber-300 hover:bg-black/95'
+                          }`}
+                          title={isRevealed ? 'Re-enable referee blur' : 'Reveal raw unblurred slip photo'}
+                        >
+                          {isRevealed ? <EyeOff className="h-3.5 w-3.5 text-emerald-400" /> : <Eye className="h-3.5 w-3.5 text-amber-300" />}
+                          <span>{isRevealed ? 'Re-Blur Slip' : '👁️ Reveal Slip'}</span>
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => setIsProfileModalOpen(true)}
+                          className="inline-flex items-center gap-1 rounded-lg border border-amber-400/40 bg-black/80 backdrop-blur-md px-2.5 py-1.5 min-h-[38px] font-mono-docket text-xs font-bold text-amber-300 hover:bg-black active:scale-95 touch-manipulation cursor-pointer shadow-lg transition"
+                          title="Log in with your locker PIN to reveal the raw slip"
+                        >
+                          <KeyRound className="h-3.5 w-3.5 text-amber-300" />
+                          <span>Log In to Reveal</span>
+                        </button>
+                      )
+                    )}
+
+                    <button
+                      type="button"
+                      onClick={() => setViewerRotation((prev) => (prev + 90) % 360)}
+                      className="inline-flex items-center gap-1 rounded-lg border border-white/20 bg-black/80 backdrop-blur-md px-2.5 py-1.5 min-h-[38px] font-mono-docket text-xs font-bold text-[#DFC15E] hover:bg-black hover:border-[#DFC15E]/60 active:scale-95 touch-manipulation cursor-pointer shadow-lg transition"
+                      title="Rotate slip image 90° clockwise"
+                    >
+                      <RotateCw className="h-3.5 w-3.5 text-[#DFC15E]" />
+                      <span>{viewerRotation !== 0 ? `Rotated ${viewerRotation}°` : 'Rotate 90°'}</span>
+                    </button>
                   </div>
-                )}
-              </div>
-            )}
+
+                  {/* Image and Relative Overlay Container */}
+                  <div
+                    className="relative inline-block mx-auto"
+                    style={{
+                      transform: viewerRotation ? `rotate(${viewerRotation}deg)` : undefined,
+                      transition: 'transform 0.25s ease-in-out',
+                    }}
+                  >
+                    <img
+                      src={currentImageUrl}
+                      alt={`Uploaded demerit slip for ${slip.patronDisplayName}`}
+                      className={`mx-auto max-h-[52vh] w-auto object-contain ${
+                        isEffectivelyBlurred && !hasTargetedBlur ? 'blur-md' : ''
+                      }`}
+                    />
+
+                    {/* Targeted Word Blur Overlays (Frosted Glass with [🦓 REF BLUR] tag) */}
+                    {hasTargetedBlur &&
+                      slip.blur_regions?.map((reg, idx) => (
+                        <div
+                          key={idx}
+                          style={{
+                            left: `${reg.x * 100}%`,
+                            top: `${reg.y * 100}%`,
+                            width: `${reg.w * 100}%`,
+                            height: `${reg.h * 100}%`,
+                          }}
+                          className="absolute rounded backdrop-blur-md bg-black/40 border border-amber-400/50 flex items-center justify-center pointer-events-none shadow-[0_0_10px_rgba(0,0,0,0.5)] z-10"
+                          title="Offending word blurred by referee"
+                        >
+                          <span className="font-mono-docket text-[8px] sm:text-[9px] font-black tracking-tight text-amber-300 bg-black/85 px-1 py-0.2 rounded border border-amber-400/40">
+                            {reg.label || '🦓 REF BLUR'}
+                          </span>
+                        </div>
+                      ))}
+
+                    {/* Full Slip Blur Overlay (if entire slip is flagged without discrete coordinates) */}
+                    {isEffectivelyBlurred && !hasTargetedBlur && (
+                      <div className="absolute inset-0 flex items-center justify-center bg-black/45 p-4 text-center rounded">
+                        <span className="rounded-2xl border-2 border-amber-400 bg-black/90 px-4 py-2 font-athletic text-lg font-black uppercase tracking-wider text-amber-300">
+                          🦓 Referee Blurred — Friendly Vibes Only
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })()}
 
             {slip.capture_note && (
               <div className="flex items-start gap-2 rounded-xl border border-emerald-500/30 bg-emerald-950/30 px-3.5 py-2.5 font-mono-docket text-[11px] text-emerald-300">
@@ -312,7 +384,7 @@ export const SlipModalViewer: React.FC<SlipModalViewerProps> = ({ slip, onClose 
                           </span>
                           <p className="text-xs sm:text-sm text-[#F5F2EB]">
                             {slip.resolvedItems.length > 1 ? `${idx + 1}) ` : ''}
-                            {item.description}
+                            {maskSensitiveInfraction(item.description, isRevealed)}
                           </p>
                         </div>
                       </div>

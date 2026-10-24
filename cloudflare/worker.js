@@ -800,6 +800,7 @@ function formatSlip(row, includeAdminOriginals = false) {
     status: row.status || 'approved',
     is_blurred: Boolean(row.is_blurred),
     moderation_flag_reason: row.moderation_flag_reason || null,
+    blur_regions: parseJsonSafe(row.blur_regions, null),
     reactions: {
       ...DEFAULT_REACTIONS,
       ...parseJsonSafe(row.reactions, DEFAULT_REACTIONS),

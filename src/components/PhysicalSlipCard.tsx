@@ -1,6 +1,7 @@
 import React from 'react';
 import { EnrichedDemeritSlip } from '../types/demerits';
 import { CheckSquare, MapPin, Clock, Calendar, Award } from 'lucide-react';
+import { maskSensitiveInfraction } from '../lib/moderation';
 
 interface PhysicalSlipCardProps {
   slip: Pick<
@@ -137,7 +138,7 @@ export const PhysicalSlipCard: React.FC<PhysicalSlipCardProps> = ({ slip, compac
               >
                 <CheckSquare className="mt-1 h-4 w-4 shrink-0 text-[#991B1B]" />
                 <span className="font-handwriting text-xl sm:text-2xl font-bold leading-snug text-[#152C5B]">
-                  {infraction}
+                  {maskSensitiveInfraction(infraction)}
                 </span>
               </li>
             ))

@@ -4,6 +4,7 @@ import { useDemerits } from '../context/DemeritsContext';
 import { EnrichedDemeritSlip } from '../types/demerits';
 import { SlipModalViewer } from '../components/SlipModalViewer';
 import { CorrectSlipMistakeModal } from '../components/CorrectSlipMistakeModal';
+import { maskSensitiveInfraction } from '../lib/moderation';
 import {
   ShieldAlert,
   Sparkles,
@@ -399,7 +400,7 @@ export const AdminPage: React.FC = () => {
                       <span className="text-[#E8B888]">{slip.incident_date}</span>
                     </div>
                     <div className="font-athletic text-lg font-bold uppercase text-white">
-                      {slip.patronDisplayName} · {slip.infractions.join(' · ')}
+                      {slip.patronDisplayName} · {slip.infractions.map((i) => maskSensitiveInfraction(i)).join(' · ')}
                     </div>
                     {slip.moderation_flag_reason && (
                       <p className="font-mono-docket text-[11px] text-amber-300">

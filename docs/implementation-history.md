@@ -2,6 +2,24 @@
 
 Chronological log of architectural decisions, database migrations, and infrastructure deployments.
 
+## 2026-10-24 — v1.6.22 Word-Targeted Blur & Dynamic Symbol Masking Engine
+- **Targeted Slip Photo Blur with Frosted Glass & Badge (`src/components/SlipModalViewer.tsx`)**:
+  - Implemented responsive word-targeted frosted-glass blur patches that cover specifically flagged words (e.g. *"Fingering"*) on physical receipt photos rather than obscuring the full slip.
+  - Stamped with a subtle `[🦓 REF BLUR]` badge while keeping patron names, dates, signatures, and other cited fouls crisp and legible.
+  - Guaranteed 100% document integrity: high-resolution raw scans in Cloudflare R2 remain pristine and uncompressed/unaltered; blur is rendered non-destructively in client-side CSS.
+- **Dynamic Text Symbol Masking (`src/lib/moderation.ts`)**:
+  - Built `maskSensitiveInfraction(text, isRevealed)` to dynamically mask sensitive bar banter words as `"F***ering the bartender"` across public scoreboards, docket cards, top ticker alerts, and modal evidence cards.
+  - Dynamically unmasks to authentic raw text when a signed-in member reveals the slip.
+- **Signed-In Patron Locker Privileges**:
+  - Patrons logged into their locker with their 4-digit PIN (and official referees) receive an instant 1-tap `[👁️ Reveal Slip]` toggle in the modal viewer to inspect the raw handwriting.
+  - Unauthenticated guests see a `[🔒 Log In to Reveal]` prompt linking to the locker login modal.
+- **Database & Live State Migration**:
+  - Added `blur_regions` column to Cloudflare D1 table `demerits`.
+  - Configured Ziggie's slip (`ab378631-2ba0-4bb6-9e67-9e4315b50a37`) to `is_blurred = 1` with bounding box `[{"x":0.397,"y":0.486,"w":0.239,"h":0.118,"label":"🦓 REF BLUR"}]`.
+  - Deployed worker version `3c58d588-b896-41f5-af09-b080776bf472` to `api.copperdemerits.com`.
+
+---
+
 ## 2026-10-24 — v1.6.21 Slip Auto-Crop, Auto-Rotate & Orientation Engine
 - **Slip Auto-Crop & Paper Boundary Isolation (`src/lib/imageAutoCrop.ts`)**:
   - Implemented luminance & edge-contrast algorithm (`detectReceiptPaperBounds`) scanning uploaded photos to differentiate bright receipt paper from dark bar countertops (copper, mahogany, slate) with a 3.5% padding margin.

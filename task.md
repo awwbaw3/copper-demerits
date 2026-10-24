@@ -1,8 +1,22 @@
 # Task Tracker — Copper Demerits (`copperdemerits.com`)
 
-## Active Sprint — v1.6.21 (Slip Auto-Crop, Auto-Rotate & Orientation Engine)
+## Active Sprint — v1.6.22 (Word-Targeted Slip Blur & Dynamic Symbol Masking)
+- [x] Implement word-targeted frosted-glass blur patch over "Fingering" on physical slip photo in `src/components/SlipModalViewer.tsx`
+- [x] Stamp frosted-glass patch with discreet `[🦓 REF BLUR]` tag while keeping patron name, date, signature, and other cited fouls crisp and legible
+- [x] Add dynamic symbol masking utility `maskSensitiveInfraction(text, isRevealed)` in `src/lib/moderation.ts`
+- [x] Apply dynamic symbol masking ("F***ering the bartender") across `PhysicalSlipCard.tsx`, `Navbar.tsx` (top ticker), `LeaderboardPage.tsx`, `AdminPage.tsx`, and `SlipModalViewer.tsx`
+- [x] Provide 1-tap `[👁️ Reveal Slip]` toggle in modal viewer for claimed patrons logged in with PIN and official Referees
+- [x] Provide `[🔒 Log In to Reveal]` prompt for unauthenticated visitors
+- [x] Preserve 100% document integrity: high-res raw scans in R2 remain completely untouched
+- [x] Added `blur_regions` column in Cloudflare D1 `demerits` table
+- [x] Updated Ziggie's record (`ab378631-2ba0-4bb6-9e67-9e4315b50a37`) to `is_blurred = 1` with targeted coordinate bounding box
+- [x] Deployed updated Cloudflare Worker version `3c58d588-b896-41f5-af09-b080776bf472` to `api.copperdemerits.com`
+- [x] Pass `npm run lint` and `npm run build` with zero errors
+- [x] Merge and push to both `dev` and `main` per user directive
+
+## Completed Sprints
+### v1.6.21 (Slip Auto-Crop, Auto-Rotate & Orientation Engine)
 - [x] Investigate and diagnose why "Fingering the bartender" was not detected in Ziggie's newest slip (`ab378631-2ba0-4bb6-9e67-9e4315b50a37`)
-  - Identified root cause: slip was photographed sideways (90° CCW / landscape orientation) on dark copper table, confusing horizontal OCR into reading cursive vertical text as "Flying chair"
 - [x] Build automated slip cropping and boundary isolation engine (`src/lib/imageAutoCrop.ts`) isolating paper slips from dark bar counters
 - [x] Implement automated slip upright orientation detection and 90° rotation in `fingerprintImageFile` (`src/lib/imageDedup.ts`)
 - [x] Add interactive 1-tap `[Rotate 90°]` and `[Rotate -90°]` controls on `src/pages/SubmitSlipPage.tsx` with auto-crop/rotate indicators
@@ -10,10 +24,6 @@
 - [x] Enhance AI Vision OCR worker prompt to detect slip orientation and bounding boxes, returning `rotation_needed` and `crop_box`
 - [x] Deploy updated Cloudflare Worker version `b58fdd9a-5da2-4669-9d4d-20e0eb4c76d9` to `api.copperdemerits.com`
 - [x] Crop and rotate Ziggie's slip photo upright, upload to Cloudflare R2 (`e8f1897461da81475adc2e96_upright.jpg`), and correct D1 record to infraction `"Fingering the bartender"`
-- [x] Pass `npm run lint` and `npm run build` with zero errors
-- [x] Merge PR #2 and all changes to `dev` and `main` per user request
-
-## Completed Sprints
 ### v1.6.20 (Demerit Correction Auth Gating & User-Oriented About / PWA Help Hub)
 - [x] Gated demerit editing (`PATCH /api/demerits/:id`) strictly to authenticated claimed patrons (for their own citations only) and Referees in Ref Booth
 - [x] Prevented patrons from reassigning citations to other members or altering review/blur status

@@ -2,6 +2,26 @@
 
 All notable changes to the **Copper Athletic Club — Ring of Honor** web application are documented in this file.
 
+## [1.6.22] - 2026-10-24
+
+### Added & Enhanced — Word-Targeted Blur & Dynamic Symbol Masking Engine
+- **Targeted Frosted-Glass Slip Word Blur (`src/components/SlipModalViewer.tsx`)**:
+  - Implemented responsive, localized frosted-glass blur patches that target specifically flagged words on a physical slip photo (e.g. *"Fingering"*) rather than blurring the whole document.
+  - Displays a stylish `[🦓 REF BLUR]` badge over the blurred word while keeping the student name, date, signature, and other cited offenses completely visible and legible.
+  - Fully preserves scanned document integrity: original high-resolution photos in Cloudflare R2 remain pristine and unedited.
+- **Dynamic Symbol Masking (`src/lib/moderation.ts`)**:
+  - Centralized `maskSensitiveInfraction(text, isRevealed)` utility dynamically masking sensitive bar banter words (e.g. `"F***ering the bartender"`) across the public scoreboard, docket cards, recent citations ticker, and evidence viewer.
+  - Automatically unmasks to the authentic raw text when a signed-in patron or referee taps the reveal toggle.
+- **Signed-In Patron Locker Privileges**:
+  - Claimed patrons signed into their locker with their 4-digit PIN (and official referees) receive an instant 1-tap `[👁️ Reveal Slip]` / `[Re-Blur Slip]` toggle in the evidence viewer.
+  - Unauthenticated visitors see a helpful `[🔒 Log In to Reveal]` button prompting them to claim or log into their locker.
+- **Admin Ref Booth Oversight & Permanent Override**:
+  - Official Referees in `/admin` retain permanent 1-tap authority to toggle `Unblur` / `Blur` for the entire public site without modifying the underlying scan.
+- **Database & Live State Migration**:
+  - Added `blur_regions` column to `demerits` table in Cloudflare D1.
+  - Updated Ziggie's live record (`ab378631-2ba0-4bb6-9e67-9e4315b50a37`) to `is_blurred = 1` with targeted coordinate bounding box `[{"x":0.397,"y":0.486,"w":0.239,"h":0.118,"label":"🦓 REF BLUR"}]`.
+  - Deployed worker version `3c58d588-b896-41f5-af09-b080776bf472` to `api.copperdemerits.com`.
+
 ## [1.6.21] - 2026-10-24
 
 ### Added & Enhanced — Slip Auto-Crop, Auto-Rotate & Orientation Engine

@@ -102,6 +102,7 @@ export interface DemeritSlip {
   status: SlipStatus;
   is_blurred?: boolean;
   moderation_flag_reason?: string | null;
+  blur_regions?: { x: number; y: number; w: number; h: number; label?: string }[] | null;
   original_infractions?: string[] | null;
   reactions?: SlipReactions;
   created_at?: string;

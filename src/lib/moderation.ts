@@ -46,6 +46,19 @@ const CLIENT_OBJECTIONABLE_PATTERNS: RegExp[] = [
 /**
  * Instant client-side profanity, name-calling, and slur detector + sanitizer.
  */
+/**
+ * Dynamically masks sensitive bar banter words on public scoreboards, tickers,
+ * and citation cards (e.g. "F***ering the bartender") preserving context
+ * while keeping public viewing PG-13.
+ * Reveals unmasked raw text when isRevealed is true.
+ */
+export function maskSensitiveInfraction(text: string, isRevealed: boolean = false): string {
+  if (!text || isRevealed) return text;
+  return text.replace(/\bfingering\b/gi, (match) => {
+    return match[0] === 'F' ? 'F***ering' : 'f***ering';
+  });
+}
+
 export function moderateTextInstant(input: string): {
   flagged: boolean;
   sanitized: string;

@@ -23,6 +23,7 @@ import { useDemerits } from '../context/DemeritsContext';
 import { ClaimProfileModal } from './ClaimProfileModal';
 import { MichiganTeamBadge, TeamBadgeMeta } from './MichiganSportsGraphics';
 import { PwaTooltip } from './PwaTooltip';
+import { maskSensitiveInfraction } from '../lib/moderation';
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>;
@@ -242,7 +243,7 @@ export const Navbar: React.FC = () => {
     approvedSlips.forEach((slip) => {
       const name = (slip.patronDisplayName || slip.raw_student || 'PATRON').toUpperCase();
       const pts = slip.demerit_count;
-      const infractions = slip.infractions?.filter(Boolean).slice(0, 2).join(' + ').toUpperCase();
+      const infractions = slip.infractions?.filter(Boolean).map((inf) => maskSensitiveInfraction(inf)).slice(0, 2).join(' + ').toUpperCase();
       const timeStr = slip.incident_time ? ` AT ${slip.incident_time}` : '';
       if (name && infractions) {
         items.push(`📋 CITATION${timeStr}: ${name} (${pts} PT${pts === 1 ? '' : 'S'}) FOR ${infractions}`);

@@ -33,9 +33,23 @@ interface ChangelogEntry {
 
 const USER_CHANGELOG: ChangelogEntry[] = [
   {
-    version: 'v1.6.21',
+    version: 'v1.6.22',
     date: 'October 24, 2026',
     badge: 'LATEST RELEASE',
+    title: 'Word-Targeted Slip Blur & Dynamic Symbol Masking',
+    summary:
+      'Introduced word-targeted referee blur patches and dynamic symbol masking ("F***ering the bartender") across public scoreboards, tickers, and citation cards. Document integrity is 100% preserved with pristine underlying scans in R2, and claimed patrons logged into their locker can reveal unblurred slips with 1 tap.',
+    highlights: [
+      'Word-Targeted Frosted Glass Blur: Overlays a sleek frosted-glass patch with a [🦓 REF BLUR] tag specifically over sensitive words on slip photos while leaving student names, dates, and other infractions completely visible.',
+      'Document Integrity Preservation: High-resolution physical receipt scans in R2 remain completely untouched; blur patches are rendered as responsive CSS overlays.',
+      'Dynamic Symbol Masking: Quotes are masked with symbols (e.g. "F***ering the bartender") on public scoreboards, docket cards, and top tickers to maintain PG-13 sports bar friendliness.',
+      'Signed-In Patron Reveal Privilege: Claimed patrons logged in with their 4-digit PIN see a 1-tap [👁️ Reveal Slip] toggle in the evidence viewer to inspect unblurred handwriting.',
+      'Admin Ref Booth Override: Official Referees retain 1-tap authority in /admin to permanently unblur or re-blur any citation for the public site.',
+    ],
+  },
+  {
+    version: 'v1.6.21',
+    date: 'October 24, 2026',
     title: 'Automatic Slip Paper Cropping & Upright Orientation Rotation',
     summary:
       'All physical demerit slips uploaded from mobile cameras or bar counters are now automatically cropped to remove dark table margins and automatically rotated 90° clockwise/counter-clockwise so every slip displays upright and centered. Also added 1-tap manual rotation controls and updated AI vision orientation prompts.',
@@ -229,7 +243,7 @@ export const AboutPage: React.FC = () => {
         {/* Discreet Aesthetic Version Pill */}
         <div className="inline-flex items-center gap-2 rounded-xl border border-[#DFC15E]/40 bg-[#1A1513] px-3 py-1.5 shadow-[0_0_15px_rgba(223,193,94,0.15)]">
           <span className="flex h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
-          <span className="font-mono-docket text-xs font-bold text-[#DFC15E]">PWA v1.6.21</span>
+          <span className="font-mono-docket text-xs font-bold text-[#DFC15E]">PWA v1.6.22</span>
           <span className="text-[10px] font-mono-docket text-[#A8988B] hidden sm:inline">
             · Marshall, MI
           </span>

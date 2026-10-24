@@ -36,6 +36,13 @@
 - [x] Removed `copper_demerits` schema from `Supabase5` (`iqbpnkttwtugxkospdqt`).
 - [x] Added **Staff & Patron Profile Claiming** (`src/components/ClaimProfileModal.tsx` + `POST /api/claim-profile`) with 4-digit Bar PINs and Detroit/Michigan team badges, and required profile sign-in before uploading slips on `/submit`.
 
+## Phase 12: Word-Targeted Slip Blur & Dynamic Symbol Masking Engine (Completed — v1.6.22)
+- [x] Responsive word-targeted frosted-glass blur patches with [🦓 REF BLUR] tag preserving full readability of student names, dates, and non-sensitive infractions.
+- [x] Guaranteed raw document integrity: original high-resolution physical scans in Cloudflare R2 remain untouched; blur is rendered non-destructively in client-side CSS.
+- [x] Dynamic symbol masking ("F***ering the bartender") across public scoreboards, docket cards, recent citations ticker, and evidence viewer.
+- [x] 1-tap [👁️ Reveal Slip] toggle for claimed patrons logged in with PIN and official Referees in Ref Booth.
+- [x] Admin Ref Booth oversight enabling permanent 1-tap unblur/blur toggle for the entire public site.
+
 ## Phase 11: Slip Auto-Crop, Auto-Rotate & Orientation Engine (Completed — v1.6.21)
 - [x] Automated slip paper cropping (`src/lib/imageAutoCrop.ts`): edge-contrast and luminance detection isolating paper slips from dark wood/copper/slate surfaces.
 - [x] Automated slip orientation rotation: auto-detects landscape orientation and rotates 90° clockwise/upright before OCR and R2 upload.
