@@ -2,8 +2,8 @@
  * Intelligent Image Auto-Crop & Auto-Rotate Engine for Copper Demerits
  *
  * Automatically normalizes EXIF orientation, detects paper receipt boundaries
- * against bar countertops (wood, slate, copper), and rotates landscape slips upright
- * so citations display clearly on the Ring of Honor scoreboard.
+ * against bar countertops (wood, slate, copper) using row/column density profiling,
+ * and rotates landscape slips upright so citations display clearly on the Ring of Honor scoreboard.
  */
 
 export interface NormalizedCropBox {
@@ -72,8 +72,11 @@ export async function loadImageElement(source: File | Blob | string): Promise<{
 }
 
 /**
- * Analyzes pixel luminosity and contrast to detect the bounding box of a light-colored paper receipt
- * against a typical dark sports bar countertop (dark wood, copper, slate).
+ * Analyzes pixel luminosity, color saturation, and density profiling to detect the bounding box
+ * of a light-colored paper receipt against typical sports bar countertops (copper, wood, slate, mahogany).
+ *
+ * Uses row and column density histograms to eliminate single-pixel specular glare, countertop scratches,
+ * and edge reflections that could otherwise expand the bounding box to the entire frame.
  */
 export function detectReceiptPaperBounds(
   img: HTMLImageElement,
@@ -97,60 +100,96 @@ export function detectReceiptPaperBounds(
     const data = imgData.data;
 
     // 1. Calculate overall scene luminance distribution
-    const luminances: number[] = new Array(sampleW * sampleH);
     let sumLum = 0;
+    const totalSamplePixels = sampleW * sampleH;
     for (let i = 0; i < data.length; i += 4) {
       const r = data[i];
       const g = data[i + 1];
       const b = data[i + 2];
-      // Standard perceived luminance formula
-      const lum = 0.299 * r + 0.587 * g + 0.114 * b;
-      luminances[i / 4] = lum;
-      sumLum += lum;
+      sumLum += 0.299 * r + 0.587 * g + 0.114 * b;
     }
-    const avgLum = sumLum / luminances.length;
+    const avgLum = sumLum / totalSamplePixels;
 
-    // Threshold: Paper receipts in dim bar lighting are significantly brighter than the background
-    // (Luminance threshold is typically ~130-150, or at least 25% above average scene luminance)
-    const paperThreshold = Math.max(125, Math.min(185, avgLum + 22));
+    // Thresholds:
+    // Physical receipt paper in bar lighting is neutral off-white/cream (|R - B| < 55, |R - G| < 45).
+    // Copper bar countertops are warm amber/reddish-brown (R is high, B is low, R - B > 50).
+    // Dark mahogany/slate is low luminance (lum < 95).
+    const minLumThreshold = Math.max(118, Math.min(170, avgLum + 16));
 
-    // 2. Identify bounding limits containing paper pixels
-    let minX = sampleW;
-    let maxX = 0;
-    let minY = sampleH;
-    let maxY = 0;
-    let paperPixelCount = 0;
+    // Density histograms across rows and columns
+    const rowPaperCount = new Uint16Array(sampleH);
+    const colPaperCount = new Uint16Array(sampleW);
+    let totalPaperPixels = 0;
 
     for (let y = 0; y < sampleH; y++) {
       for (let x = 0; x < sampleW; x++) {
-        const idx = y * sampleW + x;
-        const lum = luminances[idx];
-        if (lum >= paperThreshold) {
-          paperPixelCount++;
-          if (x < minX) minX = x;
-          if (x > maxX) maxX = x;
-          if (y < minY) minY = y;
-          if (y > maxY) maxY = y;
+        const idx = (y * sampleW + x) * 4;
+        const r = data[idx];
+        const g = data[idx + 1];
+        const b = data[idx + 2];
+        const lum = 0.299 * r + 0.587 * g + 0.114 * b;
+
+        // Is this pixel paper-like?
+        // Must be sufficiently bright, and color saturation must be low (neutral paper vs copper glare)
+        const isNeutralChroma = Math.abs(r - b) < 55 && Math.abs(r - g) < 45;
+        const isNotCopperCounter = !(r > 120 && b < 80 && (r - b) > 50);
+
+        if (lum >= minLumThreshold && isNeutralChroma && isNotCopperCounter) {
+          rowPaperCount[y]++;
+          colPaperCount[x]++;
+          totalPaperPixels++;
         }
       }
     }
 
-    const totalPixels = sampleW * sampleH;
-    const paperRatio = paperPixelCount / totalPixels;
+    const paperRatio = totalPaperPixels / totalSamplePixels;
+    // Paper must occupy a realistic portion of the photo (15% to 92%)
+    if (paperRatio < 0.15 || paperRatio > 0.94) {
+      return null;
+    }
 
-    // Only crop if detected paper occupies a plausible portion of the photo (between 20% and 92%)
-    // If it's <20%, it might be a reflection; if >92%, the receipt already fills the frame.
-    if (paperRatio < 0.2 || paperRatio > 0.94 || minX >= maxX || minY >= maxY) {
+    // 2. Identify paper boundaries using density thresholds
+    // A valid row must contain at least 18% paper pixels across its width
+    // A valid column must contain at least 12% paper pixels across its height
+    const rowThreshold = Math.max(4, Math.round(sampleW * 0.18));
+    const colThreshold = Math.max(4, Math.round(sampleH * 0.12));
+
+    let minY = -1;
+    let maxY = -1;
+    for (let y = 0; y < sampleH; y++) {
+      if (rowPaperCount[y] >= rowThreshold) {
+        if (minY === -1) minY = y;
+        maxY = y;
+      }
+    }
+
+    let minX = -1;
+    let maxX = -1;
+    for (let x = 0; x < sampleW; x++) {
+      if (colPaperCount[x] >= colThreshold) {
+        if (minX === -1) minX = x;
+        maxX = x;
+      }
+    }
+
+    if (minX === -1 || maxX === -1 || minY === -1 || maxY === -1 || minX >= maxX || minY >= maxY) {
       return null;
     }
 
     const detectedW = maxX - minX;
     const detectedH = maxY - minY;
-    if (detectedW < sampleW * 0.25 || detectedH < sampleH * 0.25) {
+
+    // Minimum size check (must be at least 22% of dimension)
+    if (detectedW < sampleW * 0.22 || detectedH < sampleH * 0.20) {
       return null;
     }
 
-    // Add 3.5% safety margin padding so text or edges are never cut off
+    // If the detected paper already occupies >= 95% of both dimensions, no cropping needed
+    if (detectedW >= sampleW * 0.95 && detectedH >= sampleH * 0.95) {
+      return null;
+    }
+
+    // Add 3.5% safety margin padding so text or edges are never clipped
     const padX = detectedW * 0.035;
     const padY = detectedH * 0.035;
 
@@ -225,7 +264,7 @@ export function renderTransformedCanvas(
   ctx.translate(targetW / 2, targetH / 2);
   ctx.rotate((normRot * Math.PI) / 180);
 
-  // Draw the cropped source region centered
+  // In rotated context: draw the cropped region centered
   const drawW = isPerpendicular ? targetH : targetW;
   const drawH = isPerpendicular ? targetW : targetH;
   ctx.drawImage(img, sx, sy, sw, sh, -drawW / 2, -drawH / 2, drawW, drawH);
@@ -239,9 +278,11 @@ export function renderTransformedCanvas(
 
 /**
  * End-to-end automatic crop and rotation processor.
- * 1. Checks aspect ratio and paper boundary.
- * 2. If image is landscape (width > height * 1.2) but receipt paper is portrait, auto-rotates 90° CW.
- * 3. If paper bounds are detected, crops out the excess counter.
+ * 1. Analyzes paper boundaries using density profiling to ignore table reflections.
+ * 2. Checks orientation: Cherry Printers A6 slips are landscape (width > height).
+ *    When captured sideways in a portrait smartphone photo (boxH > boxW * 1.05 or height > width * 1.15),
+ *    rotates 270° clockwise (90° counter-clockwise) so the slip is horizontal and upright.
+ * 3. Crops excess countertop if paper boundaries are detected.
  */
 export async function autoCropAndRotateSlip(
   source: File | Blob | string,
@@ -264,13 +305,27 @@ export async function autoCropAndRotateSlip(
   }
 
   // 2. Auto-Rotation Check:
-  // If no rotation forced, determine if the slip is sideways:
-  // Receipts are tall (portrait) receipts. If image is distinctly landscape (width > height * 1.18),
-  // rotate 90 degrees clockwise to make it upright!
+  // If no rotation forced, determine whether the landscape slip is photographed sideways:
+  // Demerit slips are naturally landscape (aspect ratio ~1.4 : 1, width > height).
+  // A portrait phone photo holds the slip vertically (height > width).
+  // Rotating 270° clockwise (90° CCW) places the top header at the top and makes the text upright!
   if (options?.forcedRotation === undefined) {
-    const isLandscape = width > height * 1.18;
-    if (isLandscape) {
-      rotationDeg = 90;
+    if (normBox) {
+      const boxW = (normBox.xMax - normBox.xMin) * width;
+      const boxH = (normBox.yMax - normBox.yMin) * height;
+      if (boxH > boxW * 1.05) {
+        rotationDeg = 270;
+      } else {
+        rotationDeg = 0;
+      }
+    } else {
+      // Fallback: If no crop box detected, check photo aspect ratio.
+      // If photo is portrait (typical smartphone capture), the landscape slip is sideways.
+      if (height > width * 1.15) {
+        rotationDeg = 270;
+      } else {
+        rotationDeg = 0;
+      }
     }
   }
 

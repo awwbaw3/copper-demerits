@@ -1,5 +1,5 @@
 /**
- * Copper Demerits (`copperdemerits.com`) — Cloudflare Worker + D1 + R2 + Workers AI Backend (v1.6.19)
+ * Copper Demerits (`copperdemerits.com`) — Cloudflare Worker + D1 + R2 + Workers AI Backend (v1.6.24)
  * - Database: Cloudflare D1 (`DB` binding -> `copper-demerits-db`)
  * - Object Storage: Cloudflare R2 (`SLIPS_BUCKET` binding -> `copper-demerits-slips`)
  * - AI Moderation: Cloudflare Workers AI (`AI` binding) + Optional `GEMINI_API_KEY` (Gemini 2.5 Flash)
@@ -406,6 +406,46 @@ function sanitizeExtractedSlips(rawSlips, fallbackDate) {
  * - Uses Gemini 2.5 Flash if `env.GEMINI_API_KEY` is configured
  * - Uses Cloudflare Workers AI Vision (`@cf/meta/llama-3.2-11b-vision-instruct` / `@cf/google/gemma-3-12b-it` / `@cf/llava-hf/llava-1.5-7b-hf`)
  */
+function tokenizeWords(text) {
+  return String(text || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .split(/\s+/)
+    .filter((w) => w.length >= 3);
+}
+
+function infractionSimilarityServer(textA, textB) {
+  const normA = String(textA || '').trim().toLowerCase();
+  const normB = String(textB || '').trim().toLowerCase();
+  if (!normA || !normB) return 0;
+  if (normA === normB) return 1.0;
+  const wordsA = tokenizeWords(normA);
+  const wordsB = tokenizeWords(normB);
+  if (wordsA.length === 0 || wordsB.length === 0) return 0;
+  let matches = 0;
+  for (const wA of wordsA) {
+    const found = wordsB.some((wB) => {
+      if (wA === wB) return true;
+      if (wA.length >= 4 && wB.length >= 4 && (wA.startsWith(wB) || wB.startsWith(wA))) return true;
+      return false;
+    });
+    if (found) matches++;
+  }
+  return (matches * 2) / (wordsA.length + wordsB.length);
+}
+
+function calculateHammingDistanceServer(hashA, hashB) {
+  if (!hashA || !hashB || hashA.length !== 16 || hashB.length !== 16) {
+    return 64;
+  }
+  let distance = 0;
+  for (let i = 0; i < 16; i++) {
+    const xor = parseInt(hashA[i], 16) ^ parseInt(hashB[i], 16);
+    distance += (xor & 1) + ((xor >> 1) & 1) + ((xor >> 2) & 1) + ((xor >> 3) & 1);
+  }
+  return distance;
+}
+
 async function extractSlipsFromImageWithAI(env, { imageBase64, defaultDate, knownMembers = [], knownAliases = [] }) {
   const fallbackDate = defaultDate || new Date().toISOString().slice(0, 10);
   if (!imageBase64) {
@@ -1288,7 +1328,7 @@ export default {
         return jsonResponse({
           ok: true,
           service: 'copper-demerits-api',
-          version: '1.6.19',
+          version: '1.6.24',
           backend: 'cloudflare-d1-r2-ai',
           database: 'copper-demerits-db',
           bucket: 'copper-demerits-slips',
@@ -2308,6 +2348,129 @@ export default {
         const flagReason = isFlaggedOrBlurred
           ? mod.reason || body.moderation_flag_reason || 'Blurred by Referee Monitor — Pending Admin Override'
           : null;
+
+        // -------------------------------------------------------------
+        // Server-Side 3-Layer Duplicate Prevention Check
+        // -------------------------------------------------------------
+        const normSha = (body.image_sha256 || '').toLowerCase().trim();
+        const normDhash = (body.image_dhash || '').trim();
+        const incidentDate = body.incident_date ? String(body.incident_date).trim() : '';
+        const incidentTime = body.incident_time ? String(body.incident_time).slice(0, 5) : '';
+
+        // Layer 1: Exact image SHA-256 match
+        if (normSha) {
+          const shaMatch = await env.DB.prepare(
+            'SELECT id, raw_student, incident_date, incident_time FROM demerits WHERE LOWER(image_sha256) = ? AND status != ?'
+          )
+            .bind(normSha, 'rejected')
+            .first();
+
+          if (shaMatch) {
+            return jsonResponse(
+              {
+                ok: false,
+                isDuplicate: true,
+                error: `Duplicate slip image rejected: This exact image is already logged for ${shaMatch.raw_student} on ${shaMatch.incident_date}.`,
+                matchedSlipId: shaMatch.id,
+              },
+              409
+            );
+          }
+        }
+
+        // Layer 2: Perceptual dHash visual similarity match (Hamming distance <= 10, >= 84.4%)
+        if (normDhash && normDhash.length === 16) {
+          const recentDhashes = await env.DB.prepare(
+            'SELECT id, raw_student, incident_date, incident_time, image_dhash FROM demerits WHERE image_dhash IS NOT NULL AND status != ?'
+          )
+            .bind('rejected')
+            .all();
+          for (const row of recentDhashes.results || []) {
+            if (row.image_dhash && row.image_dhash.length === 16) {
+              const dist = calculateHammingDistanceServer(normDhash, row.image_dhash);
+              if (dist <= 10) {
+                const sim = Math.round(((64 - dist) / 64) * 100);
+                return jsonResponse(
+                  {
+                    ok: false,
+                    isDuplicate: true,
+                    error: `Duplicate slip visual match (${sim}% visual similarity with existing ${row.raw_student} citation on ${row.incident_date}).`,
+                    matchedSlipId: row.id,
+                  },
+                  409
+                );
+              }
+            }
+          }
+        }
+
+        // Layer 3: Citation Content Match (Same patron on same date with matching time or matching infraction)
+        if (incidentDate && (resolvedPatronId || sanitizedStudent)) {
+          const candidateSlipsRes = await env.DB.prepare(
+            `SELECT id, patron_id, raw_student, incident_date, incident_time, infractions, demerit_count
+             FROM demerits
+             WHERE status != 'rejected'
+               AND (incident_date = ? OR incident_date = date(?, '+1 day') OR incident_date = date(?, '-1 day'))
+               AND (patron_id = ? OR LOWER(raw_student) = LOWER(?))`
+          )
+            .bind(
+              incidentDate,
+              incidentDate,
+              incidentDate,
+              resolvedPatronId || '',
+              sanitizedStudent.trim()
+            )
+            .all();
+
+          const candidateSlips = candidateSlipsRes.results || [];
+          for (const cand of candidateSlips) {
+            const candTime = cand.incident_time ? String(cand.incident_time).slice(0, 5) : '';
+            // Time match on same date (within 30 mins)
+            if (cand.incident_date === incidentDate && incidentTime && candTime) {
+              const [h1, m1] = incidentTime.split(':').map(Number);
+              const [h2, m2] = candTime.split(':').map(Number);
+              if (!Number.isNaN(h1) && !Number.isNaN(m1) && !Number.isNaN(h2) && !Number.isNaN(m2)) {
+                const diffMin = Math.abs(h1 * 60 + m1 - (h2 * 60 + m2));
+                if (diffMin <= 30) {
+                  return jsonResponse(
+                    {
+                      ok: false,
+                      isDuplicate: true,
+                      error: `Duplicate citation rejected: A slip for ${cand.raw_student} on ${cand.incident_date} at ${candTime} is already logged.`,
+                      matchedSlipId: cand.id,
+                    },
+                    409
+                  );
+                }
+              }
+            }
+
+            // Infraction similarity match (>= 60%)
+            let candInfractions = [];
+            try {
+              candInfractions = JSON.parse(cand.infractions || '[]');
+            } catch {
+              candInfractions = [];
+            }
+            if (Array.isArray(candInfractions) && candInfractions.length > 0 && sanitizedInfractions.length > 0) {
+              for (const cInf of candInfractions) {
+                for (const sInf of sanitizedInfractions) {
+                  if (infractionSimilarityServer(String(cInf), String(sInf)) >= 0.60) {
+                    return jsonResponse(
+                      {
+                        ok: false,
+                        isDuplicate: true,
+                        error: `Duplicate citation rejected: Patron ${cand.raw_student} already has a citation for "${cInf}" on ${cand.incident_date}.`,
+                        matchedSlipId: cand.id,
+                      },
+                      409
+                    );
+                  }
+                }
+              }
+            }
+          }
+        }
 
         // Track leaderboard status prior to this slip
         const previousLeader = await getTopLeader(env);

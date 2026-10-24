@@ -403,11 +403,6 @@ export const SubmitSlipPage: React.FC = () => {
         return;
       }
 
-      // 3. Verified as a Demerit Slip! Now store the reduced (<82KB) image in Cloudflare R2
-      const filename = `${fingerprint.sha256.slice(0, 24)}.jpg`;
-      const uploaded = await uploadCompressedSlipToR2(finalWorkingImageUrl, filename);
-      setImageUrl(uploaded.url);
-
       if (aiResult.ok && aiResult.slips && aiResult.slips.length > 0) {
         const extractedDrafts: SlipDraftItem[] = aiResult.slips.map((s) => ({
           rawStudent: s.raw_student || 'Patron',
@@ -432,6 +427,42 @@ export const SubmitSlipPage: React.FC = () => {
         }));
 
         setSlipDrafts(extractedDrafts);
+
+        // Pre-storage Citation Duplicate Check:
+        // Compare extracted student, date, time & infractions against all existing slips on the scoreboard.
+        // If this slip is already logged, block storage in Cloudflare R2 and do NOT insert a duplicate!
+        for (const draft of extractedDrafts) {
+          const citDup = checkCitationDuplicate({
+            raw_student: draft.rawStudent,
+            incident_date: draft.incidentDate,
+            incident_time: draft.incidentTime,
+            demerit_count: draft.items.reduce((sum, it) => sum + (Number(it.points) || 1), 0),
+            infractions: draft.items.map((it) => it.description),
+          });
+
+          if (citDup.isDuplicate) {
+            setDuplicateAlert(citDup);
+            setImageUrl(null);
+            setRawDataUrl(null);
+            setImageSha256(null);
+            setImageDhash(null);
+            setCompressionStats(null);
+            setUploadStatusMsg(null);
+            setErrorMsg(
+              `🦓 Referee Whistle: Duplicate slip prevented! ${
+                citDup.matchedDescription ||
+                `A demerit citation for ${draft.rawStudent} on ${draft.incidentDate} is already logged on the Ring of Honor.`
+              } (0 bytes stored)`
+            );
+            return;
+          }
+        }
+
+        // 3. Verified as genuine NEW Demerit Slip! Store the reduced (<82KB) image in Cloudflare R2
+        const filename = `${fingerprint.sha256.slice(0, 24)}.jpg`;
+        const uploaded = await uploadCompressedSlipToR2(finalWorkingImageUrl, filename);
+        setImageUrl(uploaded.url);
+
         setUploadStatusMsg(
           `Step 3/3 · Verified Demerit Slip (${extractedDrafts.length} ${
             extractedDrafts.length === 1 ? 'Slip' : 'Slips'
@@ -462,11 +493,12 @@ export const SubmitSlipPage: React.FC = () => {
         setUploadStatusMsg(
           `Photo reduced (${formatByteSize(fingerprint.originalBytes)} → ${formatByteSize(
             fingerprint.compressedBytes
-          )}) & stored in R2 · Review or enter slip details below.`
+          )}) · Review or enter slip details below.`
         );
       }
-    } catch {
-      setErrorMsg('Failed to process image file. Please try another photo.');
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Failed to process image file. Please try another photo.';
+      setErrorMsg(msg);
     } finally {
       setUploadingPhoto(false);
       e.target.value = '';
@@ -486,6 +518,28 @@ export const SubmitSlipPage: React.FC = () => {
     if (!imageUrl) {
       setErrorMsg('Please upload or capture a photo of the physical demerit slip(s) first.');
       return;
+    }
+
+    // Pre-submission citation duplicate check across all drafts
+    for (const d of slipDrafts) {
+      const citDup = checkCitationDuplicate({
+        raw_student: d.rawStudent,
+        incident_date: d.incidentDate,
+        incident_time: d.incidentTime,
+        demerit_count: d.items.reduce((sum, it) => sum + (Number(it.points) || 1), 0),
+        infractions: d.items.map((it) => it.description),
+      });
+
+      if (citDup.isDuplicate) {
+        setDuplicateAlert(citDup);
+        setErrorMsg(
+          `🦓 Referee Whistle: Cannot submit duplicate citation! ${
+            citDup.matchedDescription ||
+            `A citation for ${d.rawStudent} on ${d.incidentDate} already exists on the scoreboard.`
+          }`
+        );
+        return;
+      }
     }
 
     await persistSlipDrafts(slipDrafts, imageUrl, rawDataUrl, imageSha256, imageDhash);

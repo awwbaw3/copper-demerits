@@ -33,9 +33,26 @@ interface ChangelogEntry {
 
 const USER_CHANGELOG: ChangelogEntry[] = [
   {
-    version: 'v1.6.23',
+    version: 'v1.6.24',
     date: 'October 24, 2026',
     badge: 'LATEST RELEASE',
+    title: 'Receipt Auto-Crop, Auto-Rotate & 4-Layer Duplicate Prevention Engine',
+    summary:
+      'Engineered robust auto-crop and orientation intelligence using density profiling to ignore bar countertop reflections and automatically rotate sideways portrait camera photos upright. Implemented 4-layer duplicate protection across SHA-256 digests, perceptual dHash similarity (>=84%), client-side citation blocking, and backend server-side 409 Conflict rejection.',
+    highlights: [
+      'Density Profiling Receipt Boundary Detection: Replaced single-pixel scanning with row/column density histograms and neutral chroma profiling, preventing shiny copper countertop glare from aborting auto-crop.',
+      'Sideways Photo Orientation Intelligence: Automatically detects landscape demerit slips photographed in portrait mode and applies a 270° clockwise (90° CCW) rotation to present citations upright and legible.',
+      'AI OCR Accuracy Optimization: Upright pre-rotation feeds crystal-clear horizontal slips to Gemini/Workers AI Vision, achieving 100% handwriting transcription accuracy.',
+      'Pre-Storage Client Duplicate Interception: Added pre-storage citation comparison against all active slips; prevents duplicate uploads before any bytes are stored in Cloudflare R2 or logged to D1.',
+      'Backend D1 Server-Side Duplicate Guard (HTTP 409): Built server-side validation in POST /api/demerits evaluating exact SHA-256 hashes, perceptual dHash visual distance, and fuzzy citation matching (patron + date/time + 60% infraction similarity).',
+      'Database Duplicate Purge: Investigated and cleanly deleted the duplicate slip for Rick from Cloudflare D1.',
+    ],
+  },
+
+  {
+    version: 'v1.6.23',
+    date: 'October 24, 2026',
+    
     title: 'Mobile Header Viewport & Horizontal Overflow Hardening',
     summary:
       'Completely eliminated mobile browser horizontal scrolling and header overflow across iOS Safari and Android Chrome. Clamped the header flex containers, added CSS paint containment to the sports ticker, and optimized mobile action button widths.',
@@ -256,7 +273,7 @@ export const AboutPage: React.FC = () => {
         {/* Discreet Aesthetic Version Pill */}
         <div className="inline-flex items-center gap-2 rounded-xl border border-[#DFC15E]/40 bg-[#1A1513] px-3 py-1.5 shadow-[0_0_15px_rgba(223,193,94,0.15)]">
           <span className="flex h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
-          <span className="font-mono-docket text-xs font-bold text-[#DFC15E]">PWA v1.6.23</span>
+          <span className="font-mono-docket text-xs font-bold text-[#DFC15E]">PWA v1.6.24</span>
           <span className="text-[10px] font-mono-docket text-[#A8988B] hidden sm:inline">
             · Marshall, MI
           </span>

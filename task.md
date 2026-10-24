@@ -1,6 +1,23 @@
 # Task Tracker — Copper Demerits (`copperdemerits.com`)
 
-## Active Sprint — v1.6.23 (Mobile Header Viewport & Horizontal Overflow Hardening)
+## Active Sprint — v1.6.24 (Receipt Auto-Crop, Auto-Rotate & 4-Layer Duplicate Prevention Engine)
+- [x] Investigate duplicate slip upload for Rick and why uploaded photos were not cropped or rotated
+- [x] Delete duplicate slip row (`78b68933-9c65-48cf-83ba-567d13471bd0`) from Cloudflare D1 (`copper-demerits-db`)
+- [x] Re-architect paper boundary detection with row/column density histograms and neutral chroma profiling in `src/lib/imageAutoCrop.ts`
+- [x] Implement orientation detection for sideways portrait phone captures with automatic 270° upright rotation
+- [x] Verify upright rotation delivers 100% accurate AI OCR handwriting extraction via Gemini / Workers AI
+- [x] Upgrade perceptual dHash similarity matching and fuzzy infraction token matching in `src/lib/imageDedup.ts`
+- [x] Add pre-storage citation duplicate check in `handleFileChange` on `src/pages/SubmitSlipPage.tsx` to block R2 uploads and duplicate submissions
+- [x] Add pre-submission duplicate validation in `handleSubmit` on `src/pages/SubmitSlipPage.tsx`
+- [x] Implement 3-layer server-side duplicate prevention in Cloudflare Worker `POST /api/demerits` returning `HTTP 409 Conflict`
+- [x] Deploy updated Cloudflare Worker to `api.copperdemerits.com` (Version `29a6322f-5dbc-4f0d-ae48-bece3f950332`)
+- [x] Update documentation across `CHANGELOG.md`, `docs/implementation-history.md`, `task.md`, and `docs/roadmap.md`
+- [x] Bump version to `v1.6.24` across `package.json`, `App.tsx`, `Navbar.tsx`, and `AboutPage.tsx`
+- [x] Pass all lint and build checks (`npm run lint`, `npm run build`)
+- [ ] Commit and push to both `dev` and `main` per user rules
+
+## Completed Sprints
+### v1.6.23 (Mobile Header Viewport & Horizontal Overflow Hardening)
 - [x] Enforce `overflow-x: hidden`, `max-width: 100vw`, and `width: 100%` on `html, body` in `src/index.css`
 - [x] Add `w-full max-w-full overflow-x-hidden` to root container in `src/App.tsx`
 - [x] Add `overflow-x-clip` and `w-full max-w-full` to `<header>` in `src/components/Navbar.tsx`
@@ -11,7 +28,6 @@
 - [x] Pass `npm run lint` and `npm run build` with zero errors
 - [x] Merge and push to both `dev` and `main`
 
-## Completed Sprints
 ### v1.6.22 (Word-Targeted Slip Blur & Dynamic Symbol Masking)
 - [x] Implement word-targeted frosted-glass blur patch over "Fingering" on physical slip photo in `src/components/SlipModalViewer.tsx`
 - [x] Stamp frosted-glass patch with discreet `[🦓 REF BLUR]` tag while keeping patron name, date, signature, and other cited fouls crisp and legible

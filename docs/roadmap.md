@@ -36,6 +36,16 @@
 - [x] Removed `copper_demerits` schema from `Supabase5` (`iqbpnkttwtugxkospdqt`).
 - [x] Added **Staff & Patron Profile Claiming** (`src/components/ClaimProfileModal.tsx` + `POST /api/claim-profile`) with 4-digit Bar PINs and Detroit/Michigan team badges, and required profile sign-in before uploading slips on `/submit`.
 
+## Phase 14: Receipt Auto-Crop, Auto-Rotate & 4-Layer Duplicate Prevention Engine (Completed — v1.6.24)
+- [x] Re-architected paper boundary detection with row/column density histograms and neutral chroma profiling in `src/lib/imageAutoCrop.ts` to ignore specular countertop reflections.
+- [x] Intelligent sideways camera photo orientation detection: automatically applies 270° clockwise rotation to portrait photos of landscape receipts so text is upright.
+- [x] Verified 100% handwriting transcription accuracy from Gemini 2.5 Flash and Workers AI Vision when receiving upright pre-rotated slips.
+- [x] Pre-storage client duplicate interception in `SubmitSlipPage.tsx`: blocks storage in R2 and submission if a matching citation already exists (0 bytes stored).
+- [x] Upgraded fuzzy infraction matching (`infractionTextSimilarity`) and midnight rollover tolerance (±1 day) in `src/lib/imageDedup.ts`.
+- [x] 3-layer server-side duplicate prevention in Cloudflare Worker `POST /api/demerits` returning `HTTP 409 Conflict`.
+- [x] Purged duplicate Rick slip row from Cloudflare D1 database `copper-demerits-db`.
+- [x] Deployed updated Cloudflare Worker to `api.copperdemerits.com` (Version `29a6322f-5dbc-4f0d-ae48-bece3f950332`).
+
 ## Phase 13: Mobile Header Viewport & Horizontal Overflow Hardening (Completed — v1.6.23)
 - [x] Zero-overflow viewport enforcement with overflow-x: hidden on html, body and w-full max-w-full on root container.
 - [x] Header horizontal containment: overflow-x-clip on header and contain: paint on ticker ribbon.

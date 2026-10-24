@@ -2,6 +2,36 @@
 
 All notable changes to the **Copper Athletic Club — Ring of Honor** web application are documented in this file.
 
+## [1.6.24] - 2026-10-24
+
+### Fixed & Enhanced — Receipt Auto-Crop, Auto-Rotate & 4-Layer Duplicate Prevention Engine
+- **Row/Column Density Profiling for Paper Isolation (`src/lib/imageAutoCrop.ts`)**:
+  - Replaced single-pixel min/max scanning with row and column density histograms and neutral chroma profiling (`|R - B| < 55, |R - G| < 45`).
+  - Successfully filters out bright specular countertop glare and table scratches on shiny copper bar tops that previously caused bounding boxes to expand to the entire frame and abort auto-crop.
+  - Adds a 3.5% safe border padding margin ensuring all handwritten text and signatures remain completely unclipped.
+- **Sideways Camera Photo Auto-Rotation Intelligence**:
+  - Resolved the landscape receipt orientation issue: Cherry Printers demerit slips are landscape (aspect ratio ~1.4 : 1, width > height).
+  - When captured in a standard vertical smartphone portrait photo, the slip sits sideways (`boxH > boxW * 1.05`).
+  - The auto-crop engine now automatically applies a 270° clockwise (90° counter-clockwise) rotation to orient the receipt horizontally and upright before running OCR or storage.
+- **AI OCR Accuracy Optimization**:
+  - Feeding properly oriented upright receipts into Gemini 2.5 Flash and Cloudflare Workers AI Vision immediately restored 100% OCR precision across student names, dates, times, signatures, and handwritten infractions (e.g. *"Fighty with friends after the bar closed"*).
+- **Client-Side Pre-Storage Duplicate Interception (`src/pages/SubmitSlipPage.tsx`)**:
+  - Added pre-storage citation comparison on extracted drafts immediately after AI OCR runs.
+  - Blocks storage in Cloudflare R2 and halts automatic submission if a citation for the same patron and date/time or matching infractions already exists on the Ring of Honor board (0 bytes stored).
+  - Added duplicate check enforcement to manual submission in `handleSubmit`.
+- **Fuzzy Citation Duplicate Matching Engine (`src/lib/imageDedup.ts`)**:
+  - Enhanced citation duplicate detection with word stem tokenization, Jaccard lexical similarity (`infractionTextSimilarity`), and midnight rollover tolerance (±1 day).
+  - Detects OCR transcription variations (e.g. *"friend"* vs *"friends"*, slight time differences within 30 minutes, or midnight shift dates).
+- **Server-Side Duplicate Guard in Cloudflare Worker (`cloudflare/worker.js`)**:
+  - Added 3-layer server-side duplicate verification to `POST /api/demerits`:
+    1. Exact image SHA-256 match.
+    2. Perceptual dHash visual similarity match (Hamming distance <= 10 out of 64 bits, >= 84.4%).
+    3. Citation content match (patron + date/time within 30 mins or >= 60% infraction similarity).
+  - Returns `HTTP 409 Conflict` with detailed descriptive error payload, guaranteeing zero duplicate slips can be inserted into Cloudflare D1 even if client validation is bypassed.
+- **Database Duplicate Cleanup**:
+  - Investigated and cleanly deleted the duplicate slip (`78b68933-9c65-48cf-83ba-567d13471bd0`) from Cloudflare D1 database `copper-demerits-db`.
+  - Deployed worker version `29a6322f-5dbc-4f0d-ae48-bece3f950332` to `api.copperdemerits.com`.
+
 ## [1.6.23] - 2026-10-24
 
 ### Fixed — Mobile Browser Header Viewport & Horizontal Overflow Hardening

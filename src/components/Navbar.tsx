@@ -290,7 +290,7 @@ export const Navbar: React.FC = () => {
                   RING OF <span className="text-[#B87333]">DEMERITS</span>
                 </span>
                 <span className="hidden sm:inline-block rounded border border-[#B87333]/40 bg-[#161210] px-1 py-0.2 font-mono-docket text-[9px] font-bold text-[#DFC15E] shrink-0">
-                  v1.6.23
+                  v1.6.24
                 </span>
               </div>
               <span className="inline-flex items-center gap-1 font-sans font-bold text-[10px] sm:text-[11px] tracking-wide uppercase text-[#DFC15E] mt-0.5 truncate max-w-full">
