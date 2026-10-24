@@ -33,9 +33,25 @@ interface ChangelogEntry {
 
 const USER_CHANGELOG: ChangelogEntry[] = [
   {
-    version: 'v1.6.24',
+    version: 'v1.6.25',
     date: 'October 24, 2026',
     badge: 'LATEST RELEASE',
+    title: 'Complete Historical Slip Orientation Normalization & Countertop Cropping',
+    summary:
+      'Audited all 11 demerit slips on the live site and resolved historical sideways orientations on Kristi\'s slip (Oct 18) and Ziggie\'s slip (Oct 22). Cropped excess countertop background across all legacy uploads, rotated sideways slips 270° upright, uploaded new high-res upright assets to Cloudflare R2, and updated Cloudflare D1 records so 100% of slips across the Docket, Leaderboard, and Evidence Viewer display crisp, landscape, and upright.',
+    highlights: [
+      'Kristi (Oct 18) Slip Rotation: Rotated previously 90° clockwise portrait photo to 270° upright landscape (924x604), eliminating head-tilting when inspecting the slip.',
+      'Ziggie (Oct 22) Slip Rotation: Rotated previously 90° clockwise portrait photo to 270° upright landscape (624x432), perfectly displaying the "Pulling a Deb Jarvis" foul.',
+      'Legacy Countertop Cropping: Cropped expansive wooden and copper countertops on Rick (392x272), Ziggie (444x344), Deb Jarvis (720x564), and Jai (587x430), maximizing receipt paper readability.',
+      'Cloudflare R2 & D1 Synchronization: Uploaded all 6 optimized upright/cropped images to R2 and updated live D1 database records.',
+      '100% Orientation Consistency: Guaranteed all 11 verified slips on copperdemerits.com are oriented horizontally and upright by default.',
+    ],
+  },
+
+  {
+    version: 'v1.6.24',
+    date: 'October 24, 2026',
+    
     title: 'Receipt Auto-Crop, Auto-Rotate & 4-Layer Duplicate Prevention Engine',
     summary:
       'Engineered robust auto-crop and orientation intelligence using density profiling to ignore bar countertop reflections and automatically rotate sideways portrait camera photos upright. Implemented 4-layer duplicate protection across SHA-256 digests, perceptual dHash similarity (>=84%), client-side citation blocking, and backend server-side 409 Conflict rejection.',
@@ -273,7 +289,7 @@ export const AboutPage: React.FC = () => {
         {/* Discreet Aesthetic Version Pill */}
         <div className="inline-flex items-center gap-2 rounded-xl border border-[#DFC15E]/40 bg-[#1A1513] px-3 py-1.5 shadow-[0_0_15px_rgba(223,193,94,0.15)]">
           <span className="flex h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
-          <span className="font-mono-docket text-xs font-bold text-[#DFC15E]">PWA v1.6.24</span>
+          <span className="font-mono-docket text-xs font-bold text-[#DFC15E]">PWA v1.6.25</span>
           <span className="text-[10px] font-mono-docket text-[#A8988B] hidden sm:inline">
             · Marshall, MI
           </span>

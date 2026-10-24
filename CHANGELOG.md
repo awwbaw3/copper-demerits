@@ -2,6 +2,20 @@
 
 All notable changes to the **Copper Athletic Club — Ring of Honor** web application are documented in this file.
 
+## [1.6.25] - 2026-10-24
+
+### Fixed & Enhanced — Complete Historical Slip Orientation Normalization & Countertop Cropping
+- **Historical Sideways Slip Orientation Fix**:
+  - Audited all 11 demerit slips on the live site and identified historical sideways orientation on Kristi's slip (Oct 18) and Ziggie's slip (Oct 22).
+  - Rotated Kristi's slip (`c95d89ba-cc94-4d66-97b2-de1f42fed5e8`) from a 90° clockwise portrait photo to a 270° upright landscape receipt (`924x604`).
+  - Rotated Ziggie's slip (`0d181001-765f-4314-ba70-e4a8e7cc0495`) from a 90° clockwise portrait photo to a 270° upright landscape receipt (`624x432`).
+- **Legacy Countertop Background Cropping**:
+  - Cropped expansive wooden and copper countertops on Rick (`392x272`), Ziggie (`444x344`), Deb Jarvis (`720x564`), and Jai (`587x430`), eliminating wasted border space and magnifying handwritten text on mobile displays.
+- **Cloudflare R2 & D1 Database Synchronization**:
+  - Uploaded all 6 optimized upright and cropped assets to Cloudflare R2 bucket `copper-demerits-slips`.
+  - Updated live database records in Cloudflare D1 `copper-demerits-db`.
+  - Guaranteed 100% of slips across the Docket, Leaderboard, and Evidence Viewer display crisp, landscape, and upright without requiring manual viewer rotation.
+
 ## [1.6.24] - 2026-10-24
 
 ### Fixed & Enhanced — Receipt Auto-Crop, Auto-Rotate & 4-Layer Duplicate Prevention Engine

@@ -93,7 +93,7 @@ export const App: React.FC = () => {
                     className="inline-flex items-center gap-1 rounded border border-[#DFC15E]/30 bg-[#DFC15E]/10 px-2 py-0.5 font-mono-docket text-[10px] font-bold text-[#DFC15E] hover:bg-[#DFC15E]/20 transition"
                     title="Current App Version"
                   >
-                    <span>v1.6.24</span>
+                    <span>v1.6.25</span>
                   </Link>
                 </div>
               </div>

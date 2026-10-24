@@ -36,6 +36,14 @@
 - [x] Removed `copper_demerits` schema from `Supabase5` (`iqbpnkttwtugxkospdqt`).
 - [x] Added **Staff & Patron Profile Claiming** (`src/components/ClaimProfileModal.tsx` + `POST /api/claim-profile`) with 4-digit Bar PINs and Detroit/Michigan team badges, and required profile sign-in before uploading slips on `/submit`.
 
+## Phase 15: Complete Historical Slip Orientation Normalization & Countertop Cropping (Completed — v1.6.25)
+- [x] Audited all 11 demerit slips on the live site across dimensions and visual orientation.
+- [x] Corrected sideways orientation on Kristi's slip (Oct 18, `924x604`) and Ziggie's slip (Oct 22, `624x432`) by rotating 270° upright landscape.
+- [x] Cropped excess countertop background on Rick (`392x272`), Ziggie Oct 21 (`444x344`), Deb Jarvis (`720x564`), and Jai (`587x430`).
+- [x] Uploaded all 6 optimized assets to Cloudflare R2 bucket `copper-demerits-slips`.
+- [x] Updated all live `image_url` rows in Cloudflare D1 database `copper-demerits-db`.
+- [x] Verified 100% of slips (11 of 11) on `copperdemerits.com` are landscape and upright.
+
 ## Phase 14: Receipt Auto-Crop, Auto-Rotate & 4-Layer Duplicate Prevention Engine (Completed — v1.6.24)
 - [x] Re-architected paper boundary detection with row/column density histograms and neutral chroma profiling in `src/lib/imageAutoCrop.ts` to ignore specular countertop reflections.
 - [x] Intelligent sideways camera photo orientation detection: automatically applies 270° clockwise rotation to portrait photos of landscape receipts so text is upright.
