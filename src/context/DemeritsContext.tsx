@@ -12,6 +12,8 @@ import {
   SlipReactionKey,
   UploadedSourceFile,
   NotificationPreferences,
+  MergeProfilesPayload,
+  CorrectSlipPayload,
 } from '../types/demerits';
 import {
   DEFAULT_MEMBERS,
@@ -167,6 +169,13 @@ interface DemeritsContextValue {
   rerunAliasNormalization: () => Promise<number>;
   addOrUpdateMember: (displayName: string, isPatron: boolean, isStaff: boolean) => Promise<Member>;
   deduplicateExistingSlips: () => Promise<number>;
+  mergeProfiles: (
+    payload: MergeProfilesPayload
+  ) => Promise<{ ok: boolean; mergedMember?: Member; message?: string; error?: string }>;
+  correctSlipMistake: (
+    slipId: string,
+    payload: CorrectSlipPayload
+  ) => Promise<{ ok: boolean; slip?: EnrichedDemeritSlip; error?: string }>;
 }
 
 const DemeritsContext = createContext<DemeritsContextValue | undefined>(undefined);
@@ -1664,6 +1673,198 @@ export const DemeritsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     return removedIds.length;
   }, [rawSlips, isCloudflareConnected]);
 
+  const mergeProfiles = useCallback(
+    async (
+      payload: MergeProfilesPayload
+    ): Promise<{ ok: boolean; mergedMember?: Member; message?: string; error?: string }> => {
+      const { sourceMemberId, targetMemberId, primaryDisplayName, sourcePin } = payload;
+      if (!sourceMemberId || !targetMemberId) {
+        return { ok: false, error: 'Source and target profiles are required.' };
+      }
+      if (sourceMemberId === targetMemberId) {
+        return { ok: false, error: 'Cannot merge a profile into itself.' };
+      }
+
+      const sourceMember = members.find((m) => m.id === sourceMemberId);
+      const targetMember = members.find((m) => m.id === targetMemberId);
+
+      if (!sourceMember || !targetMember) {
+        return { ok: false, error: 'One or both profiles could not be found.' };
+      }
+
+      if (isCloudflareConnected) {
+        try {
+          const res = await cloudflareFetch<{
+            ok: boolean;
+            mergedMember?: Member;
+            message?: string;
+            error?: string;
+          }>('/api/profiles/merge', {
+            method: 'POST',
+            body: JSON.stringify({
+              source_member_id: sourceMemberId,
+              target_member_id: targetMemberId,
+              actor_member_id: currentMember?.id || targetMemberId,
+              actor_pin: activePin || '',
+              source_pin: sourcePin || '',
+              primary_display_name: primaryDisplayName || undefined,
+            }),
+          });
+
+          if (!res.ok) {
+            return { ok: false, error: res.error || 'Failed to merge profiles.' };
+          }
+
+          // Re-fetch bootstrap data to ensure complete state synchrony
+          const bootRes = await cloudflareFetch<{
+            ok: boolean;
+            members: Member[];
+            aliases: StaffAlias[];
+            demerits: DemeritSlip[];
+          }>('/api/bootstrap');
+
+          if (bootRes.ok) {
+            setMembers(bootRes.members);
+            setAliases(bootRes.aliases);
+            setRawSlips(bootRes.demerits);
+          }
+
+          if (res.mergedMember && currentMember && currentMember.id === targetMemberId) {
+            setCurrentMember(res.mergedMember);
+          }
+
+          return { ok: true, mergedMember: res.mergedMember, message: res.message };
+        } catch (err) {
+          return {
+            ok: false,
+            error: err instanceof Error ? err.message : 'Network error during profile merge.',
+          };
+        }
+      }
+
+      // Offline / fallback merge
+      const finalName = primaryDisplayName || targetMember.display_name;
+      const updatedTarget: Member = {
+        ...targetMember,
+        display_name: finalName,
+      };
+
+      setMembers((prev) =>
+        prev
+          .filter((m) => m.id !== sourceMemberId)
+          .map((m) => (m.id === targetMemberId ? updatedTarget : m))
+      );
+      setRawSlips((prev) =>
+        prev.map((s) => (s.patron_id === sourceMemberId ? { ...s, patron_id: targetMemberId } : s))
+      );
+      setAliases((prev) => [
+        ...prev.filter((a) => a.member_id !== sourceMemberId),
+        {
+          id: `alias-${Date.now()}`,
+          alias: sourceMember.display_name.trim().toLowerCase(),
+          member_id: targetMemberId,
+        },
+      ]);
+
+      if (currentMember && currentMember.id === targetMemberId) {
+        setCurrentMember(updatedTarget);
+      }
+
+      return {
+        ok: true,
+        mergedMember: updatedTarget,
+        message: `Successfully merged "${sourceMember.display_name}" into "${finalName}".`,
+      };
+    },
+    [members, isCloudflareConnected, currentMember, activePin]
+  );
+
+  const correctSlipMistake = useCallback(
+    async (
+      slipId: string,
+      payload: CorrectSlipPayload
+    ): Promise<{ ok: boolean; slip?: EnrichedDemeritSlip; error?: string }> => {
+      const existingSlip = rawSlips.find((s) => s.id === slipId);
+      if (!existingSlip) {
+        return { ok: false, error: 'Slip not found.' };
+      }
+
+      if (isCloudflareConnected) {
+        try {
+          const res = await cloudflareFetch<{
+            ok: boolean;
+            slip?: DemeritSlip;
+            error?: string;
+          }>(`/api/demerits/${encodeURIComponent(slipId)}`, {
+            method: 'PATCH',
+            body: JSON.stringify({
+              raw_student: payload.rawStudent,
+              patron_id: payload.patronId,
+              raw_signature: payload.rawSignature,
+              issuer_id: payload.issuerId,
+              infractions: payload.infractions,
+              demerit_items: payload.demeritItems,
+              demerit_count: payload.demeritCount,
+              incident_date: payload.incidentDate,
+              incident_time: payload.incidentTime,
+              location_area: payload.locationArea,
+              correction_note: payload.correctionNote,
+              actor_member_id: currentMember?.id,
+              actor_pin: activePin || '',
+            }),
+          });
+
+          if (!res.ok || !res.slip) {
+            return { ok: false, error: res.error || 'Failed to correct slip.' };
+          }
+
+          const updatedSlip = res.slip;
+          setRawSlips((prev) => prev.map((s) => (s.id === slipId ? updatedSlip : s)));
+
+          // Find updated enriched slip
+          const enriched = demerits.find((s) => s.id === slipId);
+          return { ok: true, slip: enriched };
+        } catch (err) {
+          return {
+            ok: false,
+            error: err instanceof Error ? err.message : 'Error submitting slip correction.',
+          };
+        }
+      }
+
+      // Offline / fallback edit
+      const updated: DemeritSlip = {
+        ...existingSlip,
+        raw_student:
+          payload.rawStudent !== undefined ? payload.rawStudent : existingSlip.raw_student,
+        patron_id: payload.patronId !== undefined ? payload.patronId : existingSlip.patron_id,
+        raw_signature:
+          payload.rawSignature !== undefined ? payload.rawSignature : existingSlip.raw_signature,
+        issuer_id: payload.issuerId !== undefined ? payload.issuerId : existingSlip.issuer_id,
+        infractions:
+          payload.infractions !== undefined ? payload.infractions : existingSlip.infractions,
+        demerit_items:
+          payload.demeritItems !== undefined ? payload.demeritItems : existingSlip.demerit_items,
+        demerit_count:
+          payload.demeritCount !== undefined ? payload.demeritCount : existingSlip.demerit_count,
+        incident_date:
+          payload.incidentDate !== undefined ? payload.incidentDate : existingSlip.incident_date,
+        incident_time:
+          payload.incidentTime !== undefined ? payload.incidentTime : existingSlip.incident_time,
+        location_area:
+          payload.locationArea !== undefined ? payload.locationArea : existingSlip.location_area,
+        capture_note: payload.correctionNote
+          ? `${existingSlip.capture_note || ''} · [Corrected: ${payload.correctionNote}]`
+          : existingSlip.capture_note,
+      };
+
+      setRawSlips((prev) => prev.map((s) => (s.id === slipId ? updated : s)));
+      const enriched = demerits.find((s) => s.id === slipId);
+      return { ok: true, slip: enriched };
+    },
+    [rawSlips, demerits, isCloudflareConnected, currentMember, activePin]
+  );
+
   return (
     <DemeritsContext.Provider
       value={{
@@ -1704,6 +1905,8 @@ export const DemeritsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         rerunAliasNormalization,
         addOrUpdateMember,
         deduplicateExistingSlips,
+        mergeProfiles,
+        correctSlipMistake,
       }}
     >
       {children}

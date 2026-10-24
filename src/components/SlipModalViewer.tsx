@@ -1,6 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { EnrichedDemeritSlip } from '../types/demerits';
+import { useDemerits } from '../context/DemeritsContext';
 import { formatTime12h } from './PhysicalSlipCard';
+import { CorrectSlipMistakeModal } from './CorrectSlipMistakeModal';
 import {
   X,
   ShieldCheck,
@@ -13,6 +15,7 @@ import {
   Layers,
   Image as ImageIcon,
   Tag,
+  Edit3,
 } from 'lucide-react';
 
 interface SlipModalViewerProps {
@@ -21,8 +24,22 @@ interface SlipModalViewerProps {
 }
 
 export const SlipModalViewer: React.FC<SlipModalViewerProps> = ({ slip, onClose }) => {
+  const { currentMember, isAdminOrStaff } = useDemerits();
   const dialogRef = useRef<HTMLDialogElement | null>(null);
   const [activePhotoTab, setActivePhotoTab] = useState<'primary' | 'secondary' | 'source'>('primary');
+  const [isCorrecting, setIsCorrecting] = useState(false);
+  const [activeSlip, setActiveSlip] = useState<EnrichedDemeritSlip | null>(slip);
+
+  useEffect(() => {
+    setActiveSlip(slip);
+  }, [slip]);
+
+  const canEdit = Boolean(
+    isAdminOrStaff ||
+      (currentMember &&
+        (currentMember.id === activeSlip?.submitted_by_member_id ||
+          currentMember.id === activeSlip?.patron_id))
+  );
 
   useEffect(() => {
     setActivePhotoTab('primary');
@@ -80,6 +97,7 @@ export const SlipModalViewer: React.FC<SlipModalViewerProps> = ({ slip, onClose 
       : slip?.image_url;
 
   return (
+    <>
     <dialog
       ref={dialogRef}
       closedby="any"
@@ -110,19 +128,47 @@ export const SlipModalViewer: React.FC<SlipModalViewerProps> = ({ slip, onClose 
               </h2>
             </div>
 
-            <form method="dialog">
-              <button
-                type="submit"
-                aria-label="Close slip viewer"
-                className="flex items-center justify-center min-h-[44px] min-w-[44px] rounded-xl border border-white/15 bg-white/5 p-2 text-[#D6C7B8] transition hover:border-[#B87333] hover:text-white active:scale-95 touch-manipulation cursor-pointer"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </form>
+            <div className="flex items-center gap-2">
+              {canEdit && (
+                <button
+                  type="button"
+                  onClick={() => setIsCorrecting(true)}
+                  className="inline-flex items-center gap-1.5 rounded-xl border border-[#DFC15E]/50 bg-[#DFC15E]/15 px-3 py-2 min-h-[44px] text-xs font-bold text-[#DFC15E] hover:bg-[#DFC15E]/25 active:scale-95 touch-manipulation cursor-pointer shadow-[0_0_15px_rgba(223,193,94,0.2)]"
+                  title="Correct minor OCR misread or student mistake adhering to bar rules"
+                >
+                  <Edit3 className="h-4 w-4" />
+                  <span className="hidden sm:inline">Correct Mistake</span>
+                  <span className="sm:hidden">Edit</span>
+                </button>
+              )}
+
+              <form method="dialog">
+                <button
+                  type="submit"
+                  aria-label="Close slip viewer"
+                  className="flex items-center justify-center min-h-[44px] min-w-[44px] rounded-xl border border-white/15 bg-white/5 p-2 text-[#D6C7B8] transition hover:border-[#B87333] hover:text-white active:scale-95 touch-manipulation cursor-pointer"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </form>
+            </div>
           </div>
 
           {/* Modal Body */}
           <div className="overflow-y-auto p-4 sm:p-6 space-y-4">
+            {/* Correction Audit Badge if mistake was corrected */}
+            {Boolean(activeSlip?.capture_note?.includes('Corrected')) && (
+              <div className="flex items-center gap-2 rounded-xl border border-[#DFC15E]/30 bg-[#DFC15E]/10 p-2.5 text-xs text-[#DFC15E] font-mono-docket">
+                <Edit3 className="h-4 w-4 shrink-0 text-[#DFC15E]" />
+                <span>
+                  <strong>Correction Recorded:</strong>{' '}
+                  {activeSlip?.capture_note
+                    ? activeSlip.capture_note.slice(activeSlip.capture_note.indexOf('Corrected'))
+                    : ''}
+                </span>
+              </div>
+            )}
+
             {/* Multi-Capture / Source Photo Switcher */}
             {(slip.secondary_image_url || slip.source_image_url) && (
               <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-[#B87333]/40 bg-[#121212] p-1.5">
@@ -298,5 +344,14 @@ export const SlipModalViewer: React.FC<SlipModalViewerProps> = ({ slip, onClose 
         </div>
       )}
     </dialog>
+    {activeSlip && (
+      <CorrectSlipMistakeModal
+        slip={activeSlip}
+        isOpen={isCorrecting}
+        onClose={() => setIsCorrecting(false)}
+        onSuccess={(updated) => setActiveSlip(updated)}
+      />
+    )}
+    </>
   );
 };

@@ -31,6 +31,7 @@ import {
   FileText,
   Megaphone,
   Beer,
+  GitMerge,
 } from 'lucide-react';
 
 const NOTIFICATION_CHANNELS: {
@@ -113,6 +114,7 @@ export const ClaimProfileModal: React.FC = () => {
     requestNotificationVerification,
     verifyNotificationCode,
     logoutProfile,
+    mergeProfiles,
   } = useDemerits();
 
   const [mode, setMode] = useState<'my-locker' | 'login' | 'claim' | 'new'>('login');
@@ -131,6 +133,12 @@ export const ClaimProfileModal: React.FC = () => {
   // Self-Service Nickname / Slip Alias State (My Locker)
   const [nicknameInput, setNicknameInput] = useState('');
   const [addingNickname, setAddingNickname] = useState(false);
+
+  // Self-Service Profile Merge State (My Locker)
+  const [mergeSourceId, setMergeSourceId] = useState<string>('');
+  const [mergeSourcePin, setMergeSourcePin] = useState<string>('');
+  const [mergingProfile, setMergingProfile] = useState<boolean>(false);
+  const [mergeFeedback, setMergeFeedback] = useState<{ type: 'ok' | 'err'; msg: string } | null>(null);
 
   // Opt-In Notification State (My Locker)
   const [notifEmail, setNotifEmail] = useState('');
@@ -510,6 +518,60 @@ export const ClaimProfileModal: React.FC = () => {
     setSuccessMsg(`Removed nickname "${aliasText}" from your profile.`);
   };
 
+  const otherMembersForMerge = currentMember
+    ? members.filter((m) => m.id !== currentMember.id)
+    : [];
+
+  const handleMergeProfiles = async () => {
+    if (!currentMember || !mergeSourceId) return;
+    const sourceMember = members.find((m) => m.id === mergeSourceId);
+    if (!sourceMember) return;
+
+    if (sourceMember.is_claimed && !mergeSourcePin.trim()) {
+      setMergeFeedback({
+        type: 'err',
+        msg: `"${sourceMember.display_name}" is already claimed. Please enter that profile's Bar PIN to confirm ownership and merge accounts.`,
+      });
+      return;
+    }
+
+    if (!pin.trim()) {
+      setMergeFeedback({
+        type: 'err',
+        msg: 'Please enter your current Bar PIN below before merging profiles.',
+      });
+      return;
+    }
+
+    setMergingProfile(true);
+    setMergeFeedback(null);
+    try {
+      const res = await mergeProfiles({
+        sourceMemberId: mergeSourceId,
+        targetMemberId: currentMember.id,
+        sourcePin: mergeSourcePin.trim() || undefined,
+      });
+
+      if (!res.ok) {
+        setMergeFeedback({ type: 'err', msg: res.error || 'Failed to merge profiles.' });
+      } else {
+        setMergeFeedback({
+          type: 'ok',
+          msg: res.message || `Successfully merged "${sourceMember.display_name}" into your locker!`,
+        });
+        setMergeSourceId('');
+        setMergeSourcePin('');
+      }
+    } catch (err) {
+      setMergeFeedback({
+        type: 'err',
+        msg: err instanceof Error ? err.message : 'Error merging profiles.',
+      });
+    } finally {
+      setMergingProfile(false);
+    }
+  };
+
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-3 sm:p-4 backdrop-blur-md pt-[env(safe-area-inset-top,12px)] pb-[env(safe-area-inset-bottom,12px)] pr-[env(safe-area-inset-right,12px)] pl-[env(safe-area-inset-left,12px)]"
@@ -805,6 +867,84 @@ export const ClaimProfileModal: React.FC = () => {
                   <Plus className="h-4 w-4" />
                   <span>{addingNickname ? 'Linking...' : 'Add Nickname'}</span>
                 </button>
+              </div>
+            </div>
+
+            {/* Merge Another Profile or Unclaimed Name */}
+            <div className="rounded-2xl border border-[#DFC15E]/35 bg-[#0E0C0B] p-4 space-y-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <GitMerge className="h-4 w-4 text-[#DFC15E]" />
+                  <span className="font-athletic text-base font-bold uppercase tracking-wider text-[#F5F2EB]">
+                    MERGE PROFILES / ABSORB UNCLAIMED NAME
+                  </span>
+                </div>
+                <span className="rounded-full bg-[#DFC15E]/15 border border-[#DFC15E]/40 px-2.5 py-0.5 font-mono-docket text-[10px] font-bold uppercase text-[#DFC15E]">
+                  Unified Locker
+                </span>
+              </div>
+
+              <p className="font-mono-docket text-[11px] text-[#9E8F82]">
+                Were you cited under a different name on the scoreboard or do you have a duplicate profile (e.g. Ziggie &amp; David Lee)? Merge that profile into your locker. All citations and stats transfer to you, and the merged name automatically becomes your slip alias.
+              </p>
+
+              {mergeFeedback && (
+                <div
+                  className={`rounded-xl border px-3 py-2 font-mono-docket text-xs ${
+                    mergeFeedback.type === 'ok'
+                      ? 'border-emerald-500/40 bg-emerald-950/40 text-emerald-300'
+                      : 'border-rose-500/40 bg-rose-950/40 text-rose-300'
+                  }`}
+                >
+                  {mergeFeedback.msg}
+                </div>
+              )}
+
+              <div className="space-y-2.5">
+                <div className="flex flex-col sm:flex-row gap-2">
+                  <select
+                    value={mergeSourceId}
+                    onChange={(e) => setMergeSourceId(e.target.value)}
+                    aria-label="Select profile to merge"
+                    className="flex-1 rounded-xl border border-white/15 bg-[#151210] px-3.5 py-2.5 font-mono-docket text-base sm:text-xs min-h-[44px] text-white focus:border-[#DFC15E] focus:outline-none"
+                  >
+                    <option value="">Select profile to absorb into your locker...</option>
+                    {otherMembersForMerge.map((m) => (
+                      <option key={m.id} value={m.id}>
+                        {m.display_name} {m.is_claimed ? '(Claimed Profile)' : '(Unclaimed Profile)'}
+                      </option>
+                    ))}
+                  </select>
+
+                  <button
+                    type="button"
+                    onClick={handleMergeProfiles}
+                    disabled={!mergeSourceId || mergingProfile}
+                    className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-[#DFC15E] bg-gradient-to-r from-[#DFC15E] to-[#B87333] px-4 py-2.5 min-h-[44px] touch-manipulation active:scale-95 font-athletic text-xs font-bold uppercase tracking-wider text-[#121212] hover:brightness-110 transition disabled:opacity-40 cursor-pointer shrink-0"
+                  >
+                    <GitMerge className="h-4 w-4" />
+                    <span>{mergingProfile ? 'Merging...' : 'Merge Into Locker'}</span>
+                  </button>
+                </div>
+
+                {mergeSourceId && members.find((m) => m.id === mergeSourceId)?.is_claimed && (
+                  <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 space-y-1.5">
+                    <span className="font-mono-docket text-[10px] font-bold uppercase text-amber-300">
+                      🔐 Other Profile's Bar PIN Required
+                    </span>
+                    <input
+                      type="password"
+                      inputMode="numeric"
+                      value={mergeSourcePin}
+                      onChange={(e) => setMergeSourcePin(e.target.value)}
+                      placeholder="Enter other profile's 4–8 digit PIN"
+                      className="w-full rounded-xl border border-white/15 bg-[#0D0B0A] px-3 py-2 font-mono-docket text-base sm:text-xs min-h-[44px] text-[#F5F2EB] focus:border-[#DFC15E]"
+                    />
+                    <p className="font-mono-docket text-[10px] text-[#A8988B]">
+                      To prevent hostile account takeovers, merging an already-claimed profile requires entering its PIN to verify you own both accounts.
+                    </p>
+                  </div>
+                )}
               </div>
             </div>
 

@@ -1,5 +1,5 @@
 /**
- * Copper Demerits (`copperdemerits.com`) — Cloudflare Worker + D1 + R2 + Workers AI Backend (v1.6.18)
+ * Copper Demerits (`copperdemerits.com`) — Cloudflare Worker + D1 + R2 + Workers AI Backend (v1.6.19)
  * - Database: Cloudflare D1 (`DB` binding -> `copper-demerits-db`)
  * - Object Storage: Cloudflare R2 (`SLIPS_BUCKET` binding -> `copper-demerits-slips`)
  * - AI Moderation: Cloudflare Workers AI (`AI` binding) + Optional `GEMINI_API_KEY` (Gemini 2.5 Flash)
@@ -120,8 +120,9 @@ async function moderateContent(env, { texts = [], imageBase64 = null }) {
       const parts = [
         {
           text: `You are the friendly Referee Monitor for Copper Athletic Club's tongue-in-cheek "Ring of Honor" bar demerit fan site.
-The site must be funny, friendly, and jovial (like "Too many seat moves", "Tried to order Gin & Diet Coke", "The headband", "No call / no show to see the Red Wings").
-We strictly disallow profanity, calling people mean names/insults, racist remarks, slurs, or vulgar hostility.
+The site must be funny, friendly, and jovial (like "Too many seat moves", "Tried to order Gin & Diet Coke", "The headband", "No call / no show to see the Red Wings", "Pulling a Deb Jarvis", "Giving the finger to the bartender / flipping off", "Flying chair").
+Lighthearted bar banter or gestures (e.g. flipping the bird / giving the finger to the bartender) are acceptable sports bar infractions and must NOT be misinterpreted as sexual or vulgar.
+We strictly disallow actual profanity, calling people mean names/insults, racist remarks, slurs, or vulgar hostility.
 Analyze the following text (and image if attached) and respond ONLY with valid JSON:
 {"flagged": boolean, "reason": "short explanation if flagged else empty", "blurRegions": [{"x": 0.1, "y": 0.4, "w": 0.8, "h": 0.15, "label": "CENSORED BY REF"}]}
 Text to check: ${JSON.stringify(combinedText)}`,
@@ -175,7 +176,7 @@ Text to check: ${JSON.stringify(combinedText)}`,
           {
             role: 'system',
             content:
-              'You are a friendly sports-bar referee moderator. Allow lighthearted bar banter ("too many seat moves", "ordered gin and diet coke", "missed Red Wings game", "back talk"). Flag ONLY profanity, swear words, personal insults/name-calling, racism, slurs, or vulgar hostility. Reply ONLY with JSON: {"flagged": boolean, "reason": "string"}',
+              'You are a friendly sports-bar referee moderator. Allow lighthearted bar banter ("too many seat moves", "ordered gin and diet coke", "missed Red Wings game", "back talk", "pulling a Deb Jarvis", "giving the finger/flipping off bartender"). Do NOT misinterpret gestures (giving the finger) as sexual. Flag ONLY profanity, swear words, personal insults/name-calling, racism, slurs, or vulgar hostility. Reply ONLY with JSON: {"flagged": boolean, "reason": "string"}',
           },
           {
             role: 'user',
@@ -413,14 +414,15 @@ First, verify whether this image actually contains at least one physical paper "
 If the image DOES contain 1 or more physical Demerit Slips (up to 4 slips laying next to each other), set "is_demerit_slip": true and read all handwritten fields for EVERY slip visible:
 ${rosterHint}
 
-- "raw_student": Handwritten name on the "Student:" line (e.g. "Rick", "Burtis", "David Lee", etc.)
+- "raw_student": Handwritten name on the "Student:" line (e.g. "Rick", "Burtis", "David Lee", "Ziggie", etc.)
 - "incident_date": Handwritten date on the "Date(s):" line formatted as YYYY-MM-DD (if year is 26 or missing, use 2026; if blank use "${fallbackDate}")
 - "incident_time": Handwritten time on the "Time:" line in 24-hour HH:MM format (note: bar slips are evening PM times unless AM is written, so "9:09" or "9:09 PM" -> "21:09", "6:27" -> "18:27", "8:50" -> "20:50")
 - "location_area": Handwritten room on the "Room:" line (e.g. "Copper A.C.", "Copper Bar", "Copper")
 - "demerit_count": Total integer number of demerits written on the "Demerits:" line (e.g. "1", "2", "3", "1 - so far" -> 1)
 - "raw_signature": Handwritten signature on the "Teacher:" / bottom signature line (e.g. "The Boss - AKA Sarah", "The Boss Lady", "YOUR BOSS!", or if it's Sarah's cursive signature write "Sarah (Cursive Signature)")
 - "demerit_items": Array of each handwritten offense/reason listed on the slip. Each item must have:
-  - "description": Exact handwritten offense text (e.g. "Too many seat moves", "Tried to order Gin and Diet Coke", "The headband", "Back talk, insubordinate", "No call / no show to see the Red Wings")
+  - "description": Exact handwritten offense text (e.g. "Too many seat moves", "Tried to order Gin and Diet Coke", "The headband", "Back talk, insubordinate", "No call / no show to see the Red Wings", "Pulling a Deb Jarvis", "Giving the finger to the bartender / flipping off the bartender", "Flying chair").
+    * Note on cursive reading: Read cursive accurately (e.g. "Deb Jarvis", NOT "Deb Taco"; "giving the finger to the bartender", "lingering by the bartender", or "bickering with the bartender").
   - "type": One of ["Attendance / No-Show", "Insubordination / Defiance", "Bar Etiquette / Seating", "Drink Crime / Order Foul", "Attire / Headgear Foul", "Sports / Fantasy Foul", "Party Foul / Conduct"]
   - "points": Integer points for this offense so the items sum to "demerit_count"
 
@@ -1150,7 +1152,8 @@ async function ensureSchemaAndSeed(db) {
   const baselineNicknames = [
     { id: 'c0000000-0000-4000-8000-000000000011', alias: 'rick', member_id: '11111111-1111-4111-8111-111111111111' },
     { id: 'c0000000-0000-4000-8000-000000000012', alias: 'burtis', member_id: '22222222-2222-4222-8222-222222222222' },
-    { id: 'c0000000-0000-4000-8000-000000000013', alias: 'david lee', member_id: '55555555-5555-4555-8555-555555555555' },
+    { id: 'c0000000-0000-4000-8000-000000000013', alias: 'david lee', member_id: 'bd28ef26-f7c7-4eaf-96c1-f621ba3a7feb' },
+    { id: 'c0000000-0000-4000-8000-000000000014', alias: 'ziggie', member_id: 'bd28ef26-f7c7-4eaf-96c1-f621ba3a7feb' },
   ];
   for (const nick of baselineNicknames) {
     await db
@@ -1158,6 +1161,17 @@ async function ensureSchemaAndSeed(db) {
       .bind(nick.id, nick.alias, nick.member_id)
       .run();
   }
+
+  // Ensure David Lee legacy seeded ID is cleanly merged into Ziggie
+  await db
+    .prepare("UPDATE staff_aliases SET member_id = 'bd28ef26-f7c7-4eaf-96c1-f621ba3a7feb' WHERE member_id = '55555555-5555-4555-8555-555555555555'")
+    .run();
+  await db
+    .prepare("UPDATE demerits SET patron_id = 'bd28ef26-f7c7-4eaf-96c1-f621ba3a7feb' WHERE patron_id = '55555555-5555-4555-8555-555555555555'")
+    .run();
+  await db
+    .prepare("DELETE FROM members WHERE id = '55555555-5555-4555-8555-555555555555'")
+    .run();
 }
 
 /**
@@ -1260,7 +1274,7 @@ export default {
         return jsonResponse({
           ok: true,
           service: 'copper-demerits-api',
-          version: '1.6.6',
+          version: '1.6.19',
           backend: 'cloudflare-d1-r2-ai',
           database: 'copper-demerits-db',
           bucket: 'copper-demerits-slips',
@@ -2608,7 +2622,7 @@ export default {
         return jsonResponse({ ok: true, slip: formatSlip(updated, true) });
       }
 
-      // 13. Update or Delete Demerit Slip (`/api/demerits/:id`)
+      // 13. Update, Correct Minor Mistakes, or Delete Demerit Slip (`/api/demerits/:id`)
       if (path.startsWith('/api/demerits/')) {
         const id = decodeURIComponent(path.replace('/api/demerits/', ''));
         if (request.method === 'PATCH') {
@@ -2620,11 +2634,134 @@ export default {
             return jsonResponse({ ok: false, error: 'Slip not found' }, 404);
           }
 
+          // Authenticate actor if provided
+          const actorMemberId = body.actor_member_id || request.headers.get('X-Member-Id');
+          const actorPin = (body.actor_pin || request.headers.get('X-Member-Pin') || '').trim();
+
+          let actor = null;
+          if (actorMemberId) {
+            actor = await env.DB.prepare('SELECT * FROM members WHERE id = ?').bind(actorMemberId).first();
+            if (actor && actor.claimed_pin && actorPin && actor.claimed_pin !== actorPin) {
+              return jsonResponse({ ok: false, error: 'Incorrect Bar PIN.' }, 403);
+            }
+          }
+
+          // RBAC: If updating content (student name, infractions, items, date, points), verify permission
+          const isModifyingContent =
+            body.raw_student !== undefined ||
+            body.infractions !== undefined ||
+            body.demerit_items !== undefined ||
+            body.demerit_count !== undefined ||
+            body.incident_date !== undefined ||
+            body.incident_time !== undefined;
+
+          if (isModifyingContent && actor) {
+            const isAdminOrStaff = Boolean(actor.is_admin || actor.is_staff);
+            const isSubmitter = existing.submitted_by_member_id === actor.id;
+            const isCitedPatron = existing.patron_id === actor.id;
+            if (!isAdminOrStaff && !isSubmitter && !isCitedPatron) {
+              return jsonResponse(
+                {
+                  ok: false,
+                  error: 'Only Referees, the submitter, or the cited patron can correct mistakes on this slip.',
+                },
+                403
+              );
+            }
+          }
+
+          // Content Moderation Guardrail adhering to bar rules
+          const textsToModerate = [];
+          if (typeof body.raw_student === 'string') textsToModerate.push(body.raw_student);
+          if (Array.isArray(body.infractions)) textsToModerate.push(...body.infractions);
+          if (Array.isArray(body.demerit_items)) {
+            textsToModerate.push(...body.demerit_items.map((i) => i.description));
+          }
+          if (body.correction_note) textsToModerate.push(body.correction_note);
+
+          if (textsToModerate.length > 0) {
+            const mod = await moderateContent(env, { texts: textsToModerate });
+            if (mod.flagged) {
+              return jsonResponse(
+                {
+                  ok: false,
+                  error: `Referee Whistle: Slip corrections must adhere to sports bar rules and cannot contain insults, name-calling, or profanity! (${mod.reason})`,
+                },
+                400
+              );
+            }
+          }
+
+          // Handle infractions / items / points
+          let nextInfractions = existing.infractions;
+          let nextItems = existing.demerit_items;
+          let nextCount = existing.demerit_count;
+
+          if (Array.isArray(body.infractions)) {
+            nextInfractions = JSON.stringify(body.infractions);
+          }
+          if (Array.isArray(body.demerit_items)) {
+            nextItems = JSON.stringify(body.demerit_items);
+            if (body.demerit_count === undefined) {
+              const sum = body.demerit_items.reduce((acc, it) => acc + (Number(it.points) || 1), 0);
+              if (sum > 0) nextCount = sum;
+            }
+          }
+          if (typeof body.demerit_count === 'number' && body.demerit_count >= 1) {
+            nextCount = Math.round(body.demerit_count);
+          }
+
+          // Handle patron resolution if raw_student changed
+          let nextPatronId = body.patron_id !== undefined ? body.patron_id : existing.patron_id;
+          let nextRawStudent = body.raw_student !== undefined ? String(body.raw_student).trim() : existing.raw_student;
+
+          if (body.raw_student !== undefined && body.patron_id === undefined) {
+            const [membersRes, aliasesRes] = await Promise.all([
+              env.DB.prepare('SELECT * FROM members').all(),
+              env.DB.prepare('SELECT * FROM staff_aliases').all(),
+            ]);
+            const matched = matchMemberFromAliases(
+              nextRawStudent,
+              membersRes.results || [],
+              aliasesRes.results || [],
+              'patron'
+            );
+            if (matched) {
+              nextPatronId = matched;
+            }
+          }
+
+          // Audit note
+          let nextCaptureNote = body.capture_note !== undefined ? body.capture_note : existing.capture_note;
+          if (body.correction_note && actor) {
+            const noteStamp = `[Corrected by ${actor.display_name}: ${body.correction_note}]`;
+            nextCaptureNote = nextCaptureNote ? `${nextCaptureNote} · ${noteStamp}` : noteStamp;
+          }
+
+          // Preserve original infractions before first edit
+          let nextOriginal = existing.original_infractions;
+          if (
+            !nextOriginal &&
+            body.infractions !== undefined &&
+            JSON.stringify(body.infractions) !== existing.infractions
+          ) {
+            nextOriginal = existing.infractions;
+          }
+
           await env.DB.prepare(
             `UPDATE demerits
              SET status = ?,
                  patron_id = ?,
+                 raw_student = ?,
                  issuer_id = ?,
+                 raw_signature = ?,
+                 demerit_count = ?,
+                 incident_date = ?,
+                 incident_time = ?,
+                 location_area = ?,
+                 infractions = ?,
+                 demerit_items = ?,
+                 original_infractions = ?,
                  secondary_image_url = ?,
                  capture_note = ?,
                  is_blurred = ?
@@ -2632,27 +2769,213 @@ export default {
           )
             .bind(
               body.status !== undefined ? body.status : existing.status,
-              body.patron_id !== undefined ? body.patron_id : existing.patron_id,
+              nextPatronId,
+              nextRawStudent,
               body.issuer_id !== undefined ? body.issuer_id : existing.issuer_id,
+              body.raw_signature !== undefined ? String(body.raw_signature).trim() : existing.raw_signature,
+              nextCount,
+              body.incident_date !== undefined ? body.incident_date : existing.incident_date,
+              body.incident_time !== undefined ? body.incident_time : existing.incident_time,
+              body.location_area !== undefined ? body.location_area : existing.location_area,
+              nextInfractions,
+              nextItems,
+              nextOriginal,
               body.secondary_image_url !== undefined
                 ? body.secondary_image_url
                 : existing.secondary_image_url,
-              body.capture_note !== undefined ? body.capture_note : existing.capture_note,
+              nextCaptureNote,
               body.is_blurred !== undefined ? (body.is_blurred ? 1 : 0) : existing.is_blurred,
               id
             )
             .run();
 
+          await syncSlipsWithAliasesAndNames(env.DB);
+
           const updated = await env.DB.prepare('SELECT * FROM demerits WHERE id = ?')
             .bind(id)
             .first();
-          return jsonResponse({ ok: true, slip: formatSlip(updated, false) });
+          return jsonResponse({ ok: true, slip: formatSlip(updated, true) });
         }
 
         if (request.method === 'DELETE') {
           await env.DB.prepare('DELETE FROM demerits WHERE id = ?').bind(id).run();
           return jsonResponse({ ok: true });
         }
+      }
+
+      // 14. Merge Profiles Under Different Names (`POST /api/profiles/merge`)
+      // Allows:
+      // A) Site Admin/Staff to merge ANY two profiles in Ref Booth
+      // B) A claimed member to merge another profile (or unclaimed profile) into their own account with PIN validation
+      if (path === '/api/profiles/merge' && request.method === 'POST') {
+        const body = await request.json();
+        const sourceMemberId = body.source_member_id;
+        const targetMemberId = body.target_member_id;
+        const actorMemberId = body.actor_member_id || targetMemberId;
+        const actorPin = (body.actor_pin || request.headers.get('X-Member-Pin') || '').trim();
+        const sourcePin = (body.source_pin || '').trim();
+        const primaryDisplayName = body.primary_display_name ? String(body.primary_display_name).trim() : null;
+
+        if (!sourceMemberId || !targetMemberId) {
+          return jsonResponse({ ok: false, error: 'source_member_id and target_member_id are required.' }, 400);
+        }
+        if (sourceMemberId === targetMemberId) {
+          return jsonResponse({ ok: false, error: 'Cannot merge a profile into itself.' }, 400);
+        }
+
+        const [source, target, actor] = await Promise.all([
+          env.DB.prepare('SELECT * FROM members WHERE id = ?').bind(sourceMemberId).first(),
+          env.DB.prepare('SELECT * FROM members WHERE id = ?').bind(targetMemberId).first(),
+          env.DB.prepare('SELECT * FROM members WHERE id = ?').bind(actorMemberId).first(),
+        ]);
+
+        if (!source) {
+          return jsonResponse({ ok: false, error: 'Source profile not found.' }, 404);
+        }
+        if (!target) {
+          return jsonResponse({ ok: false, error: 'Target profile not found.' }, 404);
+        }
+        if (!actor) {
+          return jsonResponse({ ok: false, error: 'Sign in to perform a profile merge.' }, 401);
+        }
+
+        const isAdminOrStaff = Boolean(actor.is_admin || actor.is_staff);
+        const isOwnClaimedTarget = actor.id === target.id && Boolean(actor.is_claimed);
+
+        if (!isAdminOrStaff && !isOwnClaimedTarget) {
+          return jsonResponse(
+            { ok: false, error: 'Only Site Admins or the target profile owner can merge profiles.' },
+            403
+          );
+        }
+
+        // Validate actor PIN
+        if (actor.claimed_pin && actorPin && actor.claimed_pin !== actorPin) {
+          return jsonResponse({ ok: false, error: 'Incorrect Bar PIN for target profile.' }, 403);
+        }
+
+        // If not Admin, ensure source is not admin/staff, and verify source PIN if source is claimed
+        if (!isAdminOrStaff) {
+          if (source.is_admin || source.is_staff) {
+            return jsonResponse({ ok: false, error: 'Cannot absorb an Admin or Staff profile.' }, 403);
+          }
+          if (source.is_claimed) {
+            if (!sourcePin || source.claimed_pin !== sourcePin) {
+              return jsonResponse(
+                {
+                  ok: false,
+                  error: `"${source.display_name}" is already claimed. Enter that profile's Bar PIN to confirm ownership and merge accounts.`,
+                },
+                403
+              );
+            }
+          }
+        }
+
+        // Moderate primary display name if provided
+        if (primaryDisplayName && primaryDisplayName !== target.display_name) {
+          const mod = await moderateContent(env, { texts: [primaryDisplayName] });
+          if (mod.flagged) {
+            return jsonResponse(
+              { ok: false, error: `Referee Whistle: Display name must be bar-friendly! (${mod.reason})` },
+              400
+            );
+          }
+        }
+
+        // 1. Move all demerits where patron_id is source to target
+        await env.DB.prepare('UPDATE demerits SET patron_id = ? WHERE patron_id = ?')
+          .bind(target.id, source.id)
+          .run();
+
+        // 2. Move all demerits where submitted_by_member_id is source to target
+        await env.DB.prepare('UPDATE demerits SET submitted_by_member_id = ? WHERE submitted_by_member_id = ?')
+          .bind(target.id, source.id)
+          .run();
+
+        // 3. Move all staff_aliases from source to target
+        await env.DB.prepare('UPDATE staff_aliases SET member_id = ? WHERE member_id = ?')
+          .bind(target.id, source.id)
+          .run();
+
+        // 4. Ensure source's display_name is added as an alias for target
+        const sourceAlias = source.display_name.trim().toLowerCase();
+        if (sourceAlias) {
+          const existingAlias = await env.DB.prepare(
+            'SELECT * FROM staff_aliases WHERE LOWER(alias) = LOWER(?)'
+          ).bind(sourceAlias).first();
+
+          if (!existingAlias) {
+            await env.DB.prepare('INSERT INTO staff_aliases (id, alias, member_id) VALUES (?, ?, ?)')
+              .bind(crypto.randomUUID(), sourceAlias, target.id)
+              .run();
+          } else if (existingAlias.member_id !== target.id) {
+            await env.DB.prepare('UPDATE staff_aliases SET member_id = ? WHERE id = ?')
+              .bind(target.id, existingAlias.id)
+              .run();
+          }
+        }
+
+        // 5. Ensure target's existing display name is also mapped as alias
+        const targetAlias = target.display_name.trim().toLowerCase();
+        if (targetAlias) {
+          const existingTargetAlias = await env.DB.prepare(
+            'SELECT * FROM staff_aliases WHERE LOWER(alias) = LOWER(?)'
+          ).bind(targetAlias).first();
+
+          if (!existingTargetAlias) {
+            await env.DB.prepare('INSERT INTO staff_aliases (id, alias, member_id) VALUES (?, ?, ?)')
+              .bind(crypto.randomUUID(), targetAlias, target.id)
+              .run();
+          }
+        }
+
+        // 6. If primaryDisplayName changed, update target's display_name and add as alias
+        let finalDisplayName = target.display_name;
+        if (primaryDisplayName && primaryDisplayName !== target.display_name) {
+          finalDisplayName = primaryDisplayName;
+          await env.DB.prepare('UPDATE members SET display_name = ? WHERE id = ?')
+            .bind(finalDisplayName, target.id)
+            .run();
+
+          const newNameAlias = finalDisplayName.trim().toLowerCase();
+          const existingNewAlias = await env.DB.prepare(
+            'SELECT * FROM staff_aliases WHERE LOWER(alias) = LOWER(?)'
+          ).bind(newNameAlias).first();
+          if (!existingNewAlias) {
+            await env.DB.prepare('INSERT INTO staff_aliases (id, alias, member_id) VALUES (?, ?, ?)')
+              .bind(crypto.randomUUID(), newNameAlias, target.id)
+              .run();
+          }
+        }
+
+        // 7. Transfer contact details if target was missing them
+        if (!target.notification_email && source.notification_email) {
+          await env.DB.prepare('UPDATE members SET notification_email = ?, notification_opt_in = 1 WHERE id = ?')
+            .bind(source.notification_email, target.id)
+            .run();
+        }
+        if (!target.notification_phone && source.notification_phone) {
+          await env.DB.prepare('UPDATE members SET notification_phone = ?, notification_carrier = ? WHERE id = ?')
+            .bind(source.notification_phone, source.notification_carrier || 'none', target.id)
+            .run();
+        }
+
+        // 8. Re-sync all slips with aliases
+        await syncSlipsWithAliasesAndNames(env.DB);
+
+        // 9. Delete source member
+        await env.DB.prepare('DELETE FROM members WHERE id = ?').bind(source.id).run();
+
+        const updatedTarget = await env.DB.prepare('SELECT * FROM members WHERE id = ?')
+          .bind(target.id)
+          .first();
+
+        return jsonResponse({
+          ok: true,
+          mergedMember: formatPublicMember(updatedTarget),
+          message: `Successfully merged "${source.display_name}" into "${finalDisplayName}". All citations and aliases are now unified.`,
+        });
       }
 
       // 14. Add or Delete Member Nickname / Staff Alias (`/api/aliases`)

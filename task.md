@@ -1,6 +1,21 @@
 # Task Tracker — Copper Demerits (`copperdemerits.com`)
 
-## Active Sprint — v1.6.18 (Ref Booth Gating & Role Separation)
+## Active Sprint — v1.6.19 (Profile Merging & Rule-Abiding Slip Mistake Correction)
+- [x] Merge Ziggie and David Lee in live Cloudflare D1 (`copper-demerits-db`): unified all 4 citations under single claimed account (`bd28ef26-f7c7-4eaf-96c1-f621ba3a7feb`), mapped both "david lee" and "ziggie" as slip aliases, and purged duplicate unclaimed roster entry
+- [x] Correct slip `0d181001-765f-4314-ba70-e4a8e7cc0495` from OCR misread "Pulling a Deb Taco" to authentic bar infraction "Pulling a Deb Jarvis"
+- [x] Implement backend endpoint `POST /api/profiles/merge` in Cloudflare Worker (`cloudflare/worker.js`) supporting both Referee Ref Booth merging and patron self-service merging (with PIN verification)
+- [x] Enhance backend endpoint `PATCH /api/demerits/:id` in Cloudflare Worker to support correcting raw student name, victim attribution, infractions, demerit items, points, date, and time with bar rule content moderation and RBAC
+- [x] Add self-service "Merge Profiles / Absorb Unclaimed Name" manager inside "My Locker" (`src/components/ClaimProfileModal.tsx`)
+- [x] Add authoritative "Referee Roster & Profile Merger" tool inside Ref Booth (`src/pages/AdminPage.tsx`)
+- [x] Build accessible `CorrectSlipMistakeModal` (`src/components/CorrectSlipMistakeModal.tsx`) with slip photo evidence thumbnail, preset bar foul pills, and rule validation
+- [x] Add "Correct Mistake" action button and correction audit trail badge to `SlipModalViewer.tsx` and Ref Booth slip cards
+- [x] Update Vision OCR and Referee Monitor prompts in `cloudflare/worker.js` to distinguish lighthearted bar banter/gestures (giving the finger / flipping off bartender, pulling a Deb Jarvis, lingering/bickering) from inappropriate content
+- [x] Deploy Cloudflare Worker (`v1.6.19`) with version ID `770805e5-5b1c-4b05-9e0c-2d28015d56d9` to `api.copperdemerits.com`
+- [x] Pass `npm run lint` and `npm run build` with zero errors
+- [x] Honor user directive: Do NOT publish to Netlify production
+
+## Completed Sprints
+### v1.6.18 (Ref Booth Gating & Role Separation)
 - [x] Gate "Ref Booth" navigation link in desktop header to authenticated admins/staff (`isAdminOrStaff`)
 - [x] Gate "Ref Booth" navigation link in mobile bottom nav to authenticated admins/staff (`isAdminOrStaff`)
 - [x] Dynamically switch mobile navigation grid between `grid-cols-4` (public) and `grid-cols-5` (admin)

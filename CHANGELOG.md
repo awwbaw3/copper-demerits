@@ -2,6 +2,36 @@
 
 All notable changes to the **Copper Athletic Club — Ring of Honor** web application are documented in this file.
 
+## [1.6.19] - 2026-10-23
+
+### Added & Enhanced — Profile Merging & Rule-Abiding Slip Mistake Correction Engine
+- **Unified Ziggie & David Lee in Live Cloudflare D1 (`copper-demerits-db`)**:
+  - Reassigned David Lee's verified citation (`a4444444-4444-4444-8444-444444444444`, Oct 17 6:27 PM, `+1 PT`) to Ziggie's claimed account (`bd28ef26-f7c7-4eaf-96c1-f621ba3a7feb`).
+  - Cross-linked both `david lee` and `ziggie` as permanent aliases for `bd28ef26-f7c7-4eaf-96c1-f621ba3a7feb`, allowing any handwritten citation written under either name to automatically merge into Ziggie's record.
+  - Purged the duplicate unclaimed member row (`55555555-5555-4555-8555-555555555555`) so the public roster and claim list stay clean.
+- **Corrected OCR Misread Citation**:
+  - Corrected slip `0d181001-765f-4314-ba70-e4a8e7cc0495` from OCR misread `"Pulling a Deb Taco"` to authentic local bar infraction `"Pulling a Deb Jarvis"` across `infractions` and `demerit_items`.
+- **Backend Profile Merging Endpoint (`POST /api/profiles/merge`)**:
+  - Added secure profile merging endpoint in Cloudflare Worker (`cloudflare/worker.js`) supporting:
+    - Authoritative merging by Referees/Admins in Ref Booth.
+    - Self-service merging by claimed patrons (with PIN verification) to absorb unclaimed duplicate profiles into their active locker.
+    - Automatic migration of all citations, submitter references, and aliases to the surviving profile.
+    - Automatic creation of the source profile's name as an alias on the target profile.
+    - Re-synchronization of all citations past and present via `syncSlipsWithAliasesAndNames(env.DB)`.
+- **Backend Slip Mistake Correction Endpoint (`PATCH /api/demerits/:id`)**:
+  - Upgraded endpoint to support updating raw student name, victim attribution, infractions, demerit items, point count, incident date, incident time, and room.
+  - Enforced content moderation guardrails: all corrected text must pass the Referee Monitor for sports bar-friendly rules (profanity/slurs prohibited).
+  - Enforced RBAC: edits are restricted to Site Admins, Bar Referees, the slip submitter, or the cited patron.
+  - Added automatic audit notes on corrected slips (`capture_note`).
+- **Interactive Slip Mistake Correction Modal (`src/components/CorrectSlipMistakeModal.tsx`)**:
+  - Accessible modal (Apple HIG 44px+ touch targets, iOS safe-zone friendly) displaying original slip photo evidence thumbnail, patron selector, line item descriptions, category dropdowns, point counters, and quick preset pills for iconic fouls (`Pulling a Deb Jarvis`, `Too many seat moves`, `Tried to order Gin & Diet Coke`, `No call / no show to see Red Wings`, `Flying chair`, `Spilling a full beer`).
+- **In-App Integration Across Public & Admin Surfaces**:
+  - **`SlipModalViewer.tsx`**: Added prominent `[Correct Mistake]` button for authorized users and dynamic correction audit badge.
+  - **`ClaimProfileModal.tsx`**: Added "Merge Profiles / Absorb Unclaimed Name" manager inside "My Locker" for patrons to easily combine duplicate profiles.
+  - **`AdminPage.tsx`**: Added "Referee Roster & Profile Merger" tool and direct `[Edit]` button on each citation card in the Ref Booth.
+- **Refined AI Referee Prompt on Bar Banter & Slang**:
+  - Updated Workers AI and Vision OCR prompts to properly interpret lighthearted sports bar banter and gestures (e.g. flipping off / giving the finger to the bartender, pulling a Deb Jarvis, lingering/bickering) without false-positive NSFW sexual content classifications.
+
 ## [1.6.18] - 2026-10-18
 
 ### Changed & Security Gated — Admin & Staff Ref Booth Isolation
