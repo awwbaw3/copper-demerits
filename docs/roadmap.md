@@ -121,3 +121,16 @@
 - [x] Added high-contrast "Return to Scoreboard" exit button on `/admin` access-denied lock screen.
 - [x] Guarded auto-blurred slip post-submission routing to only redirect to `/admin` if signed in as admin/staff, otherwise gracefully navigating to `/docket`.
 - [x] Maintained strict zero Netlify production deployments.
+
+## Phase 20: Profile Merging & Slip Mistake Correction Engine (Completed — v1.6.19)
+- [x] Unified Ziggie and David Lee in live Cloudflare D1 (`copper-demerits-db`): consolidated all 4 citations under single claimed account (`bd28ef26-f7c7-4eaf-96c1-f621ba3a7feb`), mapped both "david lee" and "ziggie" as slip aliases, and purged duplicate unclaimed roster entry.
+- [x] Corrected slip `0d181001-765f-4314-ba70-e4a8e7cc0495` from OCR misread "Pulling a Deb Taco" to authentic bar infraction "Pulling a Deb Jarvis".
+- [x] Implemented backend endpoint `POST /api/profiles/merge` in Cloudflare Worker (`cloudflare/worker.js`) supporting Referee Ref Booth merging and patron self-service merging (with PIN verification).
+- [x] Enhanced backend endpoint `PATCH /api/demerits/:id` in Cloudflare Worker to support correcting raw student name, victim attribution, infractions, demerit items, points, date, and time with bar rule content moderation and RBAC.
+- [x] Added self-service "Merge Profiles / Absorb Unclaimed Name" manager inside "My Locker" (`src/components/ClaimProfileModal.tsx`).
+- [x] Added authoritative "Referee Roster & Profile Merger" tool inside Ref Booth (`src/pages/AdminPage.tsx`).
+- [x] Built accessible `CorrectSlipMistakeModal` (`src/components/CorrectSlipMistakeModal.tsx`) with slip photo evidence thumbnail, preset bar foul pills, and rule validation.
+- [x] Added "Correct Mistake" action button and correction audit trail badge to `SlipModalViewer.tsx` and Ref Booth slip cards.
+- [x] Updated Vision OCR and Referee Monitor prompts in `cloudflare/worker.js` to distinguish lighthearted bar banter/gestures (giving the finger / flipping off bartender, pulling a Deb Jarvis, lingering/bickering) from inappropriate content.
+- [x] Deployed Cloudflare Worker (`v1.6.19`) with version ID `770805e5-5b1c-4b05-9e0c-2d28015d56d9` to `api.copperdemerits.com`.
+- [x] Verified zero Netlify production deployment.

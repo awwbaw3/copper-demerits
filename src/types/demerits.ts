@@ -59,6 +59,27 @@ export interface SlipReactions {
 
 export type SlipReactionKey = keyof SlipReactions;
 
+export interface MergeProfilesPayload {
+  sourceMemberId: string;
+  targetMemberId: string;
+  primaryDisplayName?: string;
+  sourcePin?: string;
+}
+
+export interface CorrectSlipPayload {
+  rawStudent?: string;
+  patronId?: string | null;
+  rawSignature?: string;
+  issuerId?: string | null;
+  infractions?: string[];
+  demeritItems?: DemeritLineItem[];
+  demeritCount?: number;
+  incidentDate?: string;
+  incidentTime?: string | null;
+  locationArea?: string;
+  correctionNote?: string;
+}
+
 export interface DemeritSlip {
   id: string;
   patron_id: string | null;

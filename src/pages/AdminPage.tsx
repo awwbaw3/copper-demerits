@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { useDemerits } from '../context/DemeritsContext';
 import { EnrichedDemeritSlip } from '../types/demerits';
 import { SlipModalViewer } from '../components/SlipModalViewer';
+import { CorrectSlipMistakeModal } from '../components/CorrectSlipMistakeModal';
 import {
   ShieldAlert,
   Sparkles,
@@ -21,6 +22,8 @@ import {
   Beer,
   Send,
   Trophy,
+  GitMerge,
+  Edit3,
 } from 'lucide-react';
 
 export const AdminPage: React.FC = () => {
@@ -43,10 +46,18 @@ export const AdminPage: React.FC = () => {
     deduplicateExistingSlips,
     adminOverrideSlip,
     sendFridayDigestTest,
+    mergeProfiles,
   } = useDemerits();
 
   const [selectedSlip, setSelectedSlip] = useState<EnrichedDemeritSlip | null>(null);
+  const [editingSlip, setEditingSlip] = useState<EnrichedDemeritSlip | null>(null);
   const [sendingDigestTest, setSendingDigestTest] = useState(false);
+
+  // Profile Merger State
+  const [adminMergeSourceId, setAdminMergeSourceId] = useState<string>('');
+  const [adminMergeTargetId, setAdminMergeTargetId] = useState<string>('');
+  const [adminMerging, setAdminMerging] = useState(false);
+  const [adminMergeFeedback, setAdminMergeFeedback] = useState<{ type: 'ok' | 'err'; msg: string } | null>(null);
 
   // Alias Mapper State
   const [newAliasInput, setNewAliasInput] = useState('');
@@ -210,6 +221,50 @@ export const AdminPage: React.FC = () => {
       }
     } finally {
       setSendingDigestTest(false);
+    }
+  };
+
+  const handleAdminMerge = async () => {
+    if (!adminMergeSourceId || !adminMergeTargetId) {
+      setAdminMergeFeedback({ type: 'err', msg: 'Please select both source and target profiles.' });
+      return;
+    }
+    if (adminMergeSourceId === adminMergeTargetId) {
+      setAdminMergeFeedback({ type: 'err', msg: 'Cannot merge a profile into itself.' });
+      return;
+    }
+
+    const sourceMember = members.find((m) => m.id === adminMergeSourceId);
+    const targetMember = members.find((m) => m.id === adminMergeTargetId);
+    if (!sourceMember || !targetMember) return;
+
+    setAdminMerging(true);
+    setAdminMergeFeedback(null);
+    try {
+      const res = await mergeProfiles({
+        sourceMemberId: adminMergeSourceId,
+        targetMemberId: adminMergeTargetId,
+      });
+
+      if (!res.ok) {
+        setAdminMergeFeedback({ type: 'err', msg: res.error || 'Failed to merge profiles.' });
+      } else {
+        setAdminMergeFeedback({
+          type: 'ok',
+          msg:
+            res.message ||
+            `Successfully merged "${sourceMember.display_name}" into "${targetMember.display_name}"!`,
+        });
+        setAdminMergeSourceId('');
+        setAdminMergeTargetId('');
+      }
+    } catch (err) {
+      setAdminMergeFeedback({
+        type: 'err',
+        msg: err instanceof Error ? err.message : 'Error merging profiles.',
+      });
+    } finally {
+      setAdminMerging(false);
     }
   };
 
@@ -501,6 +556,16 @@ export const AdminPage: React.FC = () => {
 
                   <button
                     type="button"
+                    onClick={() => setEditingSlip(slip)}
+                    className="inline-flex items-center gap-1 rounded-xl border border-[#DFC15E]/50 bg-[#DFC15E]/15 px-3 py-2 min-h-[44px] touch-manipulation active:scale-95 font-mono-docket text-xs text-[#DFC15E] hover:bg-[#DFC15E]/25 cursor-pointer shadow-[0_0_10px_rgba(223,193,94,0.15)]"
+                    title="Correct handwriting OCR misread, student name, or category"
+                  >
+                    <Edit3 className="h-3.5 w-3.5" />
+                    <span>Edit</span>
+                  </button>
+
+                  <button
+                    type="button"
                     onClick={() => setSelectedSlip(slip)}
                     className="inline-flex items-center gap-1 rounded-xl border border-white/15 bg-white/5 px-3 py-2 min-h-[44px] touch-manipulation active:scale-95 font-mono-docket text-xs text-[#D6C7B8] cursor-pointer"
                   >
@@ -720,7 +785,96 @@ export const AdminPage: React.FC = () => {
         </section>
       </div>
 
+      {/* Referee Roster & Profile Merger */}
+      <section className="rounded-2xl border-2 border-[#DFC15E]/40 bg-[#161311] p-4 sm:p-6 space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/10 pb-3">
+          <div className="flex items-center gap-2">
+            <GitMerge className="h-5 w-5 text-[#DFC15E]" />
+            <h2 className="font-athletic text-2xl font-bold uppercase tracking-wide text-[#F5F2EB]">
+              REFEREE ROSTER &amp; PROFILE MERGER
+            </h2>
+          </div>
+          <span className="rounded-full bg-[#DFC15E]/15 border border-[#DFC15E]/40 px-3 py-1 font-mono-docket text-xs font-bold text-[#DFC15E]">
+            Ref Booth Management
+          </span>
+        </div>
+
+        <p className="font-mono-docket text-xs text-[#D6C7B8]">
+          Combine two profiles into one unified record (for example, when a patron like Ziggie &amp; David Lee was cited under different names or a duplicate profile was created). The target profile absorbs all citations, demerit points, and aliases, and the source profile's name becomes an official slip alias.
+        </p>
+
+        {adminMergeFeedback && (
+          <div
+            className={`rounded-xl border px-4 py-3 font-mono-docket text-xs ${
+              adminMergeFeedback.type === 'ok'
+                ? 'border-emerald-500/40 bg-emerald-950/40 text-emerald-300'
+                : 'border-rose-500/40 bg-rose-950/40 text-rose-300'
+            }`}
+          >
+            {adminMergeFeedback.msg}
+          </div>
+        )}
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 rounded-xl border border-white/10 bg-[#0E0C0B] p-4">
+          <div>
+            <label className="block font-mono-docket text-xs font-bold uppercase text-[#C86D51]">
+              1. SOURCE PROFILE (ABSORBED &amp; DELETED)
+            </label>
+            <select
+              value={adminMergeSourceId}
+              onChange={(e) => setAdminMergeSourceId(e.target.value)}
+              aria-label="Source profile to absorb"
+              className="mt-1.5 w-full rounded-xl border border-white/15 bg-[#151210] px-3.5 py-2.5 font-mono-docket text-base sm:text-xs min-h-[44px] text-white focus:border-[#DFC15E]"
+            >
+              <option value="">Select profile to absorb...</option>
+              {members.map((m) => (
+                <option key={m.id} value={m.id}>
+                  {m.display_name} ({demerits.filter((d) => d.patron_id === m.id).length} slips · {m.is_claimed ? 'Claimed' : 'Unclaimed'})
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="block font-mono-docket text-xs font-bold uppercase text-emerald-400">
+              2. TARGET PROFILE (SURVIVOR ACCOUNT)
+            </label>
+            <select
+              value={adminMergeTargetId}
+              onChange={(e) => setAdminMergeTargetId(e.target.value)}
+              aria-label="Target profile to survive"
+              className="mt-1.5 w-full rounded-xl border border-white/15 bg-[#151210] px-3.5 py-2.5 font-mono-docket text-base sm:text-xs min-h-[44px] text-white focus:border-[#DFC15E]"
+            >
+              <option value="">Select surviving target profile...</option>
+              {members.map((m) => (
+                <option key={m.id} value={m.id}>
+                  {m.display_name} ({demerits.filter((d) => d.patron_id === m.id).length} slips · {m.is_claimed ? 'Claimed' : 'Unclaimed'})
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="flex flex-col justify-end">
+            <button
+              type="button"
+              onClick={handleAdminMerge}
+              disabled={!adminMergeSourceId || !adminMergeTargetId || adminMerging}
+              className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#DFC15E] via-[#E8B888] to-[#DFC15E] px-5 py-3 min-h-[44px] touch-manipulation active:scale-95 font-athletic text-sm font-black uppercase tracking-wider text-[#121212] hover:brightness-110 disabled:opacity-40 cursor-pointer shadow-[0_0_20px_rgba(223,193,94,0.25)]"
+            >
+              <GitMerge className="h-4 w-4" />
+              <span>{adminMerging ? 'Merging Profiles...' : 'Confirm & Merge Profiles'}</span>
+            </button>
+          </div>
+        </div>
+      </section>
+
       <SlipModalViewer slip={selectedSlip} onClose={() => setSelectedSlip(null)} />
+      <CorrectSlipMistakeModal
+        slip={editingSlip}
+        isOpen={Boolean(editingSlip)}
+        onClose={() => setEditingSlip(null)}
+        onSuccess={() => setEditingSlip(null)}
+      />
     </div>
   );
 };

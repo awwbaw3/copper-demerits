@@ -10,7 +10,8 @@ export const MEMBER_IDS = {
   RICK: '11111111-1111-4111-8111-111111111111',
   BURTIS: '22222222-2222-4222-8222-222222222222',
   SARAH: '33333333-3333-4333-8333-333333333333',
-  DAVID_LEE: '55555555-5555-4555-8555-555555555555',
+  ZIGGIE: 'bd28ef26-f7c7-4eaf-96c1-f621ba3a7feb',
+  DAVID_LEE: 'bd28ef26-f7c7-4eaf-96c1-f621ba3a7feb', // Ziggie and David Lee are the same person
 } as const;
 
 export const DEMERIT_CATEGORIES = [
@@ -121,13 +122,14 @@ export const DEFAULT_MEMBERS: Member[] = [
     created_at: '2026-10-17T20:00:00Z',
   },
   {
-    id: MEMBER_IDS.DAVID_LEE,
-    display_name: 'David Lee',
+    id: MEMBER_IDS.ZIGGIE,
+    display_name: 'Ziggie',
     is_staff: false,
     is_patron: true,
-    favorite_team: 'pistons-bad-boys',
-    tagline: '1 Demerit — So Far',
-    created_at: '2026-10-17T18:27:00Z',
+    is_claimed: true,
+    favorite_team: 'lions',
+    tagline: 'Ope',
+    created_at: '2026-10-18T23:18:49.452Z',
   },
 ];
 
@@ -190,7 +192,12 @@ export const DEFAULT_STAFF_ALIASES: StaffAlias[] = [
   {
     id: 'c0000000-0000-4000-8000-000000000013',
     alias: 'david lee',
-    member_id: MEMBER_IDS.DAVID_LEE,
+    member_id: MEMBER_IDS.ZIGGIE,
+  },
+  {
+    id: 'c0000000-0000-4000-8000-000000000014',
+    alias: 'ziggie',
+    member_id: MEMBER_IDS.ZIGGIE,
   },
 ];
 
