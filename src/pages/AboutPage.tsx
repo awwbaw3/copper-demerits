@@ -25,7 +25,7 @@ import { PwaTooltip } from '../components/PwaTooltip';
 interface ChangelogEntry {
   version: string;
   date: string;
-  badge: string;
+  badge?: string;
   title: string;
   summary: string;
   highlights: string[];
@@ -33,9 +33,23 @@ interface ChangelogEntry {
 
 const USER_CHANGELOG: ChangelogEntry[] = [
   {
-    version: 'v1.6.20',
+    version: 'v1.6.21',
     date: 'October 24, 2026',
     badge: 'LATEST RELEASE',
+    title: 'Automatic Slip Paper Cropping & Upright Orientation Rotation',
+    summary:
+      'All physical demerit slips uploaded from mobile cameras or bar counters are now automatically cropped to remove dark table margins and automatically rotated 90° clockwise/counter-clockwise so every slip displays upright and centered. Also added 1-tap manual rotation controls and updated AI vision orientation prompts.',
+    highlights: [
+      'Smart Paper Border Detection: Scans edge contrast against dark copper, slate, and mahogany tables to crop precisely around the paper slip.',
+      'Auto Upright Rotation: Detects landscape or sideways slips and rotates them upright before uploading and OCR scanning.',
+      '1-Tap Slip Preview Rotation: Dedicated [Rotate 90°] and [Rotate -90°] buttons on the submit screen to adjust orientation before final submission.',
+      'In-Place Viewer Rotation: Interactive rotation button directly inside the slip modal viewer for any historical citation.',
+      'Corrected Ziggie Citation: Diagnosed and corrected Ziggie’s sideways slip from OCR misread "Flying chair" to authentic "Fingering the bartender" and uploaded the upright cropped slip photo.',
+    ],
+  },
+  {
+    version: 'v1.6.20',
+    date: 'October 24, 2026',
     title: 'Demerit Correction Auth Gating & PWA Help Hub',
     summary:
       'Fine-tuned demerit editing permissions so you can only correct your own citations after claiming your locker and entering your PIN, while Referees maintain full oversight in the Ref Booth. Added this comprehensive About & PWA Guide page with interactive feature tooltips.',
@@ -215,7 +229,7 @@ export const AboutPage: React.FC = () => {
         {/* Discreet Aesthetic Version Pill */}
         <div className="inline-flex items-center gap-2 rounded-xl border border-[#DFC15E]/40 bg-[#1A1513] px-3 py-1.5 shadow-[0_0_15px_rgba(223,193,94,0.15)]">
           <span className="flex h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
-          <span className="font-mono-docket text-xs font-bold text-[#DFC15E]">PWA v1.6.20</span>
+          <span className="font-mono-docket text-xs font-bold text-[#DFC15E]">PWA v1.6.21</span>
           <span className="text-[10px] font-mono-docket text-[#A8988B] hidden sm:inline">
             · Marshall, MI
           </span>

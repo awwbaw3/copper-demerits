@@ -236,6 +236,12 @@ export interface ExtractedSlipAI {
     description: string;
     points: number;
   }[];
+  crop_box?: {
+    x_min: number;
+    y_min: number;
+    x_max: number;
+    y_max: number;
+  };
 }
 
 /**
@@ -249,6 +255,7 @@ export async function extractSlipsFromPhotoAI(
   ok: boolean;
   isDemeritSlip?: boolean;
   model?: string;
+  rotation_needed?: number;
   slips?: ExtractedSlipAI[];
   error?: string;
 }> {
@@ -257,6 +264,7 @@ export async function extractSlipsFromPhotoAI(
       ok: boolean;
       isDemeritSlip?: boolean;
       model?: string;
+      rotation_needed?: number;
       slips?: ExtractedSlipAI[];
       error?: string;
     }>('/api/extract-slip', {

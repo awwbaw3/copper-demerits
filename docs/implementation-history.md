@@ -2,6 +2,25 @@
 
 Chronological log of architectural decisions, database migrations, and infrastructure deployments.
 
+## 2026-10-24 — v1.6.21 Slip Auto-Crop, Auto-Rotate & Orientation Engine
+- **Slip Auto-Crop & Paper Boundary Isolation (`src/lib/imageAutoCrop.ts`)**:
+  - Implemented luminance & edge-contrast algorithm (`detectReceiptPaperBounds`) scanning uploaded photos to differentiate bright receipt paper from dark bar countertops (copper, mahogany, slate) with a 3.5% padding margin.
+  - Automatically isolates and crops receipt slips, maximizing on-screen legibility and reducing compressed payload size.
+- **Slip Auto-Orientation Rotation**:
+  - Implemented automatic orientation detection in `autoCropAndRotateSlip`: detects landscape captures and auto-rotates 90° clockwise/upright before OCR parsing and storage.
+  - Integrated into `fingerprintImageFile` (`src/lib/imageDedup.ts`) so every slip uploaded via camera or file drop is cropped & upright before hashing, deduplication, OCR, or cloud storage.
+- **Interactive Manual Rotation Controls**:
+  - **Submit Slip Page (`src/pages/SubmitSlipPage.tsx`)**: Added `[Rotate 90°]` and `[Rotate -90°]` buttons with visual status indicators (`✂️ AUTO-CROPPED TO RECEIPT`, `↻ ROTATED 90° UPRIGHT`) allowing users to adjust orientation with 1 tap.
+  - **Slip Modal Viewer (`src/components/SlipModalViewer.tsx`)**: Added in-place viewer rotation button so patrons can rotate any historical citation image 90° directly inside the viewer.
+- **AI Vision Worker Prompt Enhancements (`cloudflare/worker.js`)**:
+  - Augmented Cloudflare Worker AI Vision prompt to evaluate slip orientation, returning `rotation_needed` (0, 90, 180, 270) and normalized bounding boxes (`crop_box`).
+  - Deployed worker version `b58fdd9a-5da2-4669-9d4d-20e0eb4c76d9` to `api.copperdemerits.com`.
+- **Ziggie Citation Correction & Root Cause Analysis**:
+  - **Root Cause Identified**: Inspecting the raw slip image (`e8f1897461da81475adc2e96.jpg`) revealed the photo was taken 90° counter-clockwise (portrait camera holding landscape paper sideways). The horizontal AI OCR tried to read vertical cursive text, misreading "Fingering the bartender" as "Flying chair".
+  - Cropped and rotated Ziggie's slip photo upright, uploaded to Cloudflare R2 (`e8f1897461da81475adc2e96_upright.jpg`), and updated the Cloudflare D1 record (`ab378631-2ba0-4bb6-9e67-9e4315b50a37`) to authentic infraction `"Fingering the bartender"`.
+
+---
+
 ## 2026-10-24 — v1.6.20 Demerit Correction Auth Gating & User-Oriented About / PWA Help Hub
 - **Demerit Correction Access Control Enforcement**:
   - Updated `PATCH /api/demerits/:id` on Cloudflare Worker to enforce strict role-based access control.

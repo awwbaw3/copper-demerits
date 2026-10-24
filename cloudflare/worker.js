@@ -378,6 +378,15 @@ function sanitizeExtractedSlips(rawSlips, fallbackDate) {
     }
     const finalCount = cleanedItems.reduce((acc, it) => acc + it.points, 0);
 
+    let cropBox = null;
+    if (s.crop_box && typeof s.crop_box === 'object') {
+      cropBox = {
+        x_min: Math.max(0, Math.min(1, Number(s.crop_box.x_min ?? s.crop_box.xmin ?? 0))),
+        y_min: Math.max(0, Math.min(1, Number(s.crop_box.y_min ?? s.crop_box.ymin ?? 0))),
+        x_max: Math.max(0, Math.min(1, Number(s.crop_box.x_max ?? s.crop_box.xmax ?? 1))),
+        y_max: Math.max(0, Math.min(1, Number(s.crop_box.y_max ?? s.crop_box.ymax ?? 1))),
+      };
+    }
     return {
       raw_student: rawStudent,
       raw_signature: rawSignature,
@@ -387,6 +396,7 @@ function sanitizeExtractedSlips(rawSlips, fallbackDate) {
       demerit_count: finalCount,
       infractions: cleanedItems.map((it) => it.description),
       demerit_items: cleanedItems,
+      crop_box: cropBox,
     };
   });
 }
@@ -426,8 +436,11 @@ ${rosterHint}
   - "type": One of ["Attendance / No-Show", "Insubordination / Defiance", "Bar Etiquette / Seating", "Drink Crime / Order Foul", "Attire / Headgear Foul", "Sports / Fantasy Foul", "Party Foul / Conduct"]
   - "points": Integer points for this offense so the items sum to "demerit_count"
 
+- "rotation_needed": integer degrees clockwise (0, 90, 180, 270) needed to make the slip upright so handwriting reads from left-to-right, top-to-bottom. If already upright, 0; if sideways to the right, 270; if sideways to the left, 90; if upside-down, 180.
+- "crop_box": normalized bounding box of this paper slip as {"x_min": 0.05, "y_min": 0.05, "x_max": 0.95, "y_max": 0.95} with values 0.0 to 1.0 excluding bar counter background.
+
 Respond ONLY with valid JSON in this exact structure (no markdown fences, no extra commentary):
-{"is_demerit_slip": true, "slips": [{"raw_student": "...", "incident_date": "YYYY-MM-DD", "incident_time": "HH:MM", "location_area": "...", "demerit_count": 1, "raw_signature": "...", "demerit_items": [{"type": "...", "description": "...", "points": 1}]}]}`;
+{"is_demerit_slip": true, "rotation_needed": 0, "slips": [{"raw_student": "...", "incident_date": "YYYY-MM-DD", "incident_time": "HH:MM", "location_area": "...", "demerit_count": 1, "raw_signature": "...", "crop_box": {"x_min": 0.05, "y_min": 0.05, "x_max": 0.95, "y_max": 0.95}, "demerit_items": [{"type": "...", "description": "...", "points": 1}]}]}`;
 
   const dataUrl = imageBase64.startsWith('data:')
     ? imageBase64
@@ -471,7 +484,7 @@ Respond ONLY with valid JSON in this exact structure (no markdown fences, no ext
         }
         const slips = sanitizeExtractedSlips(parsed?.slips || (Array.isArray(parsed) ? parsed : []), fallbackDate);
         if (slips.length > 0) {
-          return { ok: true, isDemeritSlip: true, model: 'gemini-2.5-flash', slips };
+          return { ok: true, isDemeritSlip: true, model: 'gemini-2.5-flash', rotation_needed: Number(parsed?.rotation_needed) || 0, slips };
         }
       }
     } catch {
@@ -562,7 +575,7 @@ Respond ONLY with valid JSON in this exact structure (no markdown fences, no ext
             fallbackDate
           );
           if (slips.length > 0) {
-            return { ok: true, isDemeritSlip: true, model: modelName, slips };
+            return { ok: true, isDemeritSlip: true, model: modelName, rotation_needed: Number(parsed?.rotation_needed) || 0, slips };
           }
         }
       } catch {

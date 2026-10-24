@@ -17,6 +17,7 @@ import {
   Tag,
   Edit3,
   KeyRound,
+  RotateCw,
 } from 'lucide-react';
 
 interface SlipModalViewerProps {
@@ -30,9 +31,11 @@ export const SlipModalViewer: React.FC<SlipModalViewerProps> = ({ slip, onClose 
   const [activePhotoTab, setActivePhotoTab] = useState<'primary' | 'secondary' | 'source'>('primary');
   const [isCorrecting, setIsCorrecting] = useState(false);
   const [activeSlip, setActiveSlip] = useState<EnrichedDemeritSlip | null>(slip);
+  const [viewerRotation, setViewerRotation] = useState<number>(0);
 
   useEffect(() => {
     setActiveSlip(slip);
+    setViewerRotation(0);
   }, [slip]);
 
   const isClaimedAndLoggedIn = Boolean(
@@ -243,10 +246,25 @@ export const SlipModalViewer: React.FC<SlipModalViewerProps> = ({ slip, onClose 
             )}
 
             {currentImageUrl && (
-              <div className="relative overflow-hidden rounded-xl border-2 border-[#B87333]/40 bg-black">
+              <div className="relative overflow-hidden rounded-xl border-2 border-[#B87333]/40 bg-black min-h-[220px] flex items-center justify-center p-2">
+                <div className="absolute top-2 right-2 z-10 flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => setViewerRotation((prev) => (prev + 90) % 360)}
+                    className="inline-flex items-center gap-1 rounded-lg border border-white/20 bg-black/80 backdrop-blur-md px-2.5 py-1.5 min-h-[38px] font-mono-docket text-xs font-bold text-[#DFC15E] hover:bg-black hover:border-[#DFC15E]/60 active:scale-95 touch-manipulation cursor-pointer shadow-lg transition"
+                    title="Rotate slip image 90° clockwise"
+                  >
+                    <RotateCw className="h-3.5 w-3.5 text-[#DFC15E]" />
+                    <span>{viewerRotation !== 0 ? `Rotated ${viewerRotation}°` : 'Rotate 90°'}</span>
+                  </button>
+                </div>
                 <img
                   src={currentImageUrl}
                   alt={`Uploaded demerit slip for ${slip.patronDisplayName}`}
+                  style={{
+                    transform: viewerRotation ? `rotate(${viewerRotation}deg)` : undefined,
+                    transition: 'transform 0.25s ease-in-out',
+                  }}
                   className={`mx-auto max-h-[52vh] w-auto object-contain ${
                     slip.is_blurred ? 'blur-md' : ''
                   }`}

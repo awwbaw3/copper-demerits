@@ -1,5 +1,6 @@
 import { DemeritSlip } from '../types/demerits';
 import { KNOWN_UPLOADED_FILE_HASHES } from './defaultData';
+import { autoCropAndRotateSlip } from './imageAutoCrop';
 
 export interface ImageFingerprint {
   sha256: string;
@@ -11,6 +12,8 @@ export interface ImageFingerprint {
   originalBytes: number;
   compressedBytes: number;
   savingsPercent: number;
+  wasCropped?: boolean;
+  rotationApplied?: number;
 }
 
 /**
@@ -142,86 +145,82 @@ export async function fingerprintImageFile(
   const buffer = await file.arrayBuffer();
   const sha256 = await computeSha256FromBuffer(buffer);
 
+  // 1. Automatically crop paper boundary & auto-rotate upright
+  const autoResult = await autoCropAndRotateSlip(file, {
+    maxDimension,
+    quality: initialQuality,
+  });
+
   return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onerror = () => reject(new Error('Failed to read image file'));
-    reader.onload = () => {
-      const img = new Image();
-      img.onerror = () => reject(new Error('Invalid image format'));
-      img.onload = () => {
-        const dhash = computePerceptualDHash(img, 0);
-        const rotatedDhashes = [
-          dhash,
-          computePerceptualDHash(img, 90),
-          computePerceptualDHash(img, 180),
-          computePerceptualDHash(img, 270),
-        ].filter(Boolean);
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onerror = () => reject(new Error('Invalid image format'));
+    img.onload = () => {
+      const dhash = computePerceptualDHash(img, 0);
+      const rotatedDhashes = [
+        dhash,
+        computePerceptualDHash(img, 90),
+        computePerceptualDHash(img, 180),
+        computePerceptualDHash(img, 270),
+      ].filter(Boolean);
 
-        let { width, height } = img;
-        if (width > maxDimension || height > maxDimension) {
-          if (width > height) {
-            height = Math.round((height * maxDimension) / width);
-            width = maxDimension;
-          } else {
-            width = Math.round((width * maxDimension) / height);
-            height = maxDimension;
-          }
-        }
+      let width = img.naturalWidth || img.width;
+      let height = img.naturalHeight || img.height;
 
-        const renderCompressed = (targetW: number, targetH: number, q: number): string => {
-          const canvas = document.createElement('canvas');
-          canvas.width = targetW;
-          canvas.height = targetH;
-          const ctx = canvas.getContext('2d');
-          if (!ctx) return reader.result as string;
-          ctx.imageSmoothingEnabled = true;
-          ctx.imageSmoothingQuality = 'high';
-          // Fill white background in case of transparent PNGs before JPEG encoding
-          ctx.fillStyle = '#FFFFFF';
-          ctx.fillRect(0, 0, targetW, targetH);
-          ctx.drawImage(img, 0, 0, targetW, targetH);
-          return canvas.toDataURL('image/jpeg', q);
-        };
-
-        let dataUrl = renderCompressed(width, height, initialQuality);
-        let compressedBytes = estimateDataUrlBytes(dataUrl);
-
-        // Adaptive byte-budget loop: step down quality if needed so smartphone photos stay under ~82KB
-        const qualitySteps = [0.66, 0.58, 0.52];
-        for (const qStep of qualitySteps) {
-          if (compressedBytes <= targetMaxBytes) break;
-          dataUrl = renderCompressed(width, height, qStep);
-          compressedBytes = estimateDataUrlBytes(dataUrl);
-        }
-
-        // Final dimension step-down if an unusually dense texture still exceeds targetMaxBytes
-        if (compressedBytes > targetMaxBytes && (width > 720 || height > 720)) {
-          width = Math.round(width * 0.82);
-          height = Math.round(height * 0.82);
-          dataUrl = renderCompressed(width, height, 0.62);
-          compressedBytes = estimateDataUrlBytes(dataUrl);
-        }
-
-        const savingsPercent =
-          originalBytes > compressedBytes
-            ? Math.min(99, Math.max(1, Math.round(((originalBytes - compressedBytes) / originalBytes) * 100)))
-            : 0;
-
-        resolve({
-          sha256,
-          dhash,
-          rotatedDhashes,
-          dataUrl,
-          width,
-          height,
-          originalBytes: originalBytes || compressedBytes,
-          compressedBytes,
-          savingsPercent,
-        });
+      const renderCompressed = (targetW: number, targetH: number, q: number): string => {
+        const canvas = document.createElement('canvas');
+        canvas.width = targetW;
+        canvas.height = targetH;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return autoResult.dataUrl;
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
+        // Fill white background in case of transparent PNGs before JPEG encoding
+        ctx.fillStyle = '#FFFFFF';
+        ctx.fillRect(0, 0, targetW, targetH);
+        ctx.drawImage(img, 0, 0, targetW, targetH);
+        return canvas.toDataURL('image/jpeg', q);
       };
-      img.src = reader.result as string;
+
+      let dataUrl = renderCompressed(width, height, initialQuality);
+      let compressedBytes = estimateDataUrlBytes(dataUrl);
+
+      // Adaptive byte-budget loop: step down quality if needed so smartphone photos stay under ~82KB
+      const qualitySteps = [0.66, 0.58, 0.52];
+      for (const qStep of qualitySteps) {
+        if (compressedBytes <= targetMaxBytes) break;
+        dataUrl = renderCompressed(width, height, qStep);
+        compressedBytes = estimateDataUrlBytes(dataUrl);
+      }
+
+      // Final dimension step-down if an unusually dense texture still exceeds targetMaxBytes
+      if (compressedBytes > targetMaxBytes && (width > 720 || height > 720)) {
+        width = Math.round(width * 0.82);
+        height = Math.round(height * 0.82);
+        dataUrl = renderCompressed(width, height, 0.62);
+        compressedBytes = estimateDataUrlBytes(dataUrl);
+      }
+
+      const savingsPercent =
+        originalBytes > compressedBytes
+          ? Math.min(99, Math.max(1, Math.round(((originalBytes - compressedBytes) / originalBytes) * 100)))
+          : 0;
+
+      resolve({
+        sha256,
+        dhash,
+        rotatedDhashes,
+        dataUrl,
+        width,
+        height,
+        originalBytes: originalBytes || compressedBytes,
+        compressedBytes,
+        savingsPercent,
+        wasCropped: autoResult.wasCropped,
+        rotationApplied: autoResult.rotationApplied,
+      });
     };
-    reader.readAsDataURL(file);
+    img.src = autoResult.dataUrl;
   });
 }
 
