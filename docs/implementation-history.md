@@ -2,6 +2,14 @@
 
 Chronological log of architectural decisions, database migrations, and infrastructure deployments.
 
+## 2026-11-01 — v1.6.32 Relaxed, Readable Top Scoreboard Ticker Speed & Larger Typography
+- **Top Scrolling Banner Speed & Readability Fix (`src/index.css`, `src/components/Navbar.tsx`)**:
+  - Root cause: `.animate-ticker` had a hardcoded `34s` animation duration while `tickerItems` iterated over all `approvedSlips` (`27+` items), forcing ~6,000px of text across the viewport in 34 seconds.
+  - Updated `.animate-ticker` in `src/index.css` to use `var(--ticker-duration, 120s)` and added `.animate-ticker:active` pause support.
+  - Updated `src/components/Navbar.tsx` to include the 12 most recent slips (`approvedSlips.slice(0, 12)`), compute `tickerDurationSeconds = Math.max(115, tickerItems.length * 9)`, and increase banner height (`py-2 sm:py-2.5`) and font size (`text-sm sm:text-[15px] font-extrabold text-[#F5F2EB]`).
+
+---
+
 ## 2026-11-01 — v1.6.31 Logged-In Patron Default Attribution & 1-Tap Self vs. Other Slip Confirmation
 - **Logged-In User Default & 1-Tap Confirmation (`src/pages/SubmitSlipPage.tsx`)**:
   - Replaced hardcoded `'Rick'` in `createDefaultDraft` with `currentMember?.display_name || 'Rick'` and added an effect to sync untouched drafts when `currentMember` signs in.

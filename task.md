@@ -1,6 +1,12 @@
 # Task Tracker — Copper Demerits (`copperdemerits.com`)
 
-## Active Sprint — v1.6.31 (Logged-In Patron Default Attribution & 1-Tap Self vs. Other Slip Confirmation)
+## Active Sprint — v1.6.32 (Relaxed, Readable Top Scoreboard Ticker Speed & Larger Typography)
+- [x] Replace fixed `34s` `.animate-ticker` duration in `src/index.css` with dynamic `var(--ticker-duration, 120s)` and `:active` touch-pause support
+- [x] Cap ticker slip highlights to the 12 most recent slips (`approvedSlips.slice(0, 12)`) and compute `tickerDurationSeconds = Math.max(115, tickerItems.length * 9)` in `src/components/Navbar.tsx`
+- [x] Enlarge ticker banner height (`py-2 sm:py-2.5`) and typography (`text-sm sm:text-[15px] font-extrabold text-[#F5F2EB]`) in `src/components/Navbar.tsx`
+- [x] Bump version to `v1.6.32`, pass `npm run lint` and `npm run build`, and deploy Cloudflare Worker + Netlify production
+
+### v1.6.31 (Logged-In Patron Default Attribution & 1-Tap Self vs. Other Slip Confirmation)
 - [x] Default `createDefaultDraft` and initial `slipDrafts` on `src/pages/SubmitSlipPage.tsx` to `currentMember.display_name` when signed in
 - [x] Add upfront `[🙋‍♂️ Scanning For Myself (${currentMember.display_name})]` vs. `[👥 Scanning For Someone Else / Table]` toggle inside the Verified Bar Pass banner on `/submit`
 - [x] Add 1-tap `pendingRecipientConfirm` card when a logged-in user scans a single slip and AI Vision reads a different name on the slip (`Yes — Log For Me` vs. `No — Log For "[Name on Slip]"`)

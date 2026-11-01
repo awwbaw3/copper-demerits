@@ -239,8 +239,8 @@ export const Navbar: React.FC = () => {
     // 4. Referee Calls & Infraction Records
     items.push(`🚨 HEAD REFEREE REVIEW: SARAH ("THE BOSS") HAS ${approvedSlips.length}-FOR-${approvedSlips.length} SLIPS SUSTAINED (100% CONVICTION RATE)`);
 
-    // 5. Individual Slip Infractions & Citation Highlights
-    approvedSlips.forEach((slip) => {
+    // 5. Individual Slip Infractions & Citation Highlights (Most recent 12 citations for fresh, readable pacing)
+    approvedSlips.slice(0, 12).forEach((slip) => {
       const name = (slip.patronDisplayName || slip.raw_student || 'PATRON').toUpperCase();
       const pts = slip.demerit_count;
       const infractions = slip.infractions?.filter(Boolean).map((inf) => maskSensitiveInfraction(inf)).slice(0, 2).join(' + ').toUpperCase();
@@ -261,16 +261,25 @@ export const Navbar: React.FC = () => {
     return items;
   }, [computeStandings, approvedSlips, totalDemeritPoints, pendingCount, isAdminOrStaff]);
 
+  // Dynamic duration (~9s per item, minimum 115s) so the ticker always scrolls at a relaxed, readable ~38px/s pace
+  const tickerDurationSeconds = useMemo(
+    () => Math.max(115, tickerItems.length * 9),
+    [tickerItems.length]
+  );
+
   return (
     <>
       <header className="sticky top-0 z-40 border-b border-[#B87333]/35 bg-[#0F0D0C]/95 backdrop-blur-md pt-[env(safe-area-inset-top,0px)] pr-[env(safe-area-inset-right,0px)] pl-[env(safe-area-inset-left,0px)] w-full max-w-full overflow-x-clip">
-        {/* Animated ESPN / Fox Sports Detroit Style Ticker */}
-        <div className="w-full max-w-full overflow-hidden border-b border-[#B87333]/25 bg-gradient-to-r from-[#1A120E] via-[#281A12] to-[#1A120E] py-1.5 contain-paint">
-          <div className="animate-ticker flex items-center gap-8 text-xs font-sans font-bold uppercase tracking-wider text-[#E8B888]">
+        {/* Animated ESPN / Fox Sports Detroit Style Ticker — Relaxed speed & larger, high-contrast typography */}
+        <div className="w-full max-w-full overflow-hidden border-b border-[#B87333]/35 bg-gradient-to-r from-[#1A120E] via-[#2A1B12] to-[#1A120E] py-2 sm:py-2.5 contain-paint">
+          <div
+            style={{ '--ticker-duration': `${tickerDurationSeconds}s` } as React.CSSProperties}
+            className="animate-ticker flex items-center gap-10 text-sm sm:text-[15px] leading-snug font-sans font-extrabold uppercase tracking-wide text-[#F5F2EB]"
+          >
             {[...tickerItems, ...tickerItems].map((item, idx) => (
-              <span key={idx} className="inline-flex items-center gap-2 whitespace-nowrap">
+              <span key={idx} className="inline-flex items-center gap-3 whitespace-nowrap">
                 <span>{item}</span>
-                <span className="text-[#B87333]/50">///</span>
+                <span className="text-[#DFC15E]/80 font-black">///</span>
               </span>
             ))}
           </div>

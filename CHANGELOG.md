@@ -2,6 +2,16 @@
 
 All notable changes to the **Copper Athletic Club — Ring of Honor** web application are documented in this file.
 
+## [1.6.32] - 2026-11-01
+
+### Fixed & Enhanced — Relaxed, Readable Top Scoreboard Ticker Speed & Larger Typography
+- **Dynamic, Relaxed Ticker Scroll Speed (`src/index.css`, `src/components/Navbar.tsx`)**:
+  - Identified why the top scrolling banner accelerated to "150 MPH": `.animate-ticker` previously used a fixed `34s` duration regardless of item count, while `tickerItems` pushed every approved slip in the database (`27+` slips = ~6,000+ pixels scrolling in 34 seconds).
+  - Replaced the fixed `34s` animation with `animation: ticker-scroll var(--ticker-duration, 120s) linear infinite`, capped individual slip citation highlights in the ticker to the 12 most recent verified slips (`approvedSlips.slice(0, 12)`), and dynamically scaled `--ticker-duration` at `Math.max(115, tickerItems.length * 9)` seconds (~38 px/sec) so the banner always scrolls at a relaxed, comfortable reading speed.
+  - Added `:active` touch-hold pause support in addition to `:hover` pause.
+- **Larger, Higher-Contrast Ticker Banner (`src/components/Navbar.tsx`)**:
+  - Increased the ticker container padding from `py-1.5` to `py-2 sm:py-2.5` and enlarged the typography from `text-xs` (`12px`) to `text-sm sm:text-[15px]` (`14px`–`15px`) with `font-extrabold tracking-wide text-[#F5F2EB]` and golden `///` dividers (`text-[#DFC15E]/80`).
+
 ## [1.6.31] - 2026-11-01
 
 ### Added & Enhanced — Logged-In Patron Default Attribution & 1-Tap Self vs. Other Slip Confirmation

@@ -33,9 +33,21 @@ interface ChangelogEntry {
 
 const USER_CHANGELOG: ChangelogEntry[] = [
   {
-    version: 'v1.6.31',
+    version: 'v1.6.32',
     date: 'November 1, 2026',
     badge: 'LATEST RELEASE',
+    title: 'Relaxed, Readable Top Scoreboard Ticker Speed & Larger Typography',
+    summary:
+      'Slowed down the top scrolling ESPN-style scoreboard ticker so it never speeds up as more slips are scanned, and enlarged the banner height and font size for effortless reading across the bar.',
+    highlights: [
+      'Dynamic Readable Scroll Speed: Replaced the fixed 34s animation duration with a dynamic CSS duration (~9s per item, minimum 115s) and capped citation highlights to the 12 most recent slips so the banner always glides at a calm, readable ~38px/s pace.',
+      'Larger, Higher-Contrast Banner Text: Increased ticker padding (py-2 sm:py-2.5) and font size from 12px (text-xs) to 14px–15px (text-sm sm:text-[15px]) with extrabold ivory text (#F5F2EB) and golden dividers.',
+      'Touch & Hover Pause: Added :active touch-hold pause support alongside desktop :hover pause.',
+    ],
+  },
+  {
+    version: 'v1.6.31',
+    date: 'November 1, 2026',
     title: 'Logged-In Patron Default Attribution & 1-Tap Self vs. Other Slip Confirmation',
     summary:
       'When a logged-in patron or referee scans a slip on Drop Slip (/submit), the scanner now defaults to their logged-in profile name and prompts for a 1-tap confirmation if AI Vision reads a different name on the slip.',

@@ -101,10 +101,11 @@
 .animate-ticker {
   display: flex;
   width: max-content;
-  animation: ticker-scroll 34s linear infinite;
+  animation: ticker-scroll var(--ticker-duration, 120s) linear infinite;
 }
 
-.animate-ticker:hover {
+.animate-ticker:hover,
+.animate-ticker:active {
   animation-play-state: paused;
 }
 
