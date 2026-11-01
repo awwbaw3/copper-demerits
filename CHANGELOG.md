@@ -2,6 +2,18 @@
 
 All notable changes to the **Copper Athletic Club — Ring of Honor** web application are documented in this file.
 
+## [1.6.31] - 2026-11-01
+
+### Added & Enhanced — Logged-In Patron Default Attribution & 1-Tap Self vs. Other Slip Confirmation
+- **Default to Logged-In Profile Name (`src/pages/SubmitSlipPage.tsx`)**:
+  - Updated `createDefaultDraft` and signed-in draft initialization so the Student field automatically defaults to `currentMember.display_name` instead of hardcoded `'Rick'`.
+- **Upfront "Scanning For Myself" vs. "Scanning For Someone Else / Table" Toggle (`src/pages/SubmitSlipPage.tsx`)**:
+  - Added a prominent 2-button toggle inside the Verified Bar Pass banner (`[🙋‍♂️ Scanning For Myself (${currentMember.display_name})]` vs. `[👥 Scanning For Someone Else / Table]`), defaulting to `Scanning For Myself`.
+- **1-Tap Recipient Confirmation Card (`src/pages/SubmitSlipPage.tsx`)**:
+  - When a logged-in user scans a single slip and AI Vision reads a different name on the slip's `Student:` line, the form defaults to `currentMember.display_name` and displays a 1-tap confirmation card:
+    - **`[✅ Yes — Log For Me (${currentMember.display_name})]`**
+    - **`[👤 No — Log For "${ocrStudentName}" (Written on Slip)]`**
+
 ## [1.6.30] - 2026-11-01
 
 ### Fixed & Enhanced — Scan-Time Default for Blank Slip Times, Future-Date OCR Guard & Instant Wall Pinning

@@ -33,9 +33,21 @@ interface ChangelogEntry {
 
 const USER_CHANGELOG: ChangelogEntry[] = [
   {
-    version: 'v1.6.30',
+    version: 'v1.6.31',
     date: 'November 1, 2026',
     badge: 'LATEST RELEASE',
+    title: 'Logged-In Patron Default Attribution & 1-Tap Self vs. Other Slip Confirmation',
+    summary:
+      'When a logged-in patron or referee scans a slip on Drop Slip (/submit), the scanner now defaults to their logged-in profile name and prompts for a 1-tap confirmation if AI Vision reads a different name on the slip.',
+    highlights: [
+      'Default to Logged-In Profile Name: Replaced the hardcoded "Rick" default draft student with currentMember.display_name whenever a user is signed in.',
+      'Upfront "Scanning For Myself" vs. "Scanning For Someone Else / Table" Toggle: Added a prominent 2-button toggle inside the Verified Bar Pass banner on /submit (defaulting to "Scanning For Myself").',
+      '1-Tap Recipient Confirmation Card: When a logged-in user scans a single slip and AI Vision reads a different name on the "Student:" line, the app defaults to the logged-in user and displays a 1-tap confirmation card ("Yes — Log For Me" vs. "No — Log For [Name on Slip]") so OCR handwriting misreads never create accidental profiles.',
+    ],
+  },
+  {
+    version: 'v1.6.30',
+    date: 'November 1, 2026',
     title: 'Scan-Time Default for Blank Slip Times, Future-Date OCR Guard & Instant Wall Pinning',
     summary:
       'Fixed why newly scanned slips with blank time fields appeared lower down on the Wall of Slips. Slips without a handwritten time now automatically default to the exact time the scan was done (or the latest time on that authoritative slip date), future OCR date misreads are clamped, and newly scanned slips pin right to the top of /docket.',
@@ -355,7 +367,7 @@ export const AboutPage: React.FC = () => {
         {/* Discreet Aesthetic Version Pill */}
         <div className="inline-flex items-center gap-2 rounded-xl border border-[#DFC15E]/40 bg-[#1A1513] px-3 py-1.5 shadow-[0_0_15px_rgba(223,193,94,0.15)]">
           <span className="flex h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
-          <span className="font-mono-docket text-xs font-bold text-[#DFC15E]">PWA v1.6.30</span>
+          <span className="font-mono-docket text-xs font-bold text-[#DFC15E]">PWA v1.6.31</span>
           <span className="text-[10px] font-mono-docket text-[#A8988B] hidden sm:inline">
             · Marshall, MI
           </span>

@@ -1,6 +1,12 @@
 # Task Tracker — Copper Demerits (`copperdemerits.com`)
 
-## Active Sprint — v1.6.30 (Scan-Time Default for Blank Slip Times, Future-Date OCR Guard & Instant Wall Pinning)
+## Active Sprint — v1.6.31 (Logged-In Patron Default Attribution & 1-Tap Self vs. Other Slip Confirmation)
+- [x] Default `createDefaultDraft` and initial `slipDrafts` on `src/pages/SubmitSlipPage.tsx` to `currentMember.display_name` when signed in
+- [x] Add upfront `[🙋‍♂️ Scanning For Myself (${currentMember.display_name})]` vs. `[👥 Scanning For Someone Else / Table]` toggle inside the Verified Bar Pass banner on `/submit`
+- [x] Add 1-tap `pendingRecipientConfirm` card when a logged-in user scans a single slip and AI Vision reads a different name on the slip (`Yes — Log For Me` vs. `No — Log For "[Name on Slip]"`)
+- [x] Bump version to `v1.6.31`, pass `npm run lint` and `npm run build`, and deploy Cloudflare Worker + Netlify production
+
+### v1.6.30 (Scan-Time Default for Blank Slip Times, Future-Date OCR Guard & Instant Wall Pinning)
 - [x] Verify Burtis's newly scanned slip in live Cloudflare D1 (`copper-demerits-db`), remove sideways duplicate (`19876c85-e9af-4b5f-86f6-591d1194cf7b`), and update upright scan (`4eef8600-e68e-431f-bbad-3a3c33da1260`) to `"Sass-ing the Boss Lady"` (`17:47`)
 - [x] Fix future-dated OCR misreads on Bill's slips (`2026-11-26` and `2026-11-12` -> `2026-11-01`) and update all November 1 blank-time slips to their actual scan times
 - [x] Default blank `Time:` fields to the exact scan time (or latest time on the slip's authoritative date + 1 min) in `cloudflare/worker.js`, `src/lib/moderation.ts`, `src/pages/SubmitSlipPage.tsx`, and `src/context/DemeritsContext.tsx`

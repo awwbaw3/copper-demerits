@@ -2,6 +2,14 @@
 
 Chronological log of architectural decisions, database migrations, and infrastructure deployments.
 
+## 2026-11-01 — v1.6.31 Logged-In Patron Default Attribution & 1-Tap Self vs. Other Slip Confirmation
+- **Logged-In User Default & 1-Tap Confirmation (`src/pages/SubmitSlipPage.tsx`)**:
+  - Replaced hardcoded `'Rick'` in `createDefaultDraft` with `currentMember?.display_name || 'Rick'` and added an effect to sync untouched drafts when `currentMember` signs in.
+  - Added `scanRecipientMode` (`'self'` default vs. `'other'`) toggle inside the Verified Bar Pass banner.
+  - Added `pendingRecipientConfirm` and `handleConfirmRecipientAndLog` so when a signed-in user scans a single slip in `'self'` mode and OCR reads a different name on the slip, the draft defaults to `currentMember.display_name` and asks the user to confirm in 1 tap whether they are scanning for themselves (`currentMember.display_name`) or for the name read from the slip (`ocrStudentName`).
+
+---
+
 ## 2026-11-01 — v1.6.30 Scan-Time Default for Blank Slip Times, Future-Date OCR Guard & Instant Wall Pinning
 - **Root Cause Analysis & Live D1 Cleanup (`copper-demerits-db`)**:
   - Investigated why Burtis's newly scanned slip did not appear at the top of `/docket`:

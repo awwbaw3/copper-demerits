@@ -1571,7 +1571,7 @@ export default {
         return jsonResponse({
           ok: true,
           service: 'copper-demerits-api',
-          version: '1.6.30',
+          version: '1.6.31',
           backend: 'cloudflare-d1-r2-ai',
           database: 'copper-demerits-db',
           bucket: 'copper-demerits-slips',

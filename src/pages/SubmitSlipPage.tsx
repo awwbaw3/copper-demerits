@@ -86,10 +86,10 @@ function getFallbackClientCropBox(
   };
 }
 
-function createDefaultDraft(time?: string): SlipDraftItem {
+function createDefaultDraft(time?: string, defaultStudent = 'Rick'): SlipDraftItem {
   const localNow = getCurrentLocalDateTime();
   return {
-    rawStudent: 'Rick',
+    rawStudent: defaultStudent,
     rawSignature: 'The Boss - AKA Sarah',
     incidentDate: localNow.date,
     incidentTime: time || localNow.time,
@@ -124,11 +124,26 @@ export const SubmitSlipPage: React.FC = () => {
   const [scanMode, setScanMode] = useState<'single' | 'multi'>(initialMode);
   // 0 = Auto-Detect (1–4 slips in photo), or explicit 2, 3, 4 slips in photo
   const [expectedSlipCount, setExpectedSlipCount] = useState<number>(0);
+  // Default to 'self' so when a logged-in patron scans a slip, it defaults to their name (or asks to confirm if OCR reads a different name)
+  const [scanRecipientMode, setScanRecipientMode] = useState<'self' | 'other'>(
+    initialMode === 'multi' ? 'other' : 'self'
+  );
+  const [pendingRecipientConfirm, setPendingRecipientConfirm] = useState<{
+    ocrStudentName: string;
+    drafts: SlipDraftItem[];
+    workingImageUrl: string;
+    sha256: string;
+    dhash: string;
+    compressedBytes: number;
+    originalBytes: number;
+    savingsPercent: number;
+  } | null>(null);
 
   useEffect(() => {
     const urlMode = searchParams.get('mode');
     if (urlMode === 'multi') {
       setScanMode('multi');
+      setScanRecipientMode('other');
     } else if (urlMode === 'single') {
       setScanMode('single');
     }
@@ -137,6 +152,7 @@ export const SubmitSlipPage: React.FC = () => {
   const handleModeSwitch = (nextMode: 'single' | 'multi') => {
     setScanMode(nextMode);
     if (nextMode === 'multi') {
+      setScanRecipientMode('other');
       setSearchParams({ mode: 'multi' }, { replace: true });
     } else {
       setSearchParams({}, { replace: true });
@@ -144,7 +160,24 @@ export const SubmitSlipPage: React.FC = () => {
     }
   };
 
-  const [slipDrafts, setSlipDrafts] = useState<SlipDraftItem[]>([createDefaultDraft('21:00')]);
+  const [slipDrafts, setSlipDrafts] = useState<SlipDraftItem[]>(() => [
+    createDefaultDraft(undefined, currentMember?.display_name || 'Rick'),
+  ]);
+
+  // Whenever a user signs in (or switches account), default untouched draft student name to their logged-in name
+  useEffect(() => {
+    if (!currentMember?.display_name) return;
+    setSlipDrafts((prev) => {
+      if (
+        prev.length === 1 &&
+        !prev[0].items[0]?.description?.trim() &&
+        (prev[0].rawStudent === 'Rick' || prev[0].rawStudent === 'Patron')
+      ) {
+        return [{ ...prev[0], rawStudent: currentMember.display_name }];
+      }
+      return prev;
+    });
+  }, [currentMember?.display_name]);
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [rawDataUrl, setRawDataUrl] = useState<string | null>(null);
   const [imageSha256, setImageSha256] = useState<string | null>(null);
@@ -194,7 +227,7 @@ export const SubmitSlipPage: React.FC = () => {
       const next = [...prev];
       const localNow = getCurrentLocalDateTime();
       while (next.length < count) {
-        next.push(createDefaultDraft(localNow.time));
+        next.push(createDefaultDraft(localNow.time, currentMember?.display_name || 'Rick'));
       }
       return next;
     });
@@ -441,6 +474,79 @@ export const SubmitSlipPage: React.FC = () => {
     }
   };
 
+  const handleConfirmRecipientAndLog = async (chosenStudentName: string) => {
+    if (!pendingRecipientConfirm) return;
+    const {
+      drafts,
+      workingImageUrl,
+      sha256,
+      dhash,
+      compressedBytes,
+      originalBytes,
+      savingsPercent,
+    } = pendingRecipientConfirm;
+
+    const updatedDrafts = drafts.map((d, idx) =>
+      idx === 0 ? { ...d, rawStudent: chosenStudentName.trim() } : d
+    );
+    setSlipDrafts(updatedDrafts);
+    setPendingRecipientConfirm(null);
+    setUploadingPhoto(true);
+    setErrorMsg(null);
+
+    try {
+      for (const draft of updatedDrafts) {
+        const citDup = checkCitationDuplicate({
+          raw_student: draft.rawStudent,
+          incident_date: draft.incidentDate,
+          incident_time: draft.incidentTime,
+          demerit_count: draft.items.reduce((sum, it) => sum + (Number(it.points) || 1), 0),
+          infractions: draft.items.map((it) => it.description),
+        });
+
+        if (citDup.isDuplicate) {
+          setDuplicateAlert(citDup);
+          setShowManualEditor(true);
+          setUploadStatusMsg(
+            'Possible duplicate citation detected — review below or tap "Log It Anyway" if this is a new slip.'
+          );
+          return;
+        }
+      }
+
+      const filename = `${sha256.slice(0, 24)}.jpg`;
+      const uploaded = await uploadCompressedSlipToR2(workingImageUrl, filename);
+      setImageUrl(uploaded.url);
+
+      setUploadStatusMsg(
+        `Step 3/3 · Confirmed for ${chosenStudentName} · Storing ${formatByteSize(
+          compressedBytes
+        )} & Logging to Ring of Honor...`
+      );
+
+      await persistSlipDrafts(
+        updatedDrafts,
+        uploaded.url,
+        workingImageUrl,
+        sha256,
+        dhash,
+        false
+      );
+
+      setUploadStatusMsg(
+        `Zero-Touch Complete · Slip for ${chosenStudentName} Verified, Reduced (${formatByteSize(
+          originalBytes
+        )} → ${formatByteSize(compressedBytes)}${
+          savingsPercent > 0 ? `, ${savingsPercent}% saved` : ''
+        }) & Logged Automatically!`
+      );
+    } catch (err) {
+      setErrorMsg(err instanceof Error ? err.message : 'Failed to log confirmed slip.');
+    } finally {
+      setUploadingPhoto(false);
+    }
+  };
+
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const fileList = e.target.files ? Array.from(e.target.files) : [];
     if (fileList.length === 0) return;
@@ -454,6 +560,7 @@ export const SubmitSlipPage: React.FC = () => {
     setUploadingPhoto(true);
     setErrorMsg(null);
     setDuplicateAlert(null);
+    setPendingRecipientConfirm(null);
     setSubmittedSummary(null);
     setAutoLoggedSlips(null);
     setCompressionStats(null);
@@ -678,33 +785,40 @@ export const SubmitSlipPage: React.FC = () => {
       }
 
       if (aiResult.ok && aiResult.slips && aiResult.slips.length > 0) {
-        const extractedDrafts: SlipDraftItem[] = aiResult.slips.map((s) => ({
-          rawStudent: s.raw_student || 'Patron',
-          rawSignature: s.raw_signature || 'The Boss - AKA Sarah',
-          incidentDate: s.incident_date || todayStr,
-          incidentTime: s.incident_time || scanTimeStr,
-          locationArea: s.location_area || 'Copper A.C.',
-          cropBox: s.crop_box,
-          items:
-            Array.isArray(s.demerit_items) && s.demerit_items.length > 0
-              ? s.demerit_items.map((it) => ({
-                  type: it.type || DEMERIT_CATEGORIES[6],
-                  description: it.description || 'Bar Citation',
-                  points: Math.max(1, Number(it.points) || 1),
-                }))
-              : [
-                  {
-                    type: DEMERIT_CATEGORIES[6],
-                    description: (s.infractions && s.infractions[0]) || 'Bar Demerit Citation',
-                    points: Math.max(1, Number(s.demerit_count) || 1),
-                  },
-                ],
-        }));
+        const extractedDrafts: SlipDraftItem[] = aiResult.slips.map((s) => {
+          const rawOcrName = (s.raw_student || '').trim();
+          const fallbackStudent =
+            !rawOcrName || rawOcrName.toLowerCase() === 'patron'
+              ? currentMember.display_name
+              : rawOcrName;
+          return {
+            rawStudent: fallbackStudent,
+            rawSignature: s.raw_signature || 'The Boss - AKA Sarah',
+            incidentDate: s.incident_date || todayStr,
+            incidentTime: s.incident_time || scanTimeStr,
+            locationArea: s.location_area || 'Copper A.C.',
+            cropBox: s.crop_box,
+            items:
+              Array.isArray(s.demerit_items) && s.demerit_items.length > 0
+                ? s.demerit_items.map((it) => ({
+                    type: it.type || DEMERIT_CATEGORIES[6],
+                    description: it.description || 'Bar Citation',
+                    points: Math.max(1, Number(it.points) || 1),
+                  }))
+                : [
+                    {
+                      type: DEMERIT_CATEGORIES[6],
+                      description: (s.infractions && s.infractions[0]) || 'Bar Demerit Citation',
+                      points: Math.max(1, Number(s.demerit_count) || 1),
+                    },
+                  ],
+          };
+        });
 
         // If user explicitly chose e.g. 2, 3, or 4 slips and AI found fewer, pad drafts and open manual review so they can verify
         if (expectedSlipCount > extractedDrafts.length) {
           while (extractedDrafts.length < expectedSlipCount) {
-            extractedDrafts.push(createDefaultDraft(scanTimeStr));
+            extractedDrafts.push(createDefaultDraft(scanTimeStr, currentMember.display_name));
           }
           setSlipDrafts(extractedDrafts);
           setShowManualEditor(true);
@@ -714,10 +828,54 @@ export const SubmitSlipPage: React.FC = () => {
           return;
         }
 
-        setSlipDrafts(extractedDrafts);
         if (extractedDrafts.length > 1) {
           setScanMode('multi');
         }
+
+        // Single-slip Logged-In User Default & Confirmation Guard:
+        // When a logged-in user scans a single slip:
+        // - If OCR read their own name (or blank/'Patron'), default to `currentMember.display_name` and log immediately.
+        // - If OCR read a DIFFERENT name on the slip:
+        //   - When in "Scanning For Myself" mode (default), default the draft to `currentMember.display_name` and ask the user with 1 tap whether they are scanning for themselves (`currentMember.display_name`) or for the name written on the slip (`ocrReadName`)!
+        if (extractedDrafts.length === 1 && currentMember) {
+          const ocrReadName = (aiResult.slips[0]?.raw_student || '').trim();
+          const resolvedOcr = ocrReadName ? resolvePatronNickname(ocrReadName) : { member: null };
+          const matchesLoggedInMember =
+            !ocrReadName ||
+            ocrReadName.toLowerCase() === 'patron' ||
+            ocrReadName.toLowerCase() === currentMember.display_name.trim().toLowerCase() ||
+            resolvedOcr.member?.id === currentMember.id;
+
+          if (matchesLoggedInMember) {
+            extractedDrafts[0].rawStudent = currentMember.display_name;
+          } else if (scanRecipientMode === 'self') {
+            // Default the draft to the logged-in user's name, and ask them to confirm 1-tap:
+            // "Scanning for Myself (currentMember.display_name)" vs "Log for [ocrReadName] (Written on Slip)"
+            const selfDrafts = [
+              {
+                ...extractedDrafts[0],
+                rawStudent: currentMember.display_name,
+              },
+            ];
+            setSlipDrafts(selfDrafts);
+            setPendingRecipientConfirm({
+              ocrStudentName: resolvedOcr.member?.display_name || ocrReadName,
+              drafts: selfDrafts,
+              workingImageUrl: finalWorkingImageUrl,
+              sha256: fingerprint.sha256,
+              dhash: fingerprint.dhash,
+              compressedBytes: fingerprint.compressedBytes,
+              originalBytes: fingerprint.originalBytes,
+              savingsPercent: fingerprint.savingsPercent,
+            });
+            setUploadStatusMsg(
+              `Confirm Recipient · Defaulted to ${currentMember.display_name} (tap below to confirm for yourself or log for "${ocrReadName}")`
+            );
+            return;
+          }
+        }
+
+        setSlipDrafts(extractedDrafts);
 
         // Pre-storage Citation Duplicate Check:
         // Compare extracted student, date & infractions against all existing slips on the scoreboard.
@@ -880,41 +1038,110 @@ export const SubmitSlipPage: React.FC = () => {
           </div>
         </div>
       ) : (
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-emerald-500/40 bg-emerald-950/25 px-4 py-3">
-          <div className="flex items-center gap-3">
-            <MichiganTeamBadge
-              iconType={
-                (currentMember.favorite_team as TeamBadgeMeta['iconType']) || 'lions'
-              }
-              size="sm"
-            />
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="font-athletic text-lg font-black uppercase text-white">
-                  Dropping Slip as {currentMember.display_name}
-                </span>
-                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/20 border border-emerald-400/40 px-2 py-0.5 font-mono-docket text-[10px] font-bold uppercase text-emerald-300">
-                  <UserCheck className="h-3 w-3" />
-                  Verified Bar Pass
-                </span>
+        <div className="rounded-2xl border border-emerald-500/40 bg-emerald-950/25 p-4 space-y-3">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <MichiganTeamBadge
+                iconType={
+                  (currentMember.favorite_team as TeamBadgeMeta['iconType']) || 'lions'
+                }
+                size="sm"
+              />
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="font-athletic text-lg font-black uppercase text-white">
+                    Dropping Slip as {currentMember.display_name}
+                  </span>
+                  <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/20 border border-emerald-400/40 px-2 py-0.5 font-mono-docket text-[10px] font-bold uppercase text-emerald-300">
+                    <UserCheck className="h-3 w-3" />
+                    Verified Bar Pass
+                  </span>
+                </div>
+                <p className="font-mono-docket text-[11px] text-emerald-200/80">
+                  {scanRecipientMode === 'self'
+                    ? `Defaulting scanned slips to ${currentMember.display_name} (will ask to confirm if another name is written on the slip)`
+                    : 'Using the handwritten Student name on each slip for friends / table scans'}
+                </p>
               </div>
-              <p className="font-mono-docket text-[11px] text-emerald-200/80">
-                {currentMember.is_admin
-                  ? 'Site Administrator & Official Referee · Can scan slips for any patron'
-                  : currentMember.is_staff
-                  ? 'Official Bar Referee / Staff Account · Can scan slips for any patron'
-                  : 'Verified Ring of Honor Patron · Can scan slips for yourself or friends'}
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setIsProfileModalOpen(true)}
+              className="rounded-xl border border-white/15 bg-white/5 px-3 py-1.5 font-mono-docket text-xs text-[#E8B888] hover:border-[#B87333] cursor-pointer"
+            >
+              Edit My Profile / Switch
+            </button>
+          </div>
+
+          {/* WHO ARE YOU SCANNING FOR? (Defaults to logged-in user!) */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1 border-t border-emerald-500/20">
+            <button
+              type="button"
+              onClick={() => setScanRecipientMode('self')}
+              className={`flex items-center justify-center gap-2 rounded-xl py-2.5 px-3 min-h-[44px] font-mono-docket text-xs font-bold transition touch-manipulation active:scale-95 cursor-pointer ${
+                scanRecipientMode === 'self'
+                  ? 'bg-emerald-400 text-[#121212] shadow-md font-extrabold'
+                  : 'border border-white/15 bg-black/40 text-[#D6C7B8] hover:border-emerald-400/50 hover:text-white'
+              }`}
+            >
+              <span>🙋‍♂️ Scanning For Myself ({currentMember.display_name})</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setScanRecipientMode('other')}
+              className={`flex items-center justify-center gap-2 rounded-xl py-2.5 px-3 min-h-[44px] font-mono-docket text-xs font-bold transition touch-manipulation active:scale-95 cursor-pointer ${
+                scanRecipientMode === 'other'
+                  ? 'bg-[#DFC15E] text-[#121212] shadow-md font-extrabold'
+                  : 'border border-white/15 bg-black/40 text-[#D6C7B8] hover:border-[#DFC15E]/50 hover:text-white'
+              }`}
+            >
+              <span>👥 Scanning For Someone Else / Table</span>
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* 1-Tap Recipient Confirmation Card when Logged-In User scans a slip with a different OCR name */}
+      {pendingRecipientConfirm && currentMember && (
+        <div className="rounded-3xl border-2 border-[#DFC15E] bg-gradient-to-b from-[#261D12] to-[#14110F] p-5 sm:p-6 shadow-[0_15px_50px_rgba(223,193,94,0.25)] space-y-4">
+          <div className="flex items-start gap-3">
+            <UserCheck className="h-6 w-6 text-[#DFC15E] shrink-0 mt-0.5" />
+            <div className="space-y-1">
+              <span className="font-mono-docket text-[10px] font-bold uppercase tracking-widest text-[#DFC15E]">
+                CONFIRM WHO THIS SLIP IS FOR • DEFAULTED TO YOUR PROFILE
+              </span>
+              <h3 className="font-athletic text-2xl sm:text-3xl font-black uppercase text-white">
+                Are You Scanning This Slip For Yourself ({currentMember.display_name})?
+              </h3>
+              <p className="font-mono-docket text-xs text-[#D6C7B8]">
+                You are signed in as <strong className="text-emerald-300">{currentMember.display_name}</strong>, and AI Vision read{' '}
+                <strong className="text-[#DFC15E]">&ldquo;{pendingRecipientConfirm.ocrStudentName}&rdquo;</strong> on the slip&apos;s Student line (Offense:{' '}
+                <em>&ldquo;{pendingRecipientConfirm.drafts[0]?.items[0]?.description || 'Bar Citation'}&rdquo;</em>). Tap once to confirm who gets this demerit:
               </p>
             </div>
           </div>
 
-          <button
-            type="button"
-            onClick={() => setIsProfileModalOpen(true)}
-            className="rounded-xl border border-white/15 bg-white/5 px-3 py-1.5 font-mono-docket text-xs text-[#E8B888] hover:border-[#B87333] cursor-pointer"
-          >
-            Edit My Profile / Switch
-          </button>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+            <button
+              type="button"
+              disabled={uploadingPhoto || submitting}
+              onClick={() => handleConfirmRecipientAndLog(currentMember.display_name)}
+              className="flex items-center justify-center gap-2 rounded-2xl bg-emerald-400 px-4 py-3.5 min-h-[52px] font-athletic text-base sm:text-lg font-black uppercase tracking-wider text-[#121212] shadow-lg hover:bg-emerald-300 active:scale-95 touch-manipulation cursor-pointer disabled:opacity-50"
+            >
+              <CheckCircle2 className="h-5 w-5 shrink-0" />
+              <span>Yes — Log For Me ({currentMember.display_name})</span>
+            </button>
+
+            <button
+              type="button"
+              disabled={uploadingPhoto || submitting}
+              onClick={() => handleConfirmRecipientAndLog(pendingRecipientConfirm.ocrStudentName)}
+              className="flex items-center justify-center gap-2 rounded-2xl border-2 border-[#DFC15E] bg-[#DFC15E]/20 px-4 py-3.5 min-h-[52px] font-athletic text-base sm:text-lg font-black uppercase tracking-wider text-[#DFC15E] hover:bg-[#DFC15E] hover:text-[#121212] active:scale-95 touch-manipulation cursor-pointer disabled:opacity-50"
+            >
+              <span>👤 No — Log For &ldquo;{pendingRecipientConfirm.ocrStudentName}&rdquo;</span>
+            </button>
+          </div>
         </div>
       )}
 
