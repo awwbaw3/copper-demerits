@@ -36,6 +36,19 @@
 - [x] Removed `copper_demerits` schema from `Supabase5` (`iqbpnkttwtugxkospdqt`).
 - [x] Added **Staff & Patron Profile Claiming** (`src/components/ClaimProfileModal.tsx` + `POST /api/claim-profile`) with 4-digit Bar PINs and Detroit/Michigan team badges, and required profile sign-in before uploading slips on `/submit`.
 
+## Phase 16: First-Time Demerit Onboarding, Flexible Sign-In, Self-Service & Referee PIN Reset & Duplicate Fix (Completed — v1.6.27)
+- [x] Streamlined 3-step First-Time Claiming UX with direct pre-selection from Scoreboard cards and Slip Modals.
+
+## Phase 17: Prominent Multi-Slip & Batch Photo Scanner UI across Drop Slip & Ref Booth (Completed — v1.6.29)
+- [x] Surfaced Single vs. Multi-Slip / Batch Scan mode toggle and upfront slip-count selector (`Auto-Detect (1–4)`, `2 Slips`, `3 Slips`, `4 Slips`) directly on `/submit`.
+- [x] Added multi-file batch upload (`multiple` photos from camera roll) and individual slip cropping (`cropNormalizedRegionFromDataUrl`) with quadrant fallback (`getFallbackMultiSlipCropBox`) from multi-slip photos.
+- [x] Cropped and updated the 4 live slips from `76bb65b1254226a781b6b3d9.jpg` (Ballz, Caitlyn, Beans, Ballz) in Cloudflare R2 & D1 and fixed same-patron blank-time deduplication in `DemeritsContext.tsx`.
+- [x] Added Ref Booth (`/admin`) Multi-Slip & Batch Scanner quick-launch banner and `/submit?mode=multi` deep link.
+- [x] Flexible Sign-In supporting Display Name, Bar Nickname/Alias (`staff_aliases`), 10-Digit Phone Number, or Email Address + 4–8 digit PIN, plus Quick-Tap Roster Chips.
+- [x] Self-Service PIN Reset (`POST /api/reset-pin`) verifying phone (or last 4 digits) or email and clearing brute-force lockouts.
+- [x] Referee PIN Reset & Account Unlock (`POST /api/admin/reset-pin`) in the Ref Booth (`/admin`) for instant bar assistance.
+- [x] Eliminated false `"86% possible duplicate"` perceptual dHash rejections on tightly cropped Cherry Printers forms and added a 1-tap `"Log It Anyway — This Is a New Ticket"` override button.
+
 ## Phase 15: Complete Historical Slip Orientation Normalization & Countertop Cropping (Completed — v1.6.25)
 - [x] Audited all 11 demerit slips on the live site across dimensions and visual orientation.
 - [x] Corrected sideways orientation on Kristi's slip (Oct 18, `924x604`) and Ziggie's slip (Oct 22, `624x432`) by rotating 270° upright landscape.
@@ -183,3 +196,9 @@
 - [x] Upgraded `maskSensitiveInfraction` to cover all grammatical tenses and plurals.
 - [x] Masked original offenses evidence label in `CorrectSlipMistakeModal`.
 - [x] Documented user changelog and updated PWA version indicator to `v1.6.26`.
+
+
+## Phase 26: First-Time Onboarding, Multi-Slip Cropping, Scan-Time Defaults & Instant Wall Pinning (Completed — v1.6.27 – v1.6.30)
+- [x] Flexible Sign-In by Name/Nickname/Phone/Email, Self-Service PIN Reset (`POST /api/reset-pin`), and Referee 1-Tap PIN Reset & Unlock (`POST /api/admin/reset-pin`).
+- [x] Prominent Single vs. Multi-Slip / Batch Scanner UI across `/submit` and `/admin` with per-slip quadrant cropping and R2 upload.
+- [x] Scan-time default (`America/Detroit` / local `HH:MM` or latest time on the slip's authoritative date) when `Time:` is blank on physical slips, plus future-date OCR clamping and instant Wall of Slips (`/docket`) confirmation banner.

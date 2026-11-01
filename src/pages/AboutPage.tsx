@@ -33,9 +33,61 @@ interface ChangelogEntry {
 
 const USER_CHANGELOG: ChangelogEntry[] = [
   {
+    version: 'v1.6.30',
+    date: 'November 1, 2026',
+    badge: 'LATEST RELEASE',
+    title: 'Scan-Time Default for Blank Slip Times, Future-Date OCR Guard & Instant Wall Pinning',
+    summary:
+      'Fixed why newly scanned slips with blank time fields appeared lower down on the Wall of Slips. Slips without a handwritten time now automatically default to the exact time the scan was done (or the latest time on that authoritative slip date), future OCR date misreads are clamped, and newly scanned slips pin right to the top of /docket.',
+    highlights: [
+      'Cleaned Up Burtis & Ziggie Slips + Fixed Future-Dated Bill Slips in Live D1: Verified Burtis’s "Sass-ing the Boss Lady" slip and Ziggie’s "For NEVER trying the epic chicken wings @ the Copper!!" slip in D1, removed Burtis’s sideways duplicate scan, and corrected two earlier Bill slips where OCR misread the slash "/" in "11/1/26" as future dates (2026-11-26 and 2026-11-12).',
+      'Scan-Time Default & Authoritative Date Latest-Time Rule: When the "Time:" line on a physical slip is blank, the system now defaults to the exact local time the scan was performed (or the latest time on that slip’s authoritative date + 1 minute if later) instead of a hardcoded "21:00".',
+      'Future-Date OCR Sanity Guard: Automatically clamps any OCR date misread that falls in the future (> scan date) back to today’s local date so future-dated typos can never bury newly scanned slips.',
+      'Instant Wall of Slips Confirmation Banner & Sort Toggle: Added a green "Slip Verified & Posted to the Wall" banner, a "NEW • JUST SCANNED" card badge, and a "Slip Date & Time" vs. "Just Scanned" toggle on /docket.',
+    ],
+  },
+  {
+    version: 'v1.6.29',
+    date: 'November 1, 2026',
+    title: 'Multi-Slip Individual Ticket Cropping, Quadrant Fallback & Same-Patron Timestamp Guard',
+    summary:
+      'Fixed multi-slip photo scanning so every slip in a 2–4 slip photo is individually cropped to its own ticket image on the Wall of Slips, attributed to its respective patron, and never collapsed when the same patron receives two slips in the same batch.',
+    highlights: [
+      'Cropped & Corrected Live 4-Slip Upload (76bb65b1254226a781b6b3d9.jpg): Split the 4-slip photo into 4 individual cropped R2 slip images for Ballz ("lying about shots"), Caitlyn ("Not being where you said you were!!"), Beans ("ordering a margarita"), and Ballz ("Creating a web site w/ a design flaw - Shameful"), and fixed the OCR date from 2026-11-14 to 2026-11-01.',
+      'Guaranteed Per-Slip Cropping with Quadrant Fallback: Added automatic 2-slip, 3-slip, and 4-slip (2x2 quadrant) bounding-box fallbacks whenever a Vision LLM omits or returns a full-frame crop_box on a multi-slip photo.',
+      'Same-Patron Multi-Slip Deduplication Fix: Updated sanitizeAndDeduplicateSlips and staggered blank-time defaults (21:00, 21:01, 21:02...) so two different slips for the same patron in one photo never collapse into a single card.',
+    ],
+  },
+  {
+    version: 'v1.6.28',
+    date: 'November 1, 2026',
+    title: 'Multi-Slip & Batch Photo Scanner UI across Drop Slip & Ref Booth',
+    summary:
+      'Surfaced a prominent Multi-Slip & Batch Photo Scanner right at the top of Drop Slip (/submit) and the Ref Booth (/admin). Referees and patrons can now easily snap 2–4 physical slips laid side-by-side in a single photo or select multiple slip photos at once from their camera roll, with automatic individual slip cropping and per-patron attribution.',
+    highlights: [
+      'Prominent Single vs. Multi-Slip / Batch Mode Toggle: Added a front-and-center scan mode switcher on /submit (replacing the hidden selector previously buried inside Manual Override) plus a dedicated "Multi-Slip / Batch Upload" capture card.',
+      'Upfront Slip Count Selector: Choose "Auto-Detect (1–4)", "2 Slips", "3 Slips", or "4 Slips in Photo" before snapping so AI Vision scans every slip in the frame.',
+      'Automatic Individual Slip Cropping: When scanning a multi-slip photo, each slip is cropped using its AI Vision bounding box (crop_box) and uploaded as its own crisp ticket while preserving the full multi-slip photo as source evidence.',
+      'Multi-File Batch Gallery Upload: Enabled multi-file selection from the phone camera roll so users can select multiple separate slip photos at once and batch-log them sequentially.',
+      'Ref Booth Multi-Slip Scanner Quick-Launch: Added a prominent "Scan Multiple Slips at Once for Any Patron" card and header button in /admin linking directly to /submit?mode=multi.',
+    ],
+  },
+  {
+    version: 'v1.6.27',
+    date: 'November 1, 2026',
+    title: 'First-Time Demerit Quick Claiming, Self-Service & Referee PIN Reset & False Duplicate Slip Fix',
+    summary:
+      'Streamlined first-time patron onboarding into a 10-second 3-step Claim flow, added flexible Sign-In (by Name, Nickname, Phone, or Email + PIN), introduced Self-Service and Referee-Assisted PIN Reset & Account Unlock tools, and eliminated false "86% possible duplicate" rejections when scanning new physical Cherry Printers demerit slips.',
+    highlights: [
+      'First-Time Demerit Quick-Claim UX: Tapping any unclaimed patron card on the Scoreboard or Slip Modal opens directly to claiming that exact name in 3 quick steps (Tap Name → Phone or Email → 4–8 Digit PIN).',
+      'Flexible Sign-In by Name, Nickname, Phone, or Email: Patrons can now sign in using their Display Name (e.g. Beans), Bar Nickname/Alias (e.g. Thomas Lopez, Tommy Tacos), 10-Digit Phone, or Email + PIN, or tap their name chip in 1 click.',
+      'Self-Service & Referee PIN Reset: Added a dedicated "Reset PIN" tab (verify phone or email to set a new PIN and clear lockouts) plus a 1-tap "Referee PIN Reset & Account Unlock" tool in the Ref Booth (/admin) for Sarah, Burtis, and Rick.',
+      'Fixed False "86% Possible Duplicate" Slip Rejections: Removed the 9×8 perceptual dHash blank-template block (which matched identical Cherry Printers form headers across different tickets) and added a 1-tap "Log It Anyway — This Is a New Ticket" override button.',
+    ],
+  },
+  {
     version: 'v1.6.26',
     date: 'October 24, 2026',
-    badge: 'LATEST RELEASE',
     title: 'Universal Infraction Masking Across Leaderboard Podium & Docket',
     summary:
       'Fixed unmasked infraction description leaks on Top 3 Leaderboard Jumbotron cards and Docket penalty badges. Clarified single-database architecture (Cloudflare D1 copper-demerits-db) across all views.',
@@ -303,7 +355,7 @@ export const AboutPage: React.FC = () => {
         {/* Discreet Aesthetic Version Pill */}
         <div className="inline-flex items-center gap-2 rounded-xl border border-[#DFC15E]/40 bg-[#1A1513] px-3 py-1.5 shadow-[0_0_15px_rgba(223,193,94,0.15)]">
           <span className="flex h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
-          <span className="font-mono-docket text-xs font-bold text-[#DFC15E]">PWA v1.6.26</span>
+          <span className="font-mono-docket text-xs font-bold text-[#DFC15E]">PWA v1.6.30</span>
           <span className="text-[10px] font-mono-docket text-[#A8988B] hidden sm:inline">
             · Marshall, MI
           </span>

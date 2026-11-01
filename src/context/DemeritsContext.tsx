@@ -31,7 +31,11 @@ import {
   fingerprintImageUrl,
   ImageFingerprint,
 } from '../lib/imageDedup';
-import { moderateTextInstant, scanWithRefereeMonitor } from '../lib/moderation';
+import {
+  moderateTextInstant,
+  scanWithRefereeMonitor,
+  getCurrentLocalDateTime,
+} from '../lib/moderation';
 
 const STORAGE_KEYS = {
   MEMBERS: 'cac_demerits_members_v6',
@@ -41,6 +45,11 @@ const STORAGE_KEYS = {
   ACTIVE_MEMBER: 'cac_demerits_active_member_v6',
   ACTIVE_PIN: 'cac_demerits_active_pin_v6',
 };
+
+export interface ProfileModalIntent {
+  mode?: 'login' | 'claim' | 'new' | 'reset-pin' | 'my-locker';
+  memberId?: string;
+}
 
 export interface NewSlipPayload {
   raw_student: string;
@@ -63,6 +72,7 @@ export interface NewSlipPayload {
   createPatronIfNew?: boolean;
   allowMultiSlipBatch?: boolean;
   mergeIfCitationDuplicate?: boolean;
+  bypassDuplicateCheck?: boolean;
 }
 
 export interface ClaimProfilePayload {
@@ -106,9 +116,32 @@ interface DemeritsContextValue {
   isAdminOrStaff: boolean;
   isProfileModalOpen: boolean;
   setIsProfileModalOpen: (open: boolean) => void;
+  profileModalIntent: ProfileModalIntent | null;
+  openProfileModal: (intent?: ProfileModalIntent) => void;
   claimOrLoginProfile: (
     payload: ClaimProfilePayload
-  ) => Promise<{ ok: boolean; member?: Member; mode?: string; error?: string }>;
+  ) => Promise<{
+    ok: boolean;
+    member?: Member;
+    mode?: string;
+    needsClaim?: boolean;
+    unclaimedMember?: Member;
+    matchedMemberId?: string;
+    matchedMemberName?: string;
+    error?: string;
+  }>;
+  resetProfilePin: (payload: {
+    memberId?: string;
+    identifier?: string;
+    contactVerify: string;
+    newPin: string;
+  }) => Promise<{ ok: boolean; member?: Member; error?: string }>;
+  adminResetMemberPin: (payload: {
+    targetMemberId: string;
+    newPin: string;
+    phone?: string;
+    email?: string;
+  }) => Promise<{ ok: boolean; member?: Member; message?: string; error?: string }>;
   updateMyProfile: (
     payload: UpdateMyProfilePayload
   ) => Promise<{ ok: boolean; member?: Member; error?: string }>;
@@ -233,12 +266,23 @@ function sanitizeAndDeduplicateSlips(slips: DemeritSlip[]): DemeritSlip[] {
     const normStudent = s.raw_student.trim().toLowerCase();
     const normDate = s.incident_date.trim();
     const normTime = s.incident_time ? s.incident_time.trim().slice(0, 5) : '';
+    const normInfraction = (s.infractions?.[0] || '').trim().toLowerCase();
 
     const existingIdx = deduped.findIndex((existing) => {
+      if (existing.id === s.id) return true;
       const exStudent = existing.raw_student.trim().toLowerCase();
       const exDate = existing.incident_date.trim();
       const exTime = existing.incident_time ? existing.incident_time.trim().slice(0, 5) : '';
-      return exStudent === normStudent && exDate === normDate && exTime !== '' && exTime === normTime;
+      const exInfraction = (existing.infractions?.[0] || '').trim().toLowerCase();
+      // Only collapse two records if they are the same patron, same date, same time, AND same infraction text
+      return (
+        exStudent === normStudent &&
+        exDate === normDate &&
+        exTime !== '' &&
+        exTime === normTime &&
+        exInfraction !== '' &&
+        exInfraction === normInfraction
+      );
     });
 
     if (existingIdx >= 0) {
@@ -291,12 +335,25 @@ export const DemeritsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const [activePin, setActivePin] = useState<string>(() =>
     loadFromStorage<string>(STORAGE_KEYS.ACTIVE_PIN, '')
   );
-  const [isProfileModalOpen, setIsProfileModalOpen] = useState<boolean>(false);
+  const [isProfileModalOpen, setIsProfileModalOpenState] = useState<boolean>(false);
+  const [profileModalIntent, setProfileModalIntent] = useState<ProfileModalIntent | null>(null);
   const [autoApproveSubmissions, setAutoApproveState] = useState<boolean>(() =>
     loadFromStorage(STORAGE_KEYS.AUTO_APPROVE, true)
   );
   const [loading, setLoading] = useState<boolean>(false);
   const [isCloudflareConnected, setIsCloudflareConnected] = useState<boolean>(false);
+
+  const setIsProfileModalOpen = useCallback((open: boolean) => {
+    if (!open) {
+      setProfileModalIntent(null);
+    }
+    setIsProfileModalOpenState(open);
+  }, []);
+
+  const openProfileModal = useCallback((intent?: ProfileModalIntent) => {
+    setProfileModalIntent(intent || null);
+    setIsProfileModalOpenState(true);
+  }, []);
 
   const isAdminOrStaff = Boolean(
     currentMember &&
@@ -419,7 +476,16 @@ export const DemeritsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const claimOrLoginProfile = useCallback(
     async (
       payload: ClaimProfilePayload
-    ): Promise<{ ok: boolean; member?: Member; mode?: string; error?: string }> => {
+    ): Promise<{
+      ok: boolean;
+      member?: Member;
+      mode?: string;
+      needsClaim?: boolean;
+      unclaimedMember?: Member;
+      matchedMemberId?: string;
+      matchedMemberName?: string;
+      error?: string;
+    }> => {
       const cleanPin = (payload.pin || '').trim();
       if (cleanPin.length < 4 || cleanPin.length > 8) {
         return { ok: false, error: 'Please enter a 4 to 8 digit Bar PIN.' };
@@ -459,13 +525,111 @@ export const DemeritsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         }
         return { ok: false, error: 'Could not claim profile.' };
       } catch (err) {
+        const errData = (err as { data?: Record<string, any> })?.data;
         return {
           ok: false,
+          needsClaim: Boolean(errData?.needsClaim),
+          unclaimedMember: errData?.unclaimedMember as Member | undefined,
+          matchedMemberId: errData?.matchedMemberId as string | undefined,
+          matchedMemberName: errData?.matchedMemberName as string | undefined,
           error: err instanceof Error ? err.message : 'Profile verification failed.',
         };
       }
     },
     []
+  );
+
+  const resetProfilePin = useCallback(
+    async (payload: {
+      memberId?: string;
+      identifier?: string;
+      contactVerify: string;
+      newPin: string;
+    }): Promise<{ ok: boolean; member?: Member; error?: string }> => {
+      const cleanPin = (payload.newPin || '').trim();
+      if (cleanPin.length < 4 || cleanPin.length > 8) {
+        return { ok: false, error: 'Please choose a new 4 to 8 digit Bar PIN.' };
+      }
+
+      try {
+        const res = await cloudflareFetch<{
+          ok: boolean;
+          mode: string;
+          member: Member;
+        }>('/api/reset-pin', {
+          method: 'POST',
+          body: JSON.stringify(payload),
+        });
+
+        if (res.ok && res.member) {
+          setMembers((prev) =>
+            prev.map((m) => (m.id === res.member.id ? { ...m, ...res.member } : m))
+          );
+          setCurrentMember(res.member);
+          setActivePin(cleanPin);
+          return { ok: true, member: res.member };
+        }
+        return { ok: false, error: 'Could not reset PIN.' };
+      } catch (err) {
+        return {
+          ok: false,
+          error: err instanceof Error ? err.message : 'Could not reset PIN.',
+        };
+      }
+    },
+    []
+  );
+
+  const adminResetMemberPin = useCallback(
+    async (payload: {
+      targetMemberId: string;
+      newPin: string;
+      phone?: string;
+      email?: string;
+    }): Promise<{ ok: boolean; member?: Member; message?: string; error?: string }> => {
+      if (!currentMember || (!currentMember.is_admin && !currentMember.is_staff)) {
+        return {
+          ok: false,
+          error: 'Only Referees or Site Admins can reset another member\'s Bar PIN.',
+        };
+      }
+
+      try {
+        const res = await cloudflareFetch<{
+          ok: boolean;
+          member: Member;
+          message: string;
+        }>('/api/admin/reset-pin', {
+          method: 'POST',
+          headers: {
+            'X-Member-Id': currentMember.id,
+            'X-Member-Pin': activePin || '',
+          },
+          body: JSON.stringify({
+            actor_member_id: currentMember.id,
+            actor_pin: activePin || '',
+            target_member_id: payload.targetMemberId,
+            new_pin: payload.newPin,
+            phone: payload.phone,
+            email: payload.email,
+          }),
+        });
+
+        if (res.ok && res.member) {
+          setMembers((prev) =>
+            prev.map((m) => (m.id === res.member.id ? { ...m, ...res.member } : m))
+          );
+          return { ok: true, member: res.member, message: res.message };
+        }
+        return { ok: false, error: 'Could not reset member PIN.' };
+      } catch (err) {
+        return {
+          ok: false,
+          error: err instanceof Error ? err.message : 'Could not reset member PIN.',
+        };
+      }
+    },
+    [currentMember, activePin]
   );
 
   const updateMyProfile = useCallback(
@@ -597,7 +761,7 @@ export const DemeritsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           {
             method: 'POST',
             body: JSON.stringify({
-              memberId: currentMember.id,
+              adminMemberId: currentMember.id,
               pin: activePin,
             }),
           }
@@ -738,7 +902,9 @@ export const DemeritsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     const sorted = [...validUploadedOnly].sort((a, b) => {
       const dateCmp = b.incident_date.localeCompare(a.incident_date);
       if (dateCmp !== 0) return dateCmp;
-      return (b.incident_time || '').localeCompare(a.incident_time || '');
+      const timeCmp = (b.incident_time || '').localeCompare(a.incident_time || '');
+      if (timeCmp !== 0) return timeCmp;
+      return (b.created_at || '').localeCompare(a.created_at || '');
     });
 
     return sorted.map((slip) => {
@@ -1052,7 +1218,11 @@ export const DemeritsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         throw new Error('An uploaded slip photo is required.');
       }
 
-      if (!payload.allowMultiSlipBatch && (payload.image_sha256 || payload.image_dhash)) {
+      if (
+        !payload.bypassDuplicateCheck &&
+        !payload.allowMultiSlipBatch &&
+        (payload.image_sha256 || payload.image_dhash)
+      ) {
         const imgDup = checkDuplicateSlipImage(
           {
             sha256: payload.image_sha256 || '',
@@ -1074,8 +1244,16 @@ export const DemeritsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
       const studentTrimmed = payload.raw_student.trim() || 'Anonymous Patron';
       const sigTrimmed = payload.raw_signature.trim() || 'Staff';
-      const incidentDate = payload.incident_date || new Date().toISOString().slice(0, 10);
-      const incidentTime = payload.incident_time ? payload.incident_time.slice(0, 5) : null;
+      const localNow = getCurrentLocalDateTime();
+      const rawDate = payload.incident_date || localNow.date;
+      const incidentDate = rawDate > localNow.date ? localNow.date : rawDate;
+      let incidentTime = payload.incident_time ? payload.incident_time.slice(0, 5) : null;
+      if (!incidentTime) {
+        const latestOnDate = rawSlips
+          .filter((s) => s.status !== 'rejected' && s.incident_date === incidentDate && s.incident_time)
+          .reduce((maxT, s) => ((s.incident_time || '') > maxT ? (s.incident_time || '') : maxT), '');
+        incidentTime = latestOnDate && latestOnDate > localNow.time ? latestOnDate : localNow.time;
+      }
       const cleanInfractions = payload.infractions.map((i) => i.trim()).filter(Boolean);
 
       // Run AI + Deterministic Referee Monitor on text fields
@@ -1092,66 +1270,68 @@ export const DemeritsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         (orig, idx) => modScan.sanitizedTexts[idx + 2] || orig
       );
 
-      const citationDup = checkDuplicateCitationContent(
-        {
-          raw_student: sanitizedStudent,
-          incident_date: incidentDate,
-          incident_time: incidentTime,
-          demerit_count: payload.demerit_count,
-          infractions: sanitizedInfractions,
-        },
-        rawSlips
-      );
+      if (!payload.bypassDuplicateCheck) {
+        const citationDup = checkDuplicateCitationContent(
+          {
+            raw_student: sanitizedStudent,
+            incident_date: incidentDate,
+            incident_time: incidentTime,
+            demerit_count: payload.demerit_count,
+            infractions: sanitizedInfractions,
+          },
+          rawSlips
+        );
 
-      if (citationDup.isDuplicate && citationDup.matchedSlip) {
-        if (payload.mergeIfCitationDuplicate !== false) {
-          const target = citationDup.matchedSlip;
-          const updatedSlip: DemeritSlip = {
-            ...target,
-            secondary_image_url: target.secondary_image_url || payload.image_url,
-            capture_note: `Deduplicated across multiple uploads: matched ${sanitizedStudent} (${incidentDate} ${
-              incidentTime || ''
-            })`,
-          };
+        if (citationDup.isDuplicate && citationDup.matchedSlip) {
+          if (payload.mergeIfCitationDuplicate !== false) {
+            const target = citationDup.matchedSlip;
+            const updatedSlip: DemeritSlip = {
+              ...target,
+              secondary_image_url: target.secondary_image_url || payload.image_url,
+              capture_note: `Deduplicated across multiple uploads: matched ${sanitizedStudent} (${incidentDate} ${
+                incidentTime || ''
+              })`,
+            };
 
-          setRawSlips((prev) => prev.map((s) => (s.id === target.id ? updatedSlip : s)));
+            setRawSlips((prev) => prev.map((s) => (s.id === target.id ? updatedSlip : s)));
 
-          if (isCloudflareConnected) {
-            try {
-              await cloudflareFetch(`/api/demerits/${target.id}`, {
-                method: 'PATCH',
-                body: JSON.stringify({
-                  secondary_image_url: updatedSlip.secondary_image_url,
-                  capture_note: updatedSlip.capture_note,
-                }),
-              });
-            } catch {
-              // Keep local
+            if (isCloudflareConnected) {
+              try {
+                await cloudflareFetch(`/api/demerits/${target.id}`, {
+                  method: 'PATCH',
+                  body: JSON.stringify({
+                    secondary_image_url: updatedSlip.secondary_image_url,
+                    capture_note: updatedSlip.capture_note,
+                  }),
+                });
+              } catch {
+                // Keep local
+              }
             }
+
+            const patron = resolvePatronName(updatedSlip.raw_student);
+            const { member: issuer, matchedAlias } = resolveStaffSignature(updatedSlip.raw_signature);
+            const resolvedItems = normalizeSlipDemeritItems(updatedSlip);
+
+            return {
+              wasMergedDuplicate: true,
+              slip: {
+                ...updatedSlip,
+                resolvedItems,
+                patron,
+                issuer,
+                patronDisplayName: patron ? patron.display_name : updatedSlip.raw_student,
+                issuerDisplayName: issuer ? issuer.display_name : updatedSlip.raw_signature,
+                matchedAlias,
+              },
+            };
+          } else {
+            throw new Error(
+              `Duplicate citation detected: ${
+                citationDup.matchedDescription || 'This slip is already logged.'
+              }`
+            );
           }
-
-          const patron = resolvePatronName(updatedSlip.raw_student);
-          const { member: issuer, matchedAlias } = resolveStaffSignature(updatedSlip.raw_signature);
-          const resolvedItems = normalizeSlipDemeritItems(updatedSlip);
-
-          return {
-            wasMergedDuplicate: true,
-            slip: {
-              ...updatedSlip,
-              resolvedItems,
-              patron,
-              issuer,
-              patronDisplayName: patron ? patron.display_name : updatedSlip.raw_student,
-              issuerDisplayName: issuer ? issuer.display_name : updatedSlip.raw_signature,
-              matchedAlias,
-            },
-          };
-        } else {
-          throw new Error(
-            `Duplicate citation detected: ${
-              citationDup.matchedDescription || 'This slip is already logged.'
-            }`
-          );
         }
       }
 
@@ -1237,6 +1417,7 @@ export const DemeritsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
               ...newSlip,
               infractions: cleanInfractions,
               demerit_items: payload.demerit_items,
+              bypass_duplicate_check: Boolean(payload.bypassDuplicateCheck),
             }),
           });
           if (res.slip?.id) {
@@ -1274,6 +1455,7 @@ export const DemeritsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     },
     [
       rawSlips,
+      members,
       resolvePatronName,
       resolveStaffSignature,
       addOrUpdateMember,
@@ -1885,7 +2067,7 @@ export const DemeritsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       const enriched = demerits.find((s) => s.id === slipId);
       return { ok: true, slip: enriched };
     },
-    [rawSlips, demerits, isCloudflareConnected, currentMember, activePin]
+    [rawSlips, demerits, isCloudflareConnected, currentMember, activePin, isAdminOrStaff]
   );
 
   return (
@@ -1903,7 +2085,11 @@ export const DemeritsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         isAdminOrStaff,
         isProfileModalOpen,
         setIsProfileModalOpen,
+        profileModalIntent,
+        openProfileModal,
         claimOrLoginProfile,
+        resetProfilePin,
+        adminResetMemberPin,
         updateMyProfile,
         requestNotificationVerification,
         verifyNotificationCode,

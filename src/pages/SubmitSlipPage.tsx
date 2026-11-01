@@ -1,5 +1,5 @@
-import React, { useState, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useRef, useEffect } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useDemerits } from '../context/DemeritsContext';
 import { uploadCompressedSlipToR2 } from '../lib/supabase';
 import { DEMERIT_CATEGORIES } from '../lib/defaultData';
@@ -11,12 +11,16 @@ import {
 } from '../lib/imageDedup';
 import { MichiganTeamBadge, TeamBadgeMeta } from '../components/MichiganSportsGraphics';
 import { PwaHelpIcon } from '../components/PwaTooltip';
-import { rotateImageClockwise } from '../lib/imageAutoCrop';
+import {
+  rotateImageClockwise,
+  cropNormalizedRegionFromDataUrl,
+} from '../lib/imageAutoCrop';
 import {
   moderateTextInstant,
   scanWithRefereeMonitor,
   applyRefereeBlurStampToImage,
   extractSlipsFromPhotoAI,
+  getCurrentLocalDateTime,
 } from '../lib/moderation';
 import {
   Camera,
@@ -39,6 +43,8 @@ import {
   SlidersHorizontal,
   RotateCw,
   RotateCcw,
+  FileText,
+  Images,
 } from 'lucide-react';
 
 interface SlipDraftItem {
@@ -48,14 +54,45 @@ interface SlipDraftItem {
   incidentTime: string;
   locationArea: string;
   items: DemeritLineItem[];
+  cropBox?: {
+    x_min: number;
+    y_min: number;
+    x_max: number;
+    y_max: number;
+  };
 }
 
-function createDefaultDraft(time = '21:00'): SlipDraftItem {
+function getFallbackClientCropBox(
+  index: number,
+  totalCount: number
+): { x_min: number; y_min: number; x_max: number; y_max: number } {
+  if (totalCount === 2) {
+    return index === 0
+      ? { x_min: 0.01, y_min: 0.02, x_max: 0.51, y_max: 0.98 }
+      : { x_min: 0.49, y_min: 0.02, x_max: 0.99, y_max: 0.98 };
+  }
+  if (totalCount === 3) {
+    if (index === 0) return { x_min: 0.01, y_min: 0.01, x_max: 0.51, y_max: 0.52 };
+    if (index === 1) return { x_min: 0.49, y_min: 0.01, x_max: 0.99, y_max: 0.52 };
+    return { x_min: 0.15, y_min: 0.48, x_max: 0.85, y_max: 0.99 };
+  }
+  const row = Math.floor((index % 4) / 2);
+  const col = (index % 4) % 2;
+  return {
+    x_min: col === 0 ? 0.01 : 0.49,
+    y_min: row === 0 ? 0.01 : 0.49,
+    x_max: col === 0 ? 0.51 : 0.99,
+    y_max: row === 0 ? 0.51 : 0.99,
+  };
+}
+
+function createDefaultDraft(time?: string): SlipDraftItem {
+  const localNow = getCurrentLocalDateTime();
   return {
     rawStudent: 'Rick',
     rawSignature: 'The Boss - AKA Sarah',
-    incidentDate: new Date().toISOString().slice(0, 10),
-    incidentTime: time,
+    incidentDate: localNow.date,
+    incidentTime: time || localNow.time,
     locationArea: 'Copper A.C.',
     items: [
       {
@@ -69,6 +106,7 @@ function createDefaultDraft(time = '21:00'): SlipDraftItem {
 
 export const SubmitSlipPage: React.FC = () => {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const {
     members,
     aliases,
@@ -81,6 +119,30 @@ export const SubmitSlipPage: React.FC = () => {
     checkCitationDuplicate,
     submitDemeritSlip,
   } = useDemerits();
+
+  const initialMode = searchParams.get('mode') === 'multi' ? 'multi' : 'single';
+  const [scanMode, setScanMode] = useState<'single' | 'multi'>(initialMode);
+  // 0 = Auto-Detect (1–4 slips in photo), or explicit 2, 3, 4 slips in photo
+  const [expectedSlipCount, setExpectedSlipCount] = useState<number>(0);
+
+  useEffect(() => {
+    const urlMode = searchParams.get('mode');
+    if (urlMode === 'multi') {
+      setScanMode('multi');
+    } else if (urlMode === 'single') {
+      setScanMode('single');
+    }
+  }, [searchParams]);
+
+  const handleModeSwitch = (nextMode: 'single' | 'multi') => {
+    setScanMode(nextMode);
+    if (nextMode === 'multi') {
+      setSearchParams({ mode: 'multi' }, { replace: true });
+    } else {
+      setSearchParams({}, { replace: true });
+      setExpectedSlipCount(0);
+    }
+  };
 
   const [slipDrafts, setSlipDrafts] = useState<SlipDraftItem[]>([createDefaultDraft('21:00')]);
   const [imageUrl, setImageUrl] = useState<string | null>(null);
@@ -107,9 +169,11 @@ export const SubmitSlipPage: React.FC = () => {
     newCount: number;
     mergedCount: number;
     blurredQueueCount: number;
+    photosProcessed?: number;
   } | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const multiFileInputRef = useRef<HTMLInputElement | null>(null);
   const cameraInputRef = useRef<HTMLInputElement | null>(null);
 
   // Real-time client check across all drafts to preview Referee Blur / Queue status
@@ -128,9 +192,9 @@ export const SubmitSlipPage: React.FC = () => {
         return prev.slice(0, count);
       }
       const next = [...prev];
-      const defaultTimes = ['20:50', '20:56', '21:09', '21:15'];
+      const localNow = getCurrentLocalDateTime();
       while (next.length < count) {
-        next.push(createDefaultDraft(defaultTimes[next.length] || '21:00'));
+        next.push(createDefaultDraft(localNow.time));
       }
       return next;
     });
@@ -188,19 +252,39 @@ export const SubmitSlipPage: React.FC = () => {
   };
 
   /**
-   * Saves an array of slip drafts to Cloudflare D1 (with AI Referee auto-blur moderation & stat merging).
+   * Saves an array of slip drafts to Cloudflare D1 (with AI Referee auto-blur moderation,
+   * individual slip cropping from multi-slip photos, & stat merging).
    */
   const persistSlipDrafts = async (
     draftsToSave: SlipDraftItem[],
     targetImageUrl: string,
     targetRawDataUrl: string | null,
     targetSha256: string | null,
-    targetDhash: string | null
-  ) => {
-    if (!currentMember) return;
+    targetDhash: string | null,
+    bypassDuplicateCheck = false,
+    options?: {
+      skipSuccessRedirect?: boolean;
+    }
+  ): Promise<{
+    newCount: number;
+    mergedCount: number;
+    blurredQueueCount: number;
+  }> => {
+    if (!currentMember) {
+      return { newCount: 0, mergedCount: 0, blurredQueueCount: 0 };
+    }
     setSubmitting(true);
     setErrorMsg(null);
+    setDuplicateAlert(null);
     try {
+      let finalTargetUrl = targetImageUrl;
+      if (targetImageUrl.startsWith('data:') && targetSha256) {
+        const filename = `${targetSha256.slice(0, 24)}.jpg`;
+        const uploaded = await uploadCompressedSlipToR2(targetImageUrl, filename);
+        finalTargetUrl = uploaded.url;
+        setImageUrl(uploaded.url);
+      }
+
       let newCount = 0;
       let mergedCount = 0;
       let blurredQueueCount = 0;
@@ -219,16 +303,49 @@ export const SubmitSlipPage: React.FC = () => {
         const totalDemeritCount = validItems.reduce((sum, item) => sum + item.points, 0);
         const cleanedInfractions = validItems.map((item) => item.description);
 
+        // If this photo has multiple slips, crop each slip out using its AI Vision cropBox
+        // (or quadrant fallback if the LLM omitted or returned a full-frame box) so each patron's
+        // card on the Wall of Slips shows their own cropped ticket!
+        let individualSlipDataUrl = targetRawDataUrl;
+        let finalSlipImageUrl = finalTargetUrl;
+
+        if (isMultiSlip && targetRawDataUrl) {
+          let activeCropBox = d.cropBox;
+          const rawW = activeCropBox
+            ? (Number(activeCropBox.x_max) || 1) - (Number(activeCropBox.x_min) || 0)
+            : 1;
+          const rawH = activeCropBox
+            ? (Number(activeCropBox.y_max) || 1) - (Number(activeCropBox.y_min) || 0)
+            : 1;
+          if (!activeCropBox || rawW <= 0.08 || rawH <= 0.08 || (rawW >= 0.85 && rawH >= 0.85)) {
+            activeCropBox = getFallbackClientCropBox(i, draftsToSave.length);
+          }
+
+          try {
+            const croppedDataUrl = await cropNormalizedRegionFromDataUrl(
+              targetRawDataUrl,
+              activeCropBox,
+              960,
+              0.78
+            );
+            individualSlipDataUrl = croppedDataUrl;
+            const cropKey = `${(targetSha256 || Date.now().toString()).slice(0, 24)}_slip_${i + 1}.jpg`;
+            const cropUpload = await uploadCompressedSlipToR2(croppedDataUrl, cropKey);
+            finalSlipImageUrl = cropUpload.url;
+          } catch {
+            // Fallback to full photo
+          }
+        }
+
         // Scan text + image with AI Referee Monitor
         const modScan = await scanWithRefereeMonitor(
           [d.rawStudent, d.rawSignature, ...cleanedInfractions],
-          targetRawDataUrl
+          individualSlipDataUrl
         );
 
-        let finalSlipImageUrl = targetImageUrl;
-        if (modScan.flagged && (targetRawDataUrl || targetImageUrl)) {
+        if (modScan.flagged && (individualSlipDataUrl || finalSlipImageUrl)) {
           const blurredDataUrl = await applyRefereeBlurStampToImage(
-            targetRawDataUrl || targetImageUrl,
+            individualSlipDataUrl || finalSlipImageUrl,
             modScan.blurRegions
           );
           const blurKey = `${(targetSha256 || Date.now().toString()).slice(0, 24)}_blurred_${i + 1}.jpg`;
@@ -247,8 +364,8 @@ export const SubmitSlipPage: React.FC = () => {
           infractions: cleanedInfractions,
           demerit_items: validItems,
           image_url: finalSlipImageUrl,
-          source_image_url: isMultiSlip ? targetImageUrl : null,
-          image_sha256: i === 0 ? targetSha256 : null,
+          source_image_url: isMultiSlip ? finalTargetUrl : null,
+          image_sha256: i === 0 && !bypassDuplicateCheck ? targetSha256 : null,
           image_dhash: i === 0 ? targetDhash : null,
           is_blurred: modScan.flagged,
           moderation_flag_reason: modScan.reason,
@@ -259,7 +376,8 @@ export const SubmitSlipPage: React.FC = () => {
             : 'Auto-extracted & logged via AI Vision Capture',
           createPatronIfNew: true,
           allowMultiSlipBatch: i > 0,
-          mergeIfCitationDuplicate: true,
+          mergeIfCitationDuplicate: !bypassDuplicateCheck,
+          bypassDuplicateCheck,
         });
 
         if (res.wasMergedDuplicate) {
@@ -271,14 +389,24 @@ export const SubmitSlipPage: React.FC = () => {
         }
       }
 
-      setAutoLoggedSlips(draftsToSave);
-      setSubmittedSummary({ newCount, mergedCount, blurredQueueCount });
-      setTimeout(() => {
-        navigate(blurredQueueCount > 0 && isAdminOrStaff ? '/admin' : '/docket');
-      }, 2400);
+      if (!options?.skipSuccessRedirect) {
+        setAutoLoggedSlips(draftsToSave);
+        setSubmittedSummary({ newCount, mergedCount, blurredQueueCount, photosProcessed: 1 });
+        const loggedPatrons = draftsToSave.map((d) => d.rawStudent).join(', ');
+        setTimeout(() => {
+          navigate(
+            blurredQueueCount > 0 && isAdminOrStaff
+              ? '/admin'
+              : `/docket?justLogged=1&patron=${encodeURIComponent(loggedPatrons)}`
+          );
+        }, 2000);
+      }
+
+      return { newCount, mergedCount, blurredQueueCount };
     } catch (err) {
       setErrorMsg(err instanceof Error ? err.message : 'Could not save slip.');
       setShowManualEditor(true);
+      return { newCount: 0, mergedCount: 0, blurredQueueCount: 0 };
     } finally {
       setSubmitting(false);
     }
@@ -286,9 +414,9 @@ export const SubmitSlipPage: React.FC = () => {
 
   /**
    * Zero-Touch Image Capture + Smart Smartphone Compression + Pre-Storage Slip Verification:
-   * 1. Accepts ANY size smartphone photo (never rejects large photos) and reduces it in-browser down to ~45KB-82KB + checks duplicates.
-   * 2. Verifies via AI Vision (`/api/extract-slip`) that the photo is INDEED a physical Demerit Slip and extracts all handwritten fields BEFORE storing anything in R2.
-   * 3. Only after confirming it is a genuine Demerit Slip, uploads the reduced (<82KB) image to Cloudflare R2 (`copper-demerits-slips`) and logs to Cloudflare D1.
+   * Supports BOTH:
+   * - A single photo containing 1 to 4 physical slips laid out together
+   * - Multiple separate photos selected at once from the camera roll (`files.length > 1`)
    */
   const handleManualRotate = async (additionalDeg: number) => {
     if (!imageUrl) return;
@@ -314,8 +442,8 @@ export const SubmitSlipPage: React.FC = () => {
   };
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+    const fileList = e.target.files ? Array.from(e.target.files) : [];
+    if (fileList.length === 0) return;
 
     if (!currentMember) {
       setIsProfileModalOpen(true);
@@ -329,27 +457,152 @@ export const SubmitSlipPage: React.FC = () => {
     setSubmittedSummary(null);
     setAutoLoggedSlips(null);
     setCompressionStats(null);
-    setUploadStatusMsg(
-      'Step 1/3 · Reducing Smartphone Photo Size (<80KB) & Verifying Uniqueness (SHA-256 + dHash)...'
-    );
+
+    const isMultiBatchFiles = fileList.length > 1;
+    const isMultiModeActive = scanMode === 'multi' || expectedSlipCount > 1 || isMultiBatchFiles;
+    const localNow = getCurrentLocalDateTime();
+    const todayStr = localNow.date;
+    const scanTimeStr = localNow.time;
 
     try {
-      // 1. Accept any size smartphone image, reduce it in-browser to ~45KB-82KB, and check duplicates FIRST (0 bytes uploaded)
-      const fingerprint = await fingerprintImageFile(file, 960, 0.74, 82 * 1024);
-      setWasAutoCropped(Boolean(fingerprint.wasCropped));
-      setRotationDeg(fingerprint.rotationApplied || 0);
-      const dupCheck = checkImageDuplicate(fingerprint);
+      // CASE A: User selected MULTIPLE separate photo files from their camera roll at once!
+      if (isMultiBatchFiles) {
+        let totalNew = 0;
+        let totalMerged = 0;
+        let totalBlurred = 0;
+        const allBatchDrafts: SlipDraftItem[] = [];
 
-      if (dupCheck.isDuplicate) {
-        setDuplicateAlert(dupCheck);
-        setImageUrl(null);
-        setRawDataUrl(null);
-        setImageSha256(null);
-        setImageDhash(null);
-        setCompressionStats(null);
-        setUploadStatusMsg(null);
+        for (let fIdx = 0; fIdx < fileList.length; fIdx++) {
+          const currentFile = fileList[fIdx];
+          setUploadStatusMsg(
+            `Batch Photo ${fIdx + 1} of ${fileList.length} · Compressing & Reading Slip(s) with AI Vision...`
+          );
+
+          const fingerprint = await fingerprintImageFile(currentFile, 1100, 0.75, 95 * 1024, {
+            skipPortraitAutoRotate: expectedSlipCount > 1,
+          });
+          setImageUrl(fingerprint.dataUrl);
+          setRawDataUrl(fingerprint.dataUrl);
+          setImageSha256(fingerprint.sha256);
+          setImageDhash(fingerprint.dhash);
+          setCompressionStats({
+            originalBytes: fingerprint.originalBytes,
+            compressedBytes: fingerprint.compressedBytes,
+            savingsPercent: fingerprint.savingsPercent,
+            width: fingerprint.width,
+            height: fingerprint.height,
+          });
+
+          const aiResult = await extractSlipsFromPhotoAI(
+            fingerprint.dataUrl,
+            todayStr,
+            expectedSlipCount > 1 ? expectedSlipCount : undefined,
+            scanTimeStr
+          );
+
+          if (aiResult.isDemeritSlip === false || !aiResult.ok || !aiResult.slips?.length) {
+            continue;
+          }
+
+          let workingDataUrl = fingerprint.dataUrl;
+          if (aiResult.rotation_needed && aiResult.rotation_needed !== 0) {
+            try {
+              workingDataUrl = await rotateImageClockwise(fingerprint.dataUrl, aiResult.rotation_needed);
+              setImageUrl(workingDataUrl);
+              setRawDataUrl(workingDataUrl);
+            } catch {
+              // keep original
+            }
+          }
+
+          const extractedDrafts: SlipDraftItem[] = aiResult.slips.map((s) => ({
+            rawStudent: s.raw_student || 'Patron',
+            rawSignature: s.raw_signature || 'The Boss - AKA Sarah',
+            incidentDate: s.incident_date || todayStr,
+            incidentTime: s.incident_time || scanTimeStr,
+            locationArea: s.location_area || 'Copper A.C.',
+            cropBox: s.crop_box,
+            items:
+              Array.isArray(s.demerit_items) && s.demerit_items.length > 0
+                ? s.demerit_items.map((it) => ({
+                    type: it.type || DEMERIT_CATEGORIES[6],
+                    description: it.description || 'Bar Citation',
+                    points: Math.max(1, Number(it.points) || 1),
+                  }))
+                : [
+                    {
+                      type: DEMERIT_CATEGORIES[6],
+                      description: (s.infractions && s.infractions[0]) || 'Bar Demerit Citation',
+                      points: Math.max(1, Number(s.demerit_count) || 1),
+                    },
+                  ],
+          }));
+
+          const filename = `${fingerprint.sha256.slice(0, 24)}.jpg`;
+          const uploaded = await uploadCompressedSlipToR2(workingDataUrl, filename);
+
+          const batchRes = await persistSlipDrafts(
+            extractedDrafts,
+            uploaded.url,
+            workingDataUrl,
+            fingerprint.sha256,
+            fingerprint.dhash,
+            false,
+            { skipSuccessRedirect: true }
+          );
+
+          totalNew += batchRes.newCount;
+          totalMerged += batchRes.mergedCount;
+          totalBlurred += batchRes.blurredQueueCount;
+          allBatchDrafts.push(...extractedDrafts);
+        }
+
+        if (allBatchDrafts.length > 0) {
+          setSlipDrafts(allBatchDrafts);
+          setAutoLoggedSlips(allBatchDrafts);
+          setSubmittedSummary({
+            newCount: totalNew,
+            mergedCount: totalMerged,
+            blurredQueueCount: totalBlurred,
+            photosProcessed: fileList.length,
+          });
+          setUploadStatusMsg(
+            `Batch Complete · ${allBatchDrafts.length} Slip(s) across ${fileList.length} Photos Verified & Logged Automatically!`
+          );
+          const batchPatrons = allBatchDrafts.map((d) => d.rawStudent).join(', ');
+          setTimeout(() => {
+            navigate(
+              totalBlurred > 0 && isAdminOrStaff
+                ? '/admin'
+                : `/docket?justLogged=1&patron=${encodeURIComponent(batchPatrons)}`
+            );
+          }, 2200);
+        } else {
+          setErrorMsg(
+            '🦓 Referee Whistle: Could not detect physical Demerit Slips in the selected photos. Please try a clearer photo or use Manual Override below.'
+          );
+        }
         return;
       }
+
+      // CASE B: Single image file (containing either 1 slip OR 2–4 slips laid side-by-side)
+      const file = fileList[0];
+      setUploadStatusMsg(
+        isMultiModeActive
+          ? 'Step 1/3 · Optimizing Multi-Slip Photo (<95KB) & Preparing High-Res Layout...'
+          : 'Step 1/3 · Reducing Smartphone Photo Size (<80KB) & Preparing Slip...'
+      );
+
+      // Use slightly higher maxDimension (1150px) and skip blind portrait 270° rotation when in Multi-Slip mode
+      const fingerprint = await fingerprintImageFile(
+        file,
+        isMultiModeActive ? 1150 : 960,
+        isMultiModeActive ? 0.76 : 0.74,
+        isMultiModeActive ? 105 * 1024 : 82 * 1024,
+        { skipPortraitAutoRotate: isMultiModeActive }
+      );
+      setWasAutoCropped(Boolean(fingerprint.wasCropped));
+      setRotationDeg(fingerprint.rotationApplied || 0);
 
       setCompressionStats({
         originalBytes: fingerprint.originalBytes,
@@ -359,25 +612,46 @@ export const SubmitSlipPage: React.FC = () => {
         height: fingerprint.height,
       });
 
-      // Show local preview while AI Vision verifies that the photo is indeed a Demerit Slip
       setImageUrl(fingerprint.dataUrl);
       setRawDataUrl(fingerprint.dataUrl);
       setImageSha256(fingerprint.sha256);
       setImageDhash(fingerprint.dhash);
+
+      const dupCheck = checkImageDuplicate(fingerprint);
+      if (dupCheck.isDuplicate) {
+        setDuplicateAlert(dupCheck);
+        setShowManualEditor(true);
+        setUploadStatusMsg(null);
+        return;
+      }
+
       setUploadStatusMsg(
         `Step 2/3 · Reduced (${formatByteSize(fingerprint.originalBytes)} → ${formatByteSize(
           fingerprint.compressedBytes
-        )}) · AI Vision Verifying Demerit Slip & Reading Handwriting...`
+        )}) · AI Vision Scanning ${
+          expectedSlipCount > 1
+            ? `All ${expectedSlipCount} Slips in Photo`
+            : isMultiModeActive
+            ? 'All Slips (1–4) in Photo'
+            : 'Demerit Slip & Reading Handwriting'
+        }...`
       );
 
-      const todayStr = new Date().toISOString().slice(0, 10);
-      const aiResult = await extractSlipsFromPhotoAI(fingerprint.dataUrl, todayStr);
+      const aiResult = await extractSlipsFromPhotoAI(
+        fingerprint.dataUrl,
+        todayStr,
+        expectedSlipCount > 1 ? expectedSlipCount : undefined,
+        scanTimeStr
+      );
 
       // If AI detects the photo still needs rotation to be upright, apply it automatically
       let finalWorkingImageUrl = fingerprint.dataUrl;
       if (aiResult.rotation_needed && aiResult.rotation_needed !== 0) {
         try {
-          finalWorkingImageUrl = await rotateImageClockwise(fingerprint.dataUrl, aiResult.rotation_needed);
+          finalWorkingImageUrl = await rotateImageClockwise(
+            fingerprint.dataUrl,
+            aiResult.rotation_needed
+          );
           setImageUrl(finalWorkingImageUrl);
           setRawDataUrl(finalWorkingImageUrl);
           setRotationDeg((prev) => (prev + (aiResult.rotation_needed || 0)) % 360);
@@ -408,8 +682,9 @@ export const SubmitSlipPage: React.FC = () => {
           rawStudent: s.raw_student || 'Patron',
           rawSignature: s.raw_signature || 'The Boss - AKA Sarah',
           incidentDate: s.incident_date || todayStr,
-          incidentTime: s.incident_time || '21:00',
+          incidentTime: s.incident_time || scanTimeStr,
           locationArea: s.location_area || 'Copper A.C.',
+          cropBox: s.crop_box,
           items:
             Array.isArray(s.demerit_items) && s.demerit_items.length > 0
               ? s.demerit_items.map((it) => ({
@@ -426,11 +701,26 @@ export const SubmitSlipPage: React.FC = () => {
                 ],
         }));
 
+        // If user explicitly chose e.g. 2, 3, or 4 slips and AI found fewer, pad drafts and open manual review so they can verify
+        if (expectedSlipCount > extractedDrafts.length) {
+          while (extractedDrafts.length < expectedSlipCount) {
+            extractedDrafts.push(createDefaultDraft(scanTimeStr));
+          }
+          setSlipDrafts(extractedDrafts);
+          setShowManualEditor(true);
+          setUploadStatusMsg(
+            `AI read ${aiResult.slips.length} of ${expectedSlipCount} slips — review or complete the remaining slip card(s) below and tap Save!`
+          );
+          return;
+        }
+
         setSlipDrafts(extractedDrafts);
+        if (extractedDrafts.length > 1) {
+          setScanMode('multi');
+        }
 
         // Pre-storage Citation Duplicate Check:
-        // Compare extracted student, date, time & infractions against all existing slips on the scoreboard.
-        // If this slip is already logged, block storage in Cloudflare R2 and do NOT insert a duplicate!
+        // Compare extracted student, date & infractions against all existing slips on the scoreboard.
         for (const draft of extractedDrafts) {
           const citDup = checkCitationDuplicate({
             raw_student: draft.rawStudent,
@@ -442,40 +732,33 @@ export const SubmitSlipPage: React.FC = () => {
 
           if (citDup.isDuplicate) {
             setDuplicateAlert(citDup);
-            setImageUrl(null);
-            setRawDataUrl(null);
-            setImageSha256(null);
-            setImageDhash(null);
-            setCompressionStats(null);
-            setUploadStatusMsg(null);
-            setErrorMsg(
-              `🦓 Referee Whistle: Duplicate slip prevented! ${
-                citDup.matchedDescription ||
-                `A demerit citation for ${draft.rawStudent} on ${draft.incidentDate} is already logged on the Ring of Honor.`
-              } (0 bytes stored)`
+            setShowManualEditor(true);
+            setUploadStatusMsg(
+              'Possible duplicate citation detected — review below or tap "Log It Anyway" if this is a new slip.'
             );
             return;
           }
         }
 
-        // 3. Verified as genuine NEW Demerit Slip! Store the reduced (<82KB) image in Cloudflare R2
+        // 3. Verified as genuine NEW Demerit Slip(s)! Store the reduced image in Cloudflare R2
         const filename = `${fingerprint.sha256.slice(0, 24)}.jpg`;
         const uploaded = await uploadCompressedSlipToR2(finalWorkingImageUrl, filename);
         setImageUrl(uploaded.url);
 
         setUploadStatusMsg(
-          `Step 3/3 · Verified Demerit Slip (${extractedDrafts.length} ${
-            extractedDrafts.length === 1 ? 'Slip' : 'Slips'
-          }) · Storing ${formatByteSize(fingerprint.compressedBytes)} & Logging to Ring of Honor...`
+          `Step 3/3 · Verified ${extractedDrafts.length} ${
+            extractedDrafts.length === 1 ? 'Demerit Slip' : 'Demerit Slips in Photo'
+          } · Storing ${formatByteSize(fingerprint.compressedBytes)} & Logging to Ring of Honor...`
         );
 
         // Automatically log and save the extracted slip(s) so the user doesn't have to do anything else!
         await persistSlipDrafts(
           extractedDrafts,
           uploaded.url,
-          fingerprint.dataUrl,
+          finalWorkingImageUrl,
           fingerprint.sha256,
-          fingerprint.dhash
+          fingerprint.dhash,
+          false
         );
 
         setUploadStatusMsg(
@@ -489,6 +772,9 @@ export const SubmitSlipPage: React.FC = () => {
         );
       } else {
         // Only open manual editor if handwriting was too faint for full OCR
+        if (expectedSlipCount > 1) {
+          setSlipCountInPhoto(expectedSlipCount);
+        }
         setShowManualEditor(true);
         setUploadStatusMsg(
           `Photo reduced (${formatByteSize(fingerprint.originalBytes)} → ${formatByteSize(
@@ -497,7 +783,10 @@ export const SubmitSlipPage: React.FC = () => {
         );
       }
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Failed to process image file. Please try another photo.';
+      const msg =
+        err instanceof Error
+          ? err.message
+          : 'Failed to process image file. Please try another photo.';
       setErrorMsg(msg);
     } finally {
       setUploadingPhoto(false);
@@ -533,16 +822,16 @@ export const SubmitSlipPage: React.FC = () => {
       if (citDup.isDuplicate) {
         setDuplicateAlert(citDup);
         setErrorMsg(
-          `🦓 Referee Whistle: Cannot submit duplicate citation! ${
+          `🦓 Referee Whistle: Possible duplicate citation! ${
             citDup.matchedDescription ||
             `A citation for ${d.rawStudent} on ${d.incidentDate} already exists on the scoreboard.`
-          }`
+          } If this is a brand-new ticket, tap "Log It Anyway — This Is a New Ticket" above.`
         );
         return;
       }
     }
 
-    await persistSlipDrafts(slipDrafts, imageUrl, rawDataUrl, imageSha256, imageDhash);
+    await persistSlipDrafts(slipDrafts, imageUrl, rawDataUrl, imageSha256, imageDhash, false);
   };
 
   return (
@@ -551,15 +840,14 @@ export const SubmitSlipPage: React.FC = () => {
       <div className="border-b border-[#B87333]/30 pb-5">
         <div className="inline-flex items-center gap-2 rounded-full border border-[#B87333]/40 bg-[#B87333]/10 px-3 py-1 text-[11px] font-mono-docket uppercase tracking-widest text-[#E8B888]">
           <Wand2 className="h-3.5 w-3.5 text-[#DFC15E]" />
-          <span>ZERO-TOUCH AI VISION CAPTURE · SNAP &amp; DONE</span>
+          <span>ZERO-TOUCH AI VISION CAPTURE · SINGLE OR MULTI-SLIP SCANNER</span>
         </div>
         <h1 className="mt-2 font-athletic text-3xl sm:text-5xl font-extrabold uppercase tracking-wide text-[#F5F2EB]">
-          SNAP A <span className="text-[#B87333]">SLIP PHOTO</span>
+          SNAP <span className="text-[#B87333]">1 OR MULTIPLE SLIPS</span>
         </h1>
         <p className="mt-1 text-xs sm:text-sm text-[#B5A99D]">
-          Just snap or choose a photo of the physical demerit slip(s). Our AI Referee automatically
-          reads the handwriting (Student, Offenses, Points, Time, Room &amp; Signature) and logs it
-          to the Ring of Honor — <strong className="text-[#DFC15E]">nothing else to type!</strong>
+          Snap a single ticket, lay <strong className="text-[#F5F2EB]">2–4 physical slips side-by-side</strong> in one photo, or select <strong className="text-[#F5F2EB]">multiple photos at once</strong> from your camera roll. Our AI Referee reads every slip&apos;s Student, Offenses, Points, Time &amp; Signature and logs them to the Ring of Honor automatically —{' '}
+          <strong className="text-[#DFC15E]">anyone (Referees or Patrons) can scan slips for the whole table!</strong>
         </p>
       </div>
 
@@ -576,7 +864,7 @@ export const SubmitSlipPage: React.FC = () => {
                 SIGN IN OR CLAIM YOUR PROFILE FIRST
               </h2>
               <p className="text-xs sm:text-sm text-[#D6C7B8]">
-                Sign in with your email or 10-digit phone number + Bar PIN (or claim an unclaimed
+                Sign in with your Name, Nickname, Phone, or Email + Bar PIN (or claim an unclaimed
                 name on the board) so every uploaded slip is tied to a verified bar member.
               </p>
             </div>
@@ -612,10 +900,10 @@ export const SubmitSlipPage: React.FC = () => {
               </div>
               <p className="font-mono-docket text-[11px] text-emerald-200/80">
                 {currentMember.is_admin
-                  ? 'Site Administrator & Official Referee'
+                  ? 'Site Administrator & Official Referee · Can scan slips for any patron'
                   : currentMember.is_staff
-                  ? 'Official Bar Referee / Staff Account'
-                  : 'Verified Ring of Honor Patron'}
+                  ? 'Official Bar Referee / Staff Account · Can scan slips for any patron'
+                  : 'Verified Ring of Honor Patron · Can scan slips for yourself or friends'}
               </p>
             </div>
           </div>
@@ -651,29 +939,27 @@ export const SubmitSlipPage: React.FC = () => {
         </div>
       )}
 
-      {/* Duplicate Image Blocked Alert */}
+      {/* Duplicate Slip Notice with 1-Tap Override Button */}
       {duplicateAlert?.isDuplicate && (
-        <div className="rounded-2xl border-2 border-rose-500/60 bg-rose-950/50 p-4 sm:p-5 text-rose-200 space-y-3">
+        <div className="rounded-2xl border-2 border-amber-500/60 bg-amber-950/50 p-4 sm:p-5 text-amber-100 space-y-3">
           <div className="flex items-start gap-3">
-            <ShieldAlert className="h-6 w-6 text-rose-400 shrink-0 mt-0.5" />
-            <div>
-              <h3 className="font-athletic text-xl font-bold uppercase text-rose-200">
-                Duplicate Slip Image Blocked ({duplicateAlert.similarityPercent ?? 100}% Match)
+            <ShieldAlert className="h-6 w-6 text-amber-400 shrink-0 mt-0.5" />
+            <div className="flex-1 space-y-2">
+              <h3 className="font-athletic text-xl font-bold uppercase text-amber-200">
+                Possible Duplicate Citation Flagged ({duplicateAlert.similarityPercent ?? 100}% Match)
               </h3>
-              <p className="mt-0.5 text-xs font-mono-docket text-rose-300">
+              <p className="mt-0.5 text-xs font-mono-docket text-amber-200/90">
                 {duplicateAlert.matchedDescription
-                  ? `Matched official uploaded image: ${duplicateAlert.matchedDescription}`
-                  : duplicateAlert.reason === 'exact-sha256'
-                  ? 'Exact SHA-256 file match: this exact image file has already been uploaded.'
-                  : 'Visual Perceptual dHash match: this slip photo is visually identical to an already uploaded slip.'}
+                  ? duplicateAlert.matchedDescription
+                  : 'This photo file or citation matches a slip already logged on the Ring of Honor.'}
               </p>
               {duplicateAlert.matchedSlip && (
-                <div className="mt-3 flex items-center gap-3 rounded-xl border border-rose-500/30 bg-black/50 p-2.5">
+                <div className="mt-2 flex items-center gap-3 rounded-xl border border-amber-500/30 bg-black/50 p-2.5">
                   {duplicateAlert.matchedSlip.image_url && (
                     <img
                       src={duplicateAlert.matchedSlip.image_url}
                       alt="Existing matched slip"
-                      className="h-14 w-16 rounded-lg object-cover border border-rose-400/40"
+                      className="h-14 w-16 rounded-lg object-cover border border-amber-400/40"
                     />
                   )}
                   <div className="text-xs font-mono-docket">
@@ -681,12 +967,45 @@ export const SubmitSlipPage: React.FC = () => {
                       Existing Citation: {duplicateAlert.matchedSlip.raw_student} (+
                       {duplicateAlert.matchedSlip.demerit_count} Demerits)
                     </p>
-                    <p className="text-rose-300">
+                    <p className="text-amber-300">
                       {duplicateAlert.matchedSlip.incident_date}{' '}
                       {duplicateAlert.matchedSlip.incident_time || ''} · Signed:{' '}
                       &ldquo;{duplicateAlert.matchedSlip.raw_signature}&rdquo;
                     </p>
                   </div>
+                </div>
+              )}
+
+              {imageUrl && (
+                <div className="pt-2 flex flex-wrap items-center gap-2.5">
+                  <button
+                    type="button"
+                    disabled={submitting}
+                    onClick={() =>
+                      persistSlipDrafts(
+                        slipDrafts,
+                        imageUrl,
+                        rawDataUrl,
+                        imageSha256,
+                        imageDhash,
+                        true
+                      )
+                    }
+                    className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-[#DFC15E] to-[#B87333] px-4 py-2.5 font-athletic text-sm font-black uppercase tracking-wider text-[#121212] shadow-md hover:brightness-110 cursor-pointer disabled:opacity-50"
+                  >
+                    <CheckCircle2 className="h-4 w-4" />
+                    <span>Log It Anyway — This Is a New Ticket</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setDuplicateAlert(null);
+                      setShowManualEditor(true);
+                    }}
+                    className="rounded-xl border border-white/20 bg-white/10 px-3.5 py-2 font-mono-docket text-xs text-[#F5F2EB] hover:border-[#DFC15E] cursor-pointer"
+                  >
+                    Edit Slip Details First
+                  </button>
                 </div>
               )}
             </div>
@@ -711,7 +1030,9 @@ export const SubmitSlipPage: React.FC = () => {
                   ZERO-TOUCH AI VISION OCR • LOGGED AUTOMATICALLY
                 </span>
                 <h3 className="font-athletic text-2xl sm:text-3xl uppercase font-black text-white">
-                  Slip Grabbed &amp; Logged to Ring of Honor!
+                  {autoLoggedSlips.length > 1
+                    ? `${autoLoggedSlips.length} Slips Grabbed & Logged to Ring of Honor!`
+                    : 'Slip Grabbed & Logged to Ring of Honor!'}
                 </h3>
               </div>
             </div>
@@ -746,6 +1067,11 @@ export const SubmitSlipPage: React.FC = () => {
                 >
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <div className="font-athletic text-xl font-black uppercase text-white">
+                      {autoLoggedSlips.length > 1 && (
+                        <span className="mr-2 rounded bg-emerald-500/20 px-2 py-0.5 font-mono-docket text-xs text-emerald-300">
+                          Slip #{idx + 1}
+                        </span>
+                      )}
                       {resolvedPatron.member?.display_name || s.rawStudent}{' '}
                       {resolvedPatron.member &&
                         s.rawStudent.trim().toLowerCase() !==
@@ -792,7 +1118,7 @@ export const SubmitSlipPage: React.FC = () => {
 
       <form onSubmit={handleSubmit} className="space-y-5">
         {/* Step 1: Zero-Touch Slip Photo Capture */}
-        <div className="rounded-3xl border-2 border-[#B87333]/50 bg-[#1A1715] p-5 sm:p-7 space-y-4 shadow-[0_15px_45px_rgba(0,0,0,0.5)]">
+        <div className="rounded-3xl border-2 border-[#B87333]/50 bg-[#1A1715] p-5 sm:p-7 space-y-5 shadow-[0_15px_45px_rgba(0,0,0,0.5)]">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
               <span className="font-mono-docket text-[10px] font-bold uppercase tracking-widest text-[#DFC15E]">
@@ -800,16 +1126,19 @@ export const SubmitSlipPage: React.FC = () => {
               </span>
               <div className="flex items-center gap-2">
                 <h2 className="font-athletic text-2xl sm:text-3xl font-bold uppercase text-[#F5F2EB]">
-                  SNAP OR UPLOAD SLIP PHOTO
+                  {scanMode === 'multi'
+                    ? 'MULTI-SLIP & BATCH PHOTO SCANNER'
+                    : 'SNAP OR UPLOAD SLIP PHOTO'}
                 </h2>
                 <PwaHelpIcon
-                  tag="MOBILE CAMERA"
-                  content="Take Camera Photo activates your phone's camera directly and auto-compresses the receipt to <82KB before edge upload."
+                  tag="MULTI-SLIP & CAMERA"
+                  content="Switch between Single Slip or Multi-Slip / Batch mode! You can lay 2–4 physical slips side-by-side in a single photo, or select multiple photos at once from your gallery."
                 />
               </div>
               <p className="mt-0.5 font-mono-docket text-xs text-[#B5A99D]">
-                Works with 1 single slip or up to 4 slips in the same photo. Everything is read and
-                saved automatically!
+                {scanMode === 'multi'
+                  ? 'Lay 2 to 4 physical slips flat next to each other in 1 photo, OR select multiple slip photos from your camera roll at once!'
+                  : 'Snap 1 slip or switch to Multi-Slip / Batch Mode below to scan 2–4 slips at once!'}
               </p>
             </div>
 
@@ -825,6 +1154,7 @@ export const SubmitSlipPage: React.FC = () => {
                   setUploadStatusMsg(null);
                   setSubmittedSummary(null);
                   setAutoLoggedSlips(null);
+                  setDuplicateAlert(null);
                 }}
                 className="rounded-xl border border-rose-500/40 bg-rose-500/15 px-3 py-1.5 text-xs font-mono-docket font-bold text-rose-300 hover:bg-rose-500/25 self-start sm:self-auto cursor-pointer"
               >
@@ -833,11 +1163,96 @@ export const SubmitSlipPage: React.FC = () => {
             )}
           </div>
 
+          {/* PROMINENT SCAN MODE TOGGLE: SINGLE SLIP vs MULTI-SLIP / BATCH */}
+          <div className="rounded-2xl border border-[#B87333]/40 bg-[#12100E] p-2.5 space-y-3">
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => handleModeSwitch('single')}
+                className={`flex items-center justify-center gap-2 rounded-xl py-3 px-3 min-h-[48px] font-athletic text-base sm:text-lg font-black uppercase tracking-wider transition touch-manipulation active:scale-95 cursor-pointer ${
+                  scanMode === 'single'
+                    ? 'bg-gradient-to-r from-[#B87333] to-[#C86D51] text-[#121212] shadow-[0_0_20px_rgba(184,115,51,0.35)]'
+                    : 'border border-white/10 bg-[#1A1715] text-[#D6C7B8] hover:border-[#B87333]/50 hover:text-white'
+                }`}
+              >
+                <FileText className="h-4 w-4 shrink-0" />
+                <span>Single Slip Photo</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleModeSwitch('multi')}
+                className={`flex items-center justify-center gap-2 rounded-xl py-3 px-3 min-h-[48px] font-athletic text-base sm:text-lg font-black uppercase tracking-wider transition touch-manipulation active:scale-95 cursor-pointer ${
+                  scanMode === 'multi'
+                    ? 'bg-gradient-to-r from-[#DFC15E] to-[#B87333] text-[#121212] shadow-[0_0_20px_rgba(223,193,94,0.4)]'
+                    : 'border border-[#DFC15E]/30 bg-[#1A1715] text-[#DFC15E] hover:border-[#DFC15E] hover:bg-[#DFC15E]/10'
+                }`}
+              >
+                <Layers className="h-4 w-4 shrink-0" />
+                <span>Multi-Slip / Batch (2–4 Slips)</span>
+              </button>
+            </div>
+
+            {/* Upfront Multi-Slip Count Selector when Multi-Slip Mode is active */}
+            {scanMode === 'multi' && (
+              <div className="rounded-xl border border-[#DFC15E]/35 bg-[#1B1611] p-3 space-y-2">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <span className="flex items-center gap-1.5 font-mono-docket text-[11px] font-bold uppercase text-[#DFC15E]">
+                    <Layers className="h-3.5 w-3.5" />
+                    <span>HOW MANY PHYSICAL SLIPS ARE IN YOUR PHOTO?</span>
+                  </span>
+                  <span className="font-mono-docket text-[10px] text-[#D6C7B8]">
+                    AI splits &amp; assigns each slip to its own Patron automatically
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  {[
+                    { count: 0, label: '✨ Auto-Detect (1–4)' },
+                    { count: 2, label: '2 Slips in Photo' },
+                    { count: 3, label: '3 Slips in Photo' },
+                    { count: 4, label: '4 Slips in Photo' },
+                  ].map((opt) => (
+                    <button
+                      key={opt.count}
+                      type="button"
+                      onClick={() => {
+                        setExpectedSlipCount(opt.count);
+                        if (opt.count > 0) {
+                          setSlipCountInPhoto(opt.count);
+                        }
+                      }}
+                      className={`rounded-xl border py-2 px-2.5 min-h-[42px] font-mono-docket text-xs font-bold transition touch-manipulation active:scale-95 cursor-pointer ${
+                        expectedSlipCount === opt.count
+                          ? 'border-[#DFC15E] bg-[#DFC15E] text-[#121212] shadow-sm'
+                          : 'border-white/15 bg-[#12100E] text-[#D6C7B8] hover:border-[#DFC15E]/50'
+                      }`}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
           <input
             ref={fileInputRef}
             type="file"
             accept="image/*"
+            multiple
             onChange={handleFileChange}
+            className="hidden"
+          />
+          <input
+            ref={multiFileInputRef}
+            type="file"
+            accept="image/*"
+            multiple
+            onChange={(e) => {
+              setScanMode('multi');
+              handleFileChange(e);
+            }}
             className="hidden"
           />
           <input
@@ -915,28 +1330,29 @@ export const SubmitSlipPage: React.FC = () => {
                       )
                     </span>
                   )}
-                  {imageDhash && (
-                    <span className="text-[10px] text-emerald-400/80">dHash: {imageDhash}</span>
-                  )}
                 </div>
               </div>
             </div>
           ) : (
-            <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
+            <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-3">
               <button
                 type="button"
                 onClick={() => cameraInputRef.current?.click()}
                 disabled={uploadingPhoto || submitting}
-                className="flex flex-col items-center justify-center gap-2.5 rounded-2xl border-2 border-dashed border-[#DFC15E]/70 bg-gradient-to-b from-[#241C14] to-[#121212] p-6 sm:p-7 text-center transition hover:border-[#DFC15E] hover:brightness-110 active:scale-95 touch-manipulation cursor-pointer"
+                className="flex flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-[#DFC15E]/70 bg-gradient-to-b from-[#241C14] to-[#121212] p-5 sm:p-6 text-center transition hover:border-[#DFC15E] hover:brightness-110 active:scale-95 touch-manipulation cursor-pointer"
               >
-                <Camera className="h-9 w-9 text-[#DFC15E]" />
+                <Camera className="h-8 w-8 text-[#DFC15E]" />
                 <span className="font-athletic text-xl font-black uppercase tracking-wider text-[#F5F2EB]">
                   {uploadingPhoto
-                    ? 'AI Reading & Logging Slip...'
+                    ? 'AI Reading Slip(s)...'
+                    : scanMode === 'multi'
+                    ? 'Snap Multi-Slip Photo'
                     : 'Take Camera Photo'}
                 </span>
-                <span className="font-mono-docket text-xs text-[#D6C7B8]">
-                  Snap slip(s) — grabs all info &amp; saves automatically
+                <span className="font-mono-docket text-[11px] text-[#D6C7B8]">
+                  {scanMode === 'multi'
+                    ? 'Frame 2–4 slips side-by-side & snap once'
+                    : 'Snap 1 slip (or up to 4 slips together)'}
                 </span>
               </button>
 
@@ -944,16 +1360,32 @@ export const SubmitSlipPage: React.FC = () => {
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
                 disabled={uploadingPhoto || submitting}
-                className="flex flex-col items-center justify-center gap-2.5 rounded-2xl border-2 border-dashed border-[#B87333]/60 bg-[#121212] p-6 sm:p-7 text-center transition hover:border-[#B87333] hover:bg-[#B87333]/10 active:scale-95 touch-manipulation cursor-pointer"
+                className="flex flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-[#B87333]/60 bg-[#121212] p-5 sm:p-6 text-center transition hover:border-[#B87333] hover:bg-[#B87333]/10 active:scale-95 touch-manipulation cursor-pointer"
               >
-                <Upload className="h-9 w-9 text-[#B87333]" />
+                <Upload className="h-8 w-8 text-[#B87333]" />
                 <span className="font-athletic text-xl font-black uppercase tracking-wider text-[#F5F2EB]">
-                  {uploadingPhoto
-                    ? 'AI Reading & Logging Slip...'
-                    : 'Choose Slip Photo'}
+                  {uploadingPhoto ? 'AI Reading Slip(s)...' : 'Choose Slip Photo'}
                 </span>
-                <span className="font-mono-docket text-xs text-[#D6C7B8]">
-                  Upload single scan or multi-slip bar photo
+                <span className="font-mono-docket text-[11px] text-[#D6C7B8]">
+                  Upload from camera roll or gallery
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  handleModeSwitch('multi');
+                  multiFileInputRef.current?.click();
+                }}
+                disabled={uploadingPhoto || submitting}
+                className="flex flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-emerald-400/60 bg-gradient-to-b from-emerald-950/35 to-[#121212] p-5 sm:p-6 text-center transition hover:border-emerald-400 hover:brightness-110 active:scale-95 touch-manipulation cursor-pointer"
+              >
+                <Images className="h-8 w-8 text-emerald-400" />
+                <span className="font-athletic text-xl font-black uppercase tracking-wider text-emerald-200">
+                  {uploadingPhoto ? 'Batch Scanning...' : 'Multi-Slip / Batch Upload'}
+                </span>
+                <span className="font-mono-docket text-[11px] text-emerald-200/80">
+                  1 photo with 2–4 slips OR select multiple photos
                 </span>
               </button>
             </div>
@@ -963,7 +1395,9 @@ export const SubmitSlipPage: React.FC = () => {
           <div className="rounded-xl border border-white/10 bg-white/5 px-3.5 py-2.5 flex items-center gap-2.5 text-xs font-mono-docket text-[#D6C7B8]">
             <span className="text-base shrink-0">💡</span>
             <span>
-              <strong className="text-[#DFC15E]">Pro-Tip:</strong> Lay slip flat in good bar lighting. Our AI reads handwriting, calculates demerit points, and logs to the scoreboard in seconds!
+              <strong className="text-[#DFC15E]">Multi-Slip Pro-Tip:</strong> Lay up to{' '}
+              <strong className="text-white">4 slips side-by-side</strong> on the bar and take 1 clear photo — OR select{' '}
+              <strong className="text-white">multiple separate slip photos</strong> from your phone gallery at once. Each slip is cropped and credited to the right patron automatically!
             </span>
           </div>
 
@@ -971,7 +1405,7 @@ export const SubmitSlipPage: React.FC = () => {
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-t border-white/10 pt-3">
             <span className="font-mono-docket text-xs text-[#D6C7B8]">
               ✨ AI Vision automatically grabs Student, Date, Time, Room, Offenses, Points &amp;
-              Signature.
+              Signature for every slip.
             </span>
             <button
               type="button"
@@ -997,7 +1431,10 @@ export const SubmitSlipPage: React.FC = () => {
                   <button
                     key={cnt}
                     type="button"
-                    onClick={() => setSlipCountInPhoto(cnt)}
+                    onClick={() => {
+                      setExpectedSlipCount(cnt);
+                      setSlipCountInPhoto(cnt);
+                    }}
                     className={`rounded-xl border py-2.5 min-h-[44px] font-sans text-xs sm:text-sm font-extrabold uppercase transition touch-manipulation active:scale-95 cursor-pointer ${
                       slipDrafts.length === cnt
                         ? 'border-[#B87333] bg-[#B87333] text-[#121212] shadow-md'
@@ -1045,8 +1482,7 @@ export const SubmitSlipPage: React.FC = () => {
                     {citationDup.isDuplicate && (
                       <span className="inline-flex items-center gap-1 rounded-lg border border-amber-500/40 bg-amber-500/15 px-2.5 py-1 font-mono-docket text-[11px] text-amber-300">
                         <Fingerprint className="h-3.5 w-3.5" />
-                        Matches existing {resolvedPatron.member?.display_name || draft.rawStudent} ({draft.incidentTime}) slip — will merge
-                        photo
+                        Similar citation on file for {resolvedPatron.member?.display_name || draft.rawStudent}
                       </span>
                     )}
                   </div>
@@ -1327,4 +1763,3 @@ export const SubmitSlipPage: React.FC = () => {
     </div>
   );
 };
-

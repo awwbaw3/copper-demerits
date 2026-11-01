@@ -139,7 +139,10 @@ export async function fingerprintImageFile(
   file: File,
   maxDimension = 960,
   initialQuality = 0.74,
-  targetMaxBytes = 82 * 1024
+  targetMaxBytes = 82 * 1024,
+  options?: {
+    skipPortraitAutoRotate?: boolean;
+  }
 ): Promise<ImageFingerprint> {
   const originalBytes = file.size || 0;
   const buffer = await file.arrayBuffer();
@@ -149,6 +152,7 @@ export async function fingerprintImageFile(
   const autoResult = await autoCropAndRotateSlip(file, {
     maxDimension,
     quality: initialQuality,
+    skipPortraitAutoRotate: options?.skipPortraitAutoRotate,
   });
 
   return new Promise((resolve, reject) => {
@@ -246,15 +250,17 @@ export async function fingerprintImageUrl(
 }
 
 /**
- * Checks whether an image fingerprint matches any existing slip via:
- * 1. Known official source file SHA-256 (including multi-slip photos & rotated scans)
- * 2. Exact SHA-256 file hash match on any slip
- * 3. Rotation-aware Perceptual dHash visual similarity (Hamming distance <= 10 out of 64 bits, >= 84.4%)
+ * Checks whether an image fingerprint is an exact binary SHA-256 duplicate of an already-uploaded file.
+ *
+ * NOTE: We intentionally do NOT block uploads based on 9x8 perceptual dHash alone because every
+ * auto-cropped Cherry Printers "DEMERIT SLIP" form has the exact same bold top header, horizontal
+ * rule lines, and checkbox layout, producing 84%–92% dHash similarity across completely different
+ * tickets! Duplicate slip detection for different photos of the same ticket is handled accurately
+ * by `checkDuplicateCitationContent` after OCR reads the handwritten patron name and infraction.
  */
 export function checkDuplicateSlipImage(
   fingerprint: Pick<ImageFingerprint, 'sha256' | 'dhash' | 'rotatedDhashes'>,
-  existingSlips: DemeritSlip[],
-  maxHammingDistance = 10
+  existingSlips: DemeritSlip[]
 ): DuplicateCheckResult {
   const normalizedSha = fingerprint.sha256?.toLowerCase().trim();
 
@@ -271,15 +277,9 @@ export function checkDuplicateSlipImage(
     };
   }
 
-  const candidateHashes =
-    fingerprint.rotatedDhashes && fingerprint.rotatedDhashes.length > 0
-      ? fingerprint.rotatedDhashes
-      : fingerprint.dhash
-      ? [fingerprint.dhash]
-      : [];
-
   for (const slip of existingSlips) {
-    // 2. Exact SHA-256 match
+    if (slip.status === 'rejected') continue;
+    // 2. Exact SHA-256 binary file match
     if (slip.image_sha256 && normalizedSha && slip.image_sha256.toLowerCase() === normalizedSha) {
       return {
         isDuplicate: true,
@@ -289,37 +289,64 @@ export function checkDuplicateSlipImage(
         matchedDescription: `Exact file duplicate already on file (${slip.raw_student} on ${slip.incident_date}).`,
       };
     }
-
-    // 3. Rotation-aware Perceptual dHash visual match
-    if (slip.image_dhash && candidateHashes.length > 0) {
-      for (const candidateDhash of candidateHashes) {
-        const dist = calculateHammingDistance(candidateDhash, slip.image_dhash);
-        if (dist <= maxHammingDistance) {
-          const similarityPercent = Math.round(((64 - dist) / 64) * 100);
-          return {
-            isDuplicate: true,
-            reason: 'perceptual-dhash',
-            similarityPercent,
-            matchedSlip: slip,
-            matchedDescription: `Perceptual visual match (${similarityPercent}% visual similarity with existing ${slip.raw_student} slip).`,
-          };
-        }
-      }
-    }
   }
 
   return { isDuplicate: false };
 }
 
+const INFRACTION_STOP_WORDS = new Set([
+  'the',
+  'and',
+  'for',
+  'with',
+  'from',
+  'that',
+  'this',
+  'was',
+  'were',
+  'are',
+  'not',
+  'you',
+  'your',
+  'his',
+  'her',
+  'him',
+  'she',
+  'they',
+  'them',
+  'their',
+  'all',
+  'out',
+  'over',
+  'into',
+  'after',
+  'before',
+  'too',
+  'many',
+  'bar',
+  'copper',
+  'demerit',
+  'demerits',
+  'slip',
+  'citation',
+  'boss',
+  'lady',
+  'sarah',
+  'aka',
+  'being',
+  'having',
+  'getting',
+]);
+
 /**
- * Tokenizes text into normalized word stems for fuzzy similarity matching.
+ * Tokenizes text into meaningful normalized word stems for fuzzy similarity matching.
  */
 function tokenizeInfractionWords(text: string): string[] {
   return text
     .toLowerCase()
     .replace(/[^a-z0-9\s]/g, ' ')
     .split(/\s+/)
-    .filter((w) => w.length >= 3);
+    .filter((w) => w.length >= 3 && !INFRACTION_STOP_WORDS.has(w));
 }
 
 /**
@@ -349,14 +376,6 @@ export function infractionTextSimilarity(textA: string, textB: string): number {
   return (matches * 2) / (wordsA.length + wordsB.length);
 }
 
-function timeDifferenceMinutes(timeA: string, timeB: string): number | null {
-  if (!timeA || !timeB) return null;
-  const [hA, mA] = timeA.split(':').map(Number);
-  const [hB, mB] = timeB.split(':').map(Number);
-  if (Number.isNaN(hA) || Number.isNaN(mA) || Number.isNaN(hB) || Number.isNaN(mB)) return null;
-  return Math.abs(hA * 60 + mA - (hB * 60 + mB));
-}
-
 function dateDifferenceDays(dateA: string, dateB: string): number | null {
   if (!dateA || !dateB) return null;
   const tA = new Date(dateA).getTime();
@@ -366,11 +385,11 @@ function dateDifferenceDays(dateA: string, dateB: string): number | null {
 }
 
 /**
- * Checks whether a slip's written citation details (Student + Date + Time, or Student + Infraction)
+ * Checks whether a slip's written citation details (Same Patron + Same/Adjacent Date + Matching Infraction)
  * match an already-logged slip on the board.
  *
- * Employs fuzzy infraction matching and midnight rollover tolerance (±1 day) to catch duplicate slips
- * even when the OCR handwriting reader had minor transcription differences.
+ * Never blocks based solely on the issuer/teacher ("The Boss - AKA Sarah") or time of night,
+ * because a patron can receive multiple legitimate demerit slips on the same night for different offenses!
  */
 export function checkDuplicateCitationContent(
   candidate: {
@@ -384,28 +403,33 @@ export function checkDuplicateCitationContent(
 ): DuplicateCheckResult {
   const normStudent = candidate.raw_student.trim().toLowerCase();
   const normDate = candidate.incident_date.trim();
-  const normTime = candidate.incident_time ? candidate.incident_time.trim().slice(0, 5) : '';
   const candInfractions = candidate.infractions.map((i) => i.trim()).filter(Boolean);
+
+  if (!normStudent || candInfractions.length === 0) {
+    return { isDuplicate: false };
+  }
 
   for (const slip of existingSlips) {
     if (slip.status === 'rejected') continue;
     const slipStudent = slip.raw_student.trim().toLowerCase();
     const slipDate = slip.incident_date.trim();
-    const slipTime = slip.incident_time ? slip.incident_time.trim().slice(0, 5) : '';
     const slipInfractions = slip.infractions.map((i) => i.trim()).filter(Boolean);
 
-    // 1. Same student check (or substring like "Rick" vs "Rick A.")
+    // 1. Must be the exact same patron (or clear name match)
     const isSameStudent =
       normStudent === slipStudent ||
-      (normStudent.length >= 3 && slipStudent.includes(normStudent)) ||
-      (slipStudent.length >= 3 && normStudent.includes(slipStudent));
+      (normStudent.length >= 4 && slipStudent.includes(normStudent)) ||
+      (slipStudent.length >= 4 && normStudent.includes(slipStudent));
 
     if (!isSameStudent) continue;
 
     const daysDiff = dateDifferenceDays(normDate, slipDate);
-    const isSameOrAdjacentDay = daysDiff !== null && daysDiff <= 1;
+    const isSameDay = normDate === slipDate || daysDiff === 0;
+    const isAdjacentDay = daysDiff !== null && daysDiff <= 1;
 
-    // Check infraction similarity across all pairs
+    if (!isAdjacentDay) continue;
+
+    // 2. Check infraction similarity across all pairs
     let maxInfractionSim = 0;
     for (const cInf of candInfractions) {
       for (const sInf of slipInfractions) {
@@ -416,22 +440,8 @@ export function checkDuplicateCitationContent(
       }
     }
 
-    // Match Condition A: Same date and exact/near time (within 30 mins)
-    const minutesDiff = timeDifferenceMinutes(normTime, slipTime);
-    const isNearTime = minutesDiff !== null && minutesDiff <= 30;
-
-    if (normDate === slipDate && normTime && slipTime && isNearTime) {
-      return {
-        isDuplicate: true,
-        reason: 'citation-match',
-        similarityPercent: 100,
-        matchedSlip: slip,
-        matchedDescription: `Same patron (${slip.raw_student}), date (${slip.incident_date}), and time (${slipTime}) already logged on the Ring of Honor.`,
-      };
-    }
-
-    // Match Condition B: High infraction similarity (>= 60%) on the same or adjacent date (bar open past midnight)
-    if (isSameOrAdjacentDay && maxInfractionSim >= 0.60) {
+    // Require high infraction text similarity (>= 75% on same date, >= 85% on adjacent date)
+    if ((isSameDay && maxInfractionSim >= 0.75) || (isAdjacentDay && maxInfractionSim >= 0.85)) {
       const simPercent = Math.round(maxInfractionSim * 100);
       return {
         isDuplicate: true,
@@ -439,18 +449,6 @@ export function checkDuplicateCitationContent(
         similarityPercent: simPercent,
         matchedSlip: slip,
         matchedDescription: `Same patron (${slip.raw_student}) and matching infraction ("${slipInfractions[0] || ''}", ${simPercent}% match) already logged for ${slip.incident_date}.`,
-      };
-    }
-
-    // Match Condition C: Exact same date + any infraction keyword overlap (>= 45%)
-    if (normDate === slipDate && maxInfractionSim >= 0.45) {
-      const simPercent = Math.round(maxInfractionSim * 100);
-      return {
-        isDuplicate: true,
-        reason: 'citation-match',
-        similarityPercent: simPercent,
-        matchedSlip: slip,
-        matchedDescription: `Same patron (${slip.raw_student}), date (${slip.incident_date}), and similar infraction already logged.`,
       };
     }
   }

@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useSearchParams, Link } from 'react-router-dom';
 import {
   Search,
   Eye,
@@ -6,6 +7,10 @@ import {
   Images,
   Sparkles,
   X,
+  CheckCircle2,
+  Clock,
+  Calendar,
+  Camera,
 } from 'lucide-react';
 import { useDemerits } from '../context/DemeritsContext';
 import { EnrichedDemeritSlip, SlipReactions } from '../types/demerits';
@@ -28,15 +33,48 @@ const JOVIAL_REACTION_BUTTONS: Array<{
   { key: 'instant_classic', emoji: '😂', label: 'Instant Classic' },
 ];
 
+function isSlipRecentlyScanned(createdAt?: string, windowMinutes = 25): boolean {
+  if (!createdAt) return false;
+  const iso = createdAt.includes('T') ? createdAt : `${createdAt.replace(' ', 'T')}Z`;
+  const ts = Date.parse(iso);
+  if (Number.isNaN(ts)) return false;
+  const ageMs = Date.now() - ts;
+  return ageMs >= -60_000 && ageMs <= windowMinutes * 60_000;
+}
+
 export const DocketPage: React.FC = () => {
   const { demerits, uploadedSourceFiles, reactToSlip } = useDemerits();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [searchQuery, setSearchQuery] = useState('');
+  const [sortBy, setSortBy] = useState<'authoritative' | 'recent_scan'>('authoritative');
   const [selectedSlip, setSelectedSlip] = useState<EnrichedDemeritSlip | null>(null);
   const [previewPhotoUrl, setPreviewPhotoUrl] = useState<string | null>(null);
 
+  const justLogged = searchParams.get('justLogged') === '1';
+  const justLoggedPatron = searchParams.get('patron') || '';
+
   const approvedSlips = demerits.filter((d) => d.status === 'approved' && Boolean(d.image_url));
 
-  const filteredSlips = approvedSlips.filter((slip) => {
+  const sortedSlips = [...approvedSlips].sort((a, b) => {
+    if (sortBy === 'recent_scan' || justLogged) {
+      const aRecent = isSlipRecentlyScanned(a.created_at, 15);
+      const bRecent = isSlipRecentlyScanned(b.created_at, 15);
+      if (justLogged && aRecent !== bRecent) {
+        return aRecent ? -1 : 1;
+      }
+      if (sortBy === 'recent_scan') {
+        const cCmp = (b.created_at || '').localeCompare(a.created_at || '');
+        if (cCmp !== 0) return cCmp;
+      }
+    }
+    const dCmp = b.incident_date.localeCompare(a.incident_date);
+    if (dCmp !== 0) return dCmp;
+    const tCmp = (b.incident_time || '').localeCompare(a.incident_time || '');
+    if (tCmp !== 0) return tCmp;
+    return (b.created_at || '').localeCompare(a.created_at || '');
+  });
+
+  const filteredSlips = sortedSlips.filter((slip) => {
     if (!searchQuery.trim()) return true;
     const q = searchQuery.toLowerCase();
     return (
@@ -51,6 +89,43 @@ export const DocketPage: React.FC = () => {
 
   return (
     <div className="mx-auto max-w-6xl px-3 sm:px-4 pt-4 sm:pt-6 pb-14 space-y-7">
+      {justLogged && (
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-2xl border-2 border-emerald-500/60 bg-emerald-950/40 px-4 py-3.5 text-emerald-100 shadow-lg">
+          <div className="flex items-start sm:items-center gap-3">
+            <CheckCircle2 className="h-5 w-5 text-emerald-400 shrink-0 mt-0.5 sm:mt-0" />
+            <div>
+              <p className="font-athletic text-base sm:text-lg font-bold uppercase tracking-wider text-emerald-300">
+                ✅ Slip Verified &amp; Posted to the Wall{justLoggedPatron ? ` for ${justLoggedPatron}` : ''}!
+              </p>
+              <p className="font-mono-docket text-[11px] text-emerald-200/90">
+                Your newly scanned citation is pinned right at the top below.
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <Link
+              to="/submit"
+              className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-400 px-3 py-2 font-sans text-xs font-extrabold uppercase text-[#121212] hover:bg-emerald-300 transition"
+            >
+              <Camera className="h-3.5 w-3.5" />
+              <span>Scan Another</span>
+            </Link>
+            <button
+              type="button"
+              onClick={() => {
+                const next = new URLSearchParams(searchParams);
+                next.delete('justLogged');
+                next.delete('patron');
+                setSearchParams(next, { replace: true });
+              }}
+              className="rounded-xl border border-emerald-400/40 bg-black/40 px-2.5 py-2 text-xs text-emerald-200 hover:text-white cursor-pointer"
+            >
+              Dismiss
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* 1. VISUAL HERO BANNER WITH OFFICIAL COPPER AC TAP HANDLES */}
       <section className="relative overflow-hidden rounded-3xl border-2 border-[#B87333]/50 bg-[#121212] p-5 sm:p-8 shadow-2xl">
         <div className="absolute inset-0">
@@ -73,27 +148,57 @@ export const DocketPage: React.FC = () => {
             </h1>
           </div>
 
-          {/* Search Input - iOS Auto-Zoom Proof */}
-          <div className="relative w-full md:w-80">
-            <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[#D6C7B8]" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search Rick, Burtis, David Lee, infractions..."
-              aria-label="Search demerit slips by patron name or infraction"
-              className="w-full rounded-2xl border border-[#B87333]/50 bg-black/80 pl-10 pr-10 py-2.5 min-h-[44px] text-base sm:text-sm text-[#F5F2EB] placeholder-[#A3968A] focus:border-[#DFC15E] focus:outline-none"
-            />
-            {searchQuery && (
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 w-full md:w-auto">
+            {/* Sort Toggle: Slip Date & Time vs Recently Scanned */}
+            <div className="inline-flex rounded-2xl border border-[#B87333]/50 bg-black/80 p-1">
               <button
                 type="button"
-                onClick={() => setSearchQuery('')}
-                aria-label="Clear search query"
-                className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center justify-center min-h-[36px] min-w-[36px] rounded-lg text-[#D6C7B8] hover:text-white cursor-pointer"
+                onClick={() => setSortBy('authoritative')}
+                className={`inline-flex items-center justify-center gap-1.5 rounded-xl px-3 py-1.5 text-[11px] font-mono-docket font-bold uppercase transition cursor-pointer ${
+                  sortBy === 'authoritative'
+                    ? 'bg-[#B87333] text-[#121212]'
+                    : 'text-[#D6C7B8] hover:text-white'
+                }`}
               >
-                <X className="h-4 w-4" />
+                <Calendar className="h-3.5 w-3.5" />
+                <span>Slip Date &amp; Time</span>
               </button>
-            )}
+              <button
+                type="button"
+                onClick={() => setSortBy('recent_scan')}
+                className={`inline-flex items-center justify-center gap-1.5 rounded-xl px-3 py-1.5 text-[11px] font-mono-docket font-bold uppercase transition cursor-pointer ${
+                  sortBy === 'recent_scan'
+                    ? 'bg-[#DFC15E] text-[#121212]'
+                    : 'text-[#D6C7B8] hover:text-white'
+                }`}
+              >
+                <Clock className="h-3.5 w-3.5" />
+                <span>Just Scanned</span>
+              </button>
+            </div>
+
+            {/* Search Input - iOS Auto-Zoom Proof */}
+            <div className="relative w-full sm:w-72">
+              <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[#D6C7B8]" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search Rick, Burtis, Ziggie..."
+                aria-label="Search demerit slips by patron name or infraction"
+                className="w-full rounded-2xl border border-[#B87333]/50 bg-black/80 pl-10 pr-10 py-2.5 min-h-[44px] text-base sm:text-sm text-[#F5F2EB] placeholder-[#A3968A] focus:border-[#DFC15E] focus:outline-none"
+              />
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery('')}
+                  aria-label="Clear search query"
+                  className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center justify-center min-h-[36px] min-w-[36px] rounded-lg text-[#D6C7B8] hover:text-white cursor-pointer"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              )}
+            </div>
           </div>
         </div>
       </section>
@@ -122,141 +227,151 @@ export const DocketPage: React.FC = () => {
         </div>
       ) : (
         <section className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {filteredSlips.map((slip) => {
-          const items = normalizeSlipDemeritItems(slip);
-          const primaryMeta = getMichiganTeamMetaForType(
-            items[0]?.type || '',
-            items[0]?.description || ''
-          );
-          const reactions: SlipReactions = slip.reactions || {
-            buy_round: 0,
-            tough_call: 0,
-            two_mins: 0,
-            instant_classic: 0,
-          };
+          {filteredSlips.map((slip) => {
+            const items = normalizeSlipDemeritItems(slip);
+            const primaryMeta = getMichiganTeamMetaForType(
+              items[0]?.type || '',
+              items[0]?.description || ''
+            );
+            const reactions: SlipReactions = slip.reactions || {
+              buy_round: 0,
+              tough_call: 0,
+              two_mins: 0,
+              instant_classic: 0,
+            };
+            const isRecent = isSlipRecentlyScanned(slip.created_at, 20);
 
-          return (
-            <div
-              key={slip.id}
-              onClick={() => setSelectedSlip(slip)}
-              className={`group cursor-pointer overflow-hidden rounded-3xl border-2 bg-gradient-to-b from-[#1B1613] to-[#121212] ${primaryMeta.borderGlow} transition-all duration-300 hover:-translate-y-1`}
-            >
-              {/* Large Interactive Slip Photo Header */}
-              <div className="relative h-64 w-full overflow-hidden bg-black">
-                <img
-                  src={slip.image_url || '/slips/20261017_211324.jpg'}
-                  alt={`Slip for ${slip.patronDisplayName || slip.raw_student}`}
-                  className={`h-full w-full object-cover transition-transform duration-500 group-hover:scale-105 ${
-                    slip.is_blurred ? 'blur-md scale-105' : ''
-                  }`}
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-[#121212] via-transparent to-black/40" />
+            return (
+              <div
+                key={slip.id}
+                onClick={() => setSelectedSlip(slip)}
+                className={`group cursor-pointer overflow-hidden rounded-3xl border-2 bg-gradient-to-b from-[#1B1613] to-[#121212] ${
+                  isRecent ? 'border-emerald-400/80 ring-2 ring-emerald-400/30' : primaryMeta.borderGlow
+                } transition-all duration-300 hover:-translate-y-1`}
+              >
+                {/* Large Interactive Slip Photo Header */}
+                <div className="relative h-64 w-full overflow-hidden bg-black">
+                  <img
+                    src={slip.image_url || '/slips/20261017_211324.jpg'}
+                    alt={`Slip for ${slip.patronDisplayName || slip.raw_student}`}
+                    className={`h-full w-full object-cover transition-transform duration-500 group-hover:scale-105 ${
+                      slip.is_blurred ? 'blur-md scale-105' : ''
+                    }`}
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-[#121212] via-transparent to-black/40" />
 
-                {slip.is_blurred && (
-                  <div className="absolute inset-0 flex items-center justify-center bg-black/45">
-                    <span className="inline-flex items-center gap-1.5 rounded-2xl border-2 border-amber-400 bg-black/85 px-4 py-2 font-athletic text-lg font-black uppercase tracking-wider text-amber-300 shadow-lg">
-                      <EyeOff className="h-4 w-4" />
-                      <span>🦓 Referee Blurred — Friendly Vibes Only</span>
-                    </span>
-                  </div>
-                )}
+                  {slip.is_blurred && (
+                    <div className="absolute inset-0 flex items-center justify-center bg-black/45">
+                      <span className="inline-flex items-center gap-1.5 rounded-2xl border-2 border-amber-400 bg-black/85 px-4 py-2 font-athletic text-lg font-black uppercase tracking-wider text-amber-300 shadow-lg">
+                        <EyeOff className="h-4 w-4" />
+                        <span>🦓 Referee Blurred — Friendly Vibes Only</span>
+                      </span>
+                    </div>
+                  )}
 
-                {/* Top Badges */}
-                <div className="absolute top-3 left-3 right-3 flex items-center justify-between">
-                  <span className="rounded-xl bg-black/80 border border-white/15 px-3 py-1 font-mono-docket text-xs font-bold text-[#DFC15E]">
-                    {slip.incident_date} · {slip.incident_time ? `${slip.incident_time.slice(0, 5)} · ` : ''}{slip.location_area}
-                  </span>
-                  <span className="rounded-2xl bg-[#C86D51] px-3.5 py-1 font-display-tall text-3xl font-black text-[#121212] shadow-lg">
-                    +{slip.demerit_count} PTS
-                  </span>
-                </div>
-
-                {/* Bottom Patron + Team Badge */}
-                <div className="absolute bottom-3 left-4 right-4 flex items-end justify-between">
-                  <div>
-                    <span className="text-[10px] font-mono-docket uppercase tracking-widest text-[#E8B888]">
-                      CITED PATRON
-                    </span>
-                    <h2 className="font-display-tall text-4xl font-black uppercase text-white leading-none">
-                      {slip.patronDisplayName}
-                    </h2>
-                  </div>
-                  <MichiganTeamEmblem iconType={primaryMeta.iconType} size="md" />
-                </div>
-              </div>
-
-              {/* Itemized Team Penalty Pills */}
-              <div className="p-5 space-y-3">
-                <div className="space-y-2">
-                  {items.map((item, idx) => {
-                    const meta = getMichiganTeamMetaForType(item.type, item.description);
-                    return (
-                      <div
-                        key={idx}
-                        className={`flex items-center justify-between gap-3 rounded-2xl border bg-gradient-to-r ${meta.bgGradient} ${meta.borderGlow} px-3.5 py-2.5`}
-                      >
-                        <div className="flex items-center gap-2.5 min-w-0">
-                          <MichiganTeamEmblem iconType={meta.iconType} size="sm" />
-                          <div className="min-w-0">
-                            <span className="block font-athletic text-xs font-bold uppercase tracking-wider text-[#DFC15E]">
-                              {meta.teamName}
-                            </span>
-                            <span className="block font-handwriting text-xl text-[#F5F2EB] leading-tight">
-                              “{maskSensitiveInfraction(item.description)}”
-                            </span>
-                          </div>
-                        </div>
-                        <span className="shrink-0 rounded-xl bg-black/60 border border-white/15 px-2.5 py-1 font-display-tall text-2xl font-black text-[#E8B888]">
-                          +{item.points}
+                  {/* Top Badges */}
+                  <div className="absolute top-3 left-3 right-3 flex items-center justify-between gap-2">
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      {isRecent && (
+                        <span className="rounded-xl bg-emerald-400 px-2.5 py-1 font-mono-docket text-[10px] font-black uppercase tracking-wider text-[#121212] shadow-md">
+                          NEW • JUST SCANNED
                         </span>
-                      </div>
-                    );
-                  })}
-                </div>
-
-                {/* Preset Jovial Bar Reactions (No Free-Text Comments) */}
-                <div
-                  className="pt-2 flex flex-wrap items-center gap-2"
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  {JOVIAL_REACTION_BUTTONS.map((btn) => {
-                    const count = reactions[btn.key] || 0;
-                    return (
-                      <button
-                        key={btn.key}
-                        type="button"
-                        onClick={() => reactToSlip(slip.id, btn.key)}
-                        aria-label={`React ${btn.label} (currently ${count})`}
-                        className="inline-flex items-center gap-1.5 rounded-xl border border-white/20 bg-black/60 px-3 py-2 min-h-[42px] font-sans text-xs font-bold text-[#E8B888] transition hover:border-[#DFC15E] hover:bg-[#B87333]/25 active:scale-95 touch-manipulation cursor-pointer"
-                      >
-                        <span className="text-sm">{btn.emoji}</span>
-                        <span>{btn.label}</span>
-                        {count > 0 && (
-                          <span className="ml-0.5 rounded-full bg-[#DFC15E]/20 border border-[#DFC15E]/40 px-1.5 py-0.2 font-mono-docket font-bold text-[#DFC15E]">
-                            {count}
-                          </span>
-                        )}
-                      </button>
-                    );
-                  })}
-                </div>
-
-                {/* Footer Signature + Inspect Button */}
-                <div className="pt-3 border-t border-white/10 flex items-center justify-between text-xs">
-                  <div className="font-mono-docket text-[#D6C7B8]">
-                    SIGNED: <span className="font-handwriting text-lg text-[#DFC15E] ml-1">{slip.raw_signature}</span>{' '}
-                    <span className="text-[#E8B888]">({slip.issuerDisplayName})</span>
+                      )}
+                      <span className="rounded-xl bg-black/80 border border-white/15 px-3 py-1 font-mono-docket text-xs font-bold text-[#DFC15E]">
+                        {slip.incident_date} · {slip.incident_time ? `${slip.incident_time.slice(0, 5)} · ` : ''}{slip.location_area}
+                      </span>
+                    </div>
+                    <span className="rounded-2xl bg-[#C86D51] px-3.5 py-1 font-display-tall text-3xl font-black text-[#121212] shadow-lg shrink-0">
+                      +{slip.demerit_count} PTS
+                    </span>
                   </div>
-                  <span className="inline-flex items-center gap-1.5 rounded-xl bg-[#B87333]/20 border border-[#B87333]/50 px-3.5 py-2 min-h-[40px] font-sans font-bold text-xs uppercase tracking-tight text-[#E8B888] group-hover:bg-[#B87333] group-hover:text-[#121212] active:scale-95 touch-manipulation transition">
-                    <Eye className="h-4 w-4" />
-                    <span>Zoom Slip</span>
-                  </span>
+
+                  {/* Bottom Patron + Team Badge */}
+                  <div className="absolute bottom-3 left-4 right-4 flex items-end justify-between">
+                    <div>
+                      <span className="text-[10px] font-mono-docket uppercase tracking-widest text-[#E8B888]">
+                        CITED PATRON
+                      </span>
+                      <h2 className="font-display-tall text-4xl font-black uppercase text-white leading-none">
+                        {slip.patronDisplayName}
+                      </h2>
+                    </div>
+                    <MichiganTeamEmblem iconType={primaryMeta.iconType} size="md" />
+                  </div>
+                </div>
+
+                {/* Itemized Team Penalty Pills */}
+                <div className="p-5 space-y-3">
+                  <div className="space-y-2">
+                    {items.map((item, idx) => {
+                      const meta = getMichiganTeamMetaForType(item.type, item.description);
+                      return (
+                        <div
+                          key={idx}
+                          className={`flex items-center justify-between gap-3 rounded-2xl border bg-gradient-to-r ${meta.bgGradient} ${meta.borderGlow} px-3.5 py-2.5`}
+                        >
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <MichiganTeamEmblem iconType={meta.iconType} size="sm" />
+                            <div className="min-w-0">
+                              <span className="block font-athletic text-xs font-bold uppercase tracking-wider text-[#DFC15E]">
+                                {meta.teamName}
+                              </span>
+                              <span className="block font-handwriting text-xl text-[#F5F2EB] leading-tight">
+                                “{maskSensitiveInfraction(item.description)}”
+                              </span>
+                            </div>
+                          </div>
+                          <span className="shrink-0 rounded-xl bg-black/60 border border-white/15 px-2.5 py-1 font-display-tall text-2xl font-black text-[#E8B888]">
+                            +{item.points}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* Preset Jovial Bar Reactions (No Free-Text Comments) */}
+                  <div
+                    className="pt-2 flex flex-wrap items-center gap-2"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    {JOVIAL_REACTION_BUTTONS.map((btn) => {
+                      const count = reactions[btn.key] || 0;
+                      return (
+                        <button
+                          key={btn.key}
+                          type="button"
+                          onClick={() => reactToSlip(slip.id, btn.key)}
+                          aria-label={`React ${btn.label} (currently ${count})`}
+                          className="inline-flex items-center gap-1.5 rounded-xl border border-white/20 bg-black/60 px-3 py-2 min-h-[42px] font-sans text-xs font-bold text-[#E8B888] transition hover:border-[#DFC15E] hover:bg-[#B87333]/25 active:scale-95 touch-manipulation cursor-pointer"
+                        >
+                          <span className="text-sm">{btn.emoji}</span>
+                          <span>{btn.label}</span>
+                          {count > 0 && (
+                            <span className="ml-0.5 rounded-full bg-[#DFC15E]/20 border border-[#DFC15E]/40 px-1.5 py-0.2 font-mono-docket font-bold text-[#DFC15E]">
+                              {count}
+                            </span>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {/* Footer Signature + Inspect Button */}
+                  <div className="pt-3 border-t border-white/10 flex items-center justify-between text-xs">
+                    <div className="font-mono-docket text-[#D6C7B8]">
+                      SIGNED: <span className="font-handwriting text-lg text-[#DFC15E] ml-1">{slip.raw_signature}</span>{' '}
+                      <span className="text-[#E8B888]">({slip.issuerDisplayName})</span>
+                    </div>
+                    <span className="inline-flex items-center gap-1.5 rounded-xl bg-[#B87333]/20 border border-[#B87333]/50 px-3.5 py-2 min-h-[40px] font-sans font-bold text-xs uppercase tracking-tight text-[#E8B888] group-hover:bg-[#B87333] group-hover:text-[#121212] active:scale-95 touch-manipulation transition">
+                      <Eye className="h-4 w-4" />
+                      <span>Zoom Slip</span>
+                    </span>
+                  </div>
                 </div>
               </div>
-            </div>
-          );
-        })}
-      </section>
+            );
+          })}
+        </section>
       )}
 
       {/* 3. COMPACT UPLOADED CAMERA FILES STRIP (3 SOURCE PHOTOS -> 4 UNIQUE SLIPS) */}

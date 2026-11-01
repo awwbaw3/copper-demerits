@@ -29,7 +29,7 @@ interface SlipModalViewerProps {
 }
 
 export const SlipModalViewer: React.FC<SlipModalViewerProps> = ({ slip, onClose }) => {
-  const { currentMember, isAdminOrStaff, activePin, setIsProfileModalOpen } = useDemerits();
+  const { currentMember, isAdminOrStaff, activePin, openProfileModal } = useDemerits();
   const dialogRef = useRef<HTMLDialogElement | null>(null);
   const [activePhotoTab, setActivePhotoTab] = useState<'primary' | 'secondary' | 'source'>('primary');
   const [isCorrecting, setIsCorrecting] = useState(false);
@@ -59,6 +59,15 @@ export const SlipModalViewer: React.FC<SlipModalViewerProps> = ({ slip, onClose 
 
   const canEdit = Boolean(isAdminOrStaff || isOwnDemerit);
   const canReveal = Boolean(isClaimedAndLoggedIn || isAdminOrStaff);
+
+  const handleOpenProfileForSlip = () => {
+    const targetMemberId = activeSlip?.patron?.id || activeSlip?.patron_id || undefined;
+    const isPatronClaimed = Boolean(activeSlip?.patron?.is_claimed);
+    openProfileModal({
+      mode: targetMemberId && !isPatronClaimed ? 'claim' : 'login',
+      memberId: targetMemberId,
+    });
+  };
 
   useEffect(() => {
     setActivePhotoTab('primary');
@@ -162,15 +171,19 @@ export const SlipModalViewer: React.FC<SlipModalViewerProps> = ({ slip, onClose 
               ) : !currentMember ? (
                 <button
                   type="button"
-                  onClick={() => {
-                    setIsProfileModalOpen(true);
-                  }}
+                  onClick={handleOpenProfileForSlip}
                   className="inline-flex items-center gap-1.5 rounded-xl border border-white/20 bg-white/5 px-3 py-2 min-h-[44px] text-xs font-mono-docket text-[#D6C7B8] hover:text-[#DFC15E] hover:border-[#DFC15E]/40 active:scale-95 touch-manipulation cursor-pointer"
                   title="Claim your locker or log in with your PIN to correct your own demerits"
                 >
                   <KeyRound className="h-3.5 w-3.5 text-[#DFC15E]" />
-                  <span className="hidden sm:inline">Log In to Edit</span>
-                  <span className="sm:hidden">Log In</span>
+                  <span className="hidden sm:inline">
+                    {slip.patron && !slip.patron.is_claimed
+                      ? `Claim ${slip.patronDisplayName} / Sign In`
+                      : 'Log In to Edit'}
+                  </span>
+                  <span className="sm:hidden">
+                    {slip.patron && !slip.patron.is_claimed ? 'Claim' : 'Log In'}
+                  </span>
                 </button>
               ) : null}
 
@@ -281,7 +294,7 @@ export const SlipModalViewer: React.FC<SlipModalViewerProps> = ({ slip, onClose 
                       ) : (
                         <button
                           type="button"
-                          onClick={() => setIsProfileModalOpen(true)}
+                          onClick={handleOpenProfileForSlip}
                           className="inline-flex items-center gap-1 rounded-lg border border-amber-400/40 bg-black/80 backdrop-blur-md px-2.5 py-1.5 min-h-[38px] font-mono-docket text-xs font-bold text-amber-300 hover:bg-black active:scale-95 touch-manipulation cursor-pointer shadow-lg transition"
                           title="Log in with your locker PIN to reveal the raw slip"
                         >
@@ -400,9 +413,20 @@ export const SlipModalViewer: React.FC<SlipModalViewerProps> = ({ slip, onClose 
             {/* Patron & Staff Signature Details */}
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 text-xs">
               <div className="rounded-xl border border-white/10 bg-[#121212] p-3.5">
-                <div className="flex items-center gap-1.5 text-[#9E8F82] font-mono-docket">
-                  <UserCheck className="h-3.5 w-3.5 text-[#B87333]" />
-                  <span>STUDENT (PATRON)</span>
+                <div className="flex items-center justify-between gap-1.5 text-[#9E8F82] font-mono-docket">
+                  <span className="flex items-center gap-1.5">
+                    <UserCheck className="h-3.5 w-3.5 text-[#B87333]" />
+                    <span>STUDENT (PATRON)</span>
+                  </span>
+                  {!currentMember && slip.patron && !slip.patron.is_claimed && (
+                    <button
+                      type="button"
+                      onClick={handleOpenProfileForSlip}
+                      className="rounded-lg border border-[#DFC15E]/50 bg-[#DFC15E]/15 px-2 py-0.5 font-mono-docket text-[10px] font-bold text-[#DFC15E] hover:bg-[#DFC15E]/25 cursor-pointer"
+                    >
+                      ⚡ Claim Name
+                    </button>
+                  )}
                 </div>
                 <p className="mt-1 font-athletic text-lg font-bold uppercase text-[#F5F2EB]">
                   {slip.patronDisplayName}

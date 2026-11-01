@@ -35,7 +35,13 @@ export async function cloudflareFetch<T = unknown>(
 
   const data = await res.json();
   if (!res.ok) {
-    throw new Error((data && data.error) || `Cloudflare API error (${res.status})`);
+    const error = new Error((data && data.error) || `Cloudflare API error (${res.status})`) as Error & {
+      data?: Record<string, unknown>;
+      status?: number;
+    };
+    error.data = data;
+    error.status = res.status;
+    throw error;
   }
   return data as T;
 }

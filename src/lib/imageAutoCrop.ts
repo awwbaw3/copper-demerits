@@ -291,6 +291,7 @@ export async function autoCropAndRotateSlip(
     customCrop?: NormalizedCropBox;
     maxDimension?: number;
     quality?: number;
+    skipPortraitAutoRotate?: boolean;
   }
 ): Promise<AutoCropAndRotateResult> {
   const { img, width, height } = await loadImageElement(source);
@@ -309,7 +310,9 @@ export async function autoCropAndRotateSlip(
   // Demerit slips are naturally landscape (aspect ratio ~1.4 : 1, width > height).
   // A portrait phone photo holds the slip vertically (height > width).
   // Rotating 270° clockwise (90° CCW) places the top header at the top and makes the text upright!
-  if (options?.forcedRotation === undefined) {
+  // Note: When scanning multiple slips stacked vertically in a single photo (`skipPortraitAutoRotate`),
+  // the combined height > width even though the slips are upright, so let AI Vision handle rotation.
+  if (options?.forcedRotation === undefined && !options?.skipPortraitAutoRotate) {
     if (normBox) {
       const boxW = (normBox.xMax - normBox.xMin) * width;
       const boxH = (normBox.yMax - normBox.yMin) * height;
@@ -377,4 +380,36 @@ export async function rotateImageClockwise(
   const { img } = await loadImageElement(imageSource);
   const { dataUrl } = renderTransformedCanvas(img, additionalDeg, null, 1100, quality);
   return dataUrl;
+}
+
+/**
+ * Crops an individual slip region out of a multi-slip photo using normalized coordinates (0.0 to 1.0)
+ * returned by AI Vision OCR (`crop_box: { x_min, y_min, x_max, y_max }`), with a 2% safety margin.
+ */
+export async function cropNormalizedRegionFromDataUrl(
+  imageSource: string,
+  cropBox: { x_min: number; y_min: number; x_max: number; y_max: number },
+  maxDimension = 960,
+  quality = 0.76
+): Promise<string> {
+  try {
+    const { img, width, height } = await loadImageElement(imageSource);
+    const pad = 0.02;
+    const xMin = Math.max(0, Math.min(0.95, (Number(cropBox.x_min) || 0) - pad));
+    const yMin = Math.max(0, Math.min(0.95, (Number(cropBox.y_min) || 0) - pad));
+    const xMax = Math.max(xMin + 0.08, Math.min(1, (Number(cropBox.x_max) || 1) + pad));
+    const yMax = Math.max(yMin + 0.08, Math.min(1, (Number(cropBox.y_max) || 1) + pad));
+
+    const pixelCrop: PixelCropBox = {
+      x: Math.round(xMin * width),
+      y: Math.round(yMin * height),
+      width: Math.max(40, Math.round((xMax - xMin) * width)),
+      height: Math.max(40, Math.round((yMax - yMin) * height)),
+    };
+
+    const { dataUrl } = renderTransformedCanvas(img, 0, pixelCrop, maxDimension, quality);
+    return dataUrl;
+  } catch {
+    return imageSource;
+  }
 }

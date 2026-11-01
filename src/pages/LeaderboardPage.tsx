@@ -9,6 +9,8 @@ import {
   Eye,
   X,
   QrCode,
+  Sparkles,
+  KeyRound,
 } from 'lucide-react';
 import { useDemerits } from '../context/DemeritsContext';
 import {
@@ -37,7 +39,7 @@ function memberRecordTagline(members: Member[], memberId: string | null, fallbac
 }
 
 export const LeaderboardPage: React.FC = () => {
-  const { computeStandings, loading, members, currentMember, setIsProfileModalOpen } = useDemerits();
+  const { computeStandings, loading, members, currentMember, openProfileModal } = useDemerits();
 
   const [periodKey, setPeriodKey] = useState<PeriodMode>('all-time');
   const [customStartDate, setCustomStartDate] = useState<string>('2026-10-01');
@@ -257,6 +259,44 @@ export const LeaderboardPage: React.FC = () => {
         </div>
       </section>
 
+      {/* FIRST-TIME DEMERIT QUICK-CLAIM BANNER (When signed out) */}
+      {!currentMember && (
+        <section className="rounded-2xl border border-[#DFC15E]/45 bg-gradient-to-r from-[#241B11] via-[#181310] to-[#121212] p-4 sm:px-5 sm:py-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-lg">
+          <div className="flex items-start sm:items-center gap-3">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#DFC15E]/20 border border-[#DFC15E]/50 text-[#DFC15E]">
+              <Sparkles className="h-5 w-5" />
+            </div>
+            <div>
+              <h2 className="font-athletic text-lg sm:text-xl font-black uppercase text-white leading-tight">
+                GOT YOUR FIRST DEMERIT? CLAIM YOUR NAME IN 10 SECONDS!
+              </h2>
+              <p className="font-mono-docket text-xs text-[#D6C7B8]">
+                First time here? Tap <strong className="text-[#DFC15E]">⚡ CLAIM PROFILE</strong> on your card below (or tap <strong className="text-[#DFC15E]">Claim My Name</strong>) to pick your 4–8 digit Bar PIN. Returning regular? Sign in with your Name, Phone, or Email!
+              </p>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2 shrink-0">
+            <button
+              type="button"
+              onClick={() => openProfileModal({ mode: 'claim' })}
+              className="inline-flex items-center gap-1.5 rounded-xl bg-[#DFC15E] px-3.5 py-2 min-h-[42px] font-sans text-xs font-black uppercase tracking-tight text-[#121212] hover:brightness-110 active:scale-95 transition cursor-pointer"
+            >
+              <Sparkles className="h-3.5 w-3.5" />
+              <span>First Time? Claim Name</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => openProfileModal({ mode: 'login' })}
+              className="inline-flex items-center gap-1.5 rounded-xl border border-white/20 bg-white/5 px-3.5 py-2 min-h-[42px] font-sans text-xs font-bold uppercase tracking-tight text-[#F5F2EB] hover:border-[#DFC15E] active:scale-95 transition cursor-pointer"
+            >
+              <KeyRound className="h-3.5 w-3.5 text-[#DFC15E]" />
+              <span>Sign In / Reset PIN</span>
+            </button>
+          </div>
+        </section>
+      )}
+
       {/* 2. INDIVIDUAL LEADERBOARD — SHOWCASED AT THE TOP */}
       <section className="space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-2">
@@ -315,7 +355,21 @@ export const LeaderboardPage: React.FC = () => {
                             return (
                               <button
                                 type="button"
-                                onClick={() => setIsProfileModalOpen(true)}
+                                onClick={() => {
+                                  if (isMe) {
+                                    openProfileModal({ mode: 'my-locker' });
+                                  } else if (memberRecord?.is_claimed) {
+                                    openProfileModal({
+                                      mode: 'login',
+                                      memberId: patron.memberId || undefined,
+                                    });
+                                  } else {
+                                    openProfileModal({
+                                      mode: 'claim',
+                                      memberId: patron.memberId || undefined,
+                                    });
+                                  }
+                                }}
                                 className={`inline-flex items-center gap-1 rounded-xl border px-3 py-1.5 min-h-[40px] font-sans text-xs font-bold uppercase transition cursor-pointer touch-manipulation active:scale-95 ${
                                   isMe
                                     ? 'border-emerald-400/60 bg-emerald-500/20 text-emerald-200'
@@ -327,7 +381,7 @@ export const LeaderboardPage: React.FC = () => {
                                 {isMe
                                   ? '✓ YOUR CARD'
                                   : memberRecord?.is_claimed
-                                  ? '🔒 CLAIMED'
+                                  ? '🔒 SIGN IN'
                                   : '⚡ CLAIM PROFILE'}
                               </button>
                             );

@@ -1,6 +1,43 @@
 # Task Tracker — Copper Demerits (`copperdemerits.com`)
 
-## Active Sprint — v1.6.26 (Universal Infraction Masking Across Leaderboard Podium & Docket)
+## Active Sprint — v1.6.30 (Scan-Time Default for Blank Slip Times, Future-Date OCR Guard & Instant Wall Pinning)
+- [x] Verify Burtis's newly scanned slip in live Cloudflare D1 (`copper-demerits-db`), remove sideways duplicate (`19876c85-e9af-4b5f-86f6-591d1194cf7b`), and update upright scan (`4eef8600-e68e-431f-bbad-3a3c33da1260`) to `"Sass-ing the Boss Lady"` (`17:47`)
+- [x] Fix future-dated OCR misreads on Bill's slips (`2026-11-26` and `2026-11-12` -> `2026-11-01`) and update all November 1 blank-time slips to their actual scan times
+- [x] Default blank `Time:` fields to the exact scan time (or latest time on the slip's authoritative date + 1 min) in `cloudflare/worker.js`, `src/lib/moderation.ts`, `src/pages/SubmitSlipPage.tsx`, and `src/context/DemeritsContext.tsx`
+- [x] Add future-date OCR sanity guard in `normalizeExtractedDate` (`cloudflare/worker.js`) and `submitDemeritSlip` (`src/context/DemeritsContext.tsx`)
+- [x] Add `justLogged` confirmation banner, `NEW • JUST SCANNED` badge, and `Slip Date & Time` vs. `Just Scanned` sort toggle on `src/pages/DocketPage.tsx`
+- [x] Bump version to `v1.6.30`, pass `npm run lint` and `npm run build`, and deploy Cloudflare Worker + Netlify production
+
+### v1.6.29 (Multi-Slip Individual Ticket Cropping, Quadrant Fallback & Live 4-Slip Fix)
+- [x] Inspect live 4-slip upload (`76bb65b1254226a781b6b3d9.jpg`) in Cloudflare D1 & R2
+- [x] Crop all 4 individual slips (`76bb65b1254226a781b6b3d9_slip_1.jpg`..`_slip_4.jpg`) and upload to Cloudflare R2
+- [x] Update the 4 D1 rows (`Ballz`, `Caitlyn`, `Beans`, `Ballz`) with their cropped `image_url`, `2026-11-01` date, staggered times, and corrected infraction text
+- [x] Add `getFallbackMultiSlipCropBox` (`cloudflare/worker.js`) and `getFallbackClientCropBox` (`SubmitSlipPage.tsx`) so multi-slip photos always crop each individual ticket even if the Vision LLM returns a full-frame box
+- [x] Fix `sanitizeAndDeduplicateSlips` (`src/context/DemeritsContext.tsx`) and stagger blank-time defaults (`cloudflare/worker.js`) so two slips for the same patron in one photo never collapse into one
+- [x] Bump version to `v1.6.29`, pass `npm run lint` and `npm run build`, and deploy Cloudflare Worker + Netlify production
+
+### v1.6.28 (Prominent Multi-Slip & Batch Photo Scanner UI)
+- [x] Surface prominent `Single Slip Photo` vs. `Multi-Slip / Batch (2–4 Slips)` toggle and upfront slip count selector on `src/pages/SubmitSlipPage.tsx`
+- [x] Add 3rd `Multi-Slip / Batch Upload` capture card and support `?mode=multi` URL query param on `/submit`
+- [x] Enable multi-file gallery selection (`multiple`) for batch-processing multiple separate slip photos in one go
+- [x] Add `cropNormalizedRegionFromDataUrl` and `skipPortraitAutoRotate` in `src/lib/imageAutoCrop.ts` so multi-slip photos crop each individual ticket (`image_url`) while preserving the full photo (`source_image_url`)
+- [x] Pass `expectedSlipCount` from `extractSlipsFromPhotoAI` (`src/lib/moderation.ts`) to `POST /api/extract-slip` (`cloudflare/worker.js`)
+- [x] Add `Multi-Slip / Batch Scanner` header button and quick-launch banner in `src/pages/AdminPage.tsx`
+- [x] Bump version to `v1.6.28` across `package.json`, `Navbar.tsx`, `AboutPage.tsx`, and `cloudflare/worker.js`
+- [x] Pass `npm run lint` and `npm run build` with 0 errors and deploy Cloudflare Worker + Netlify production
+
+### v1.6.27 (First-Time Demerit Onboarding, PIN Reset & False Duplicate Slip Fix)
+- [x] Unlock Thomas Lopez (`Beans`, `c01a25a2-15ba-4621-a0ae-d79aebf7b5ea`) in live Cloudflare D1 (`DELETE FROM pin_failures`) and map aliases (`thomas lopez`, `thomas`, `tom lopez`, `beans`)
+- [x] Upgrade `POST /api/claim-profile` (`findMemberByFlexibleIdentifier`) to support Sign-In via Display Name, Bar Nickname/Alias, 10-Digit Phone, or Email + PIN
+- [x] Auto-redirect unclaimed profiles entered on the Sign In tab directly to Claim mode with the member pre-selected
+- [x] Add `POST /api/reset-pin` (Self-Service PIN Reset via phone/last-4 or email verification) and `POST /api/admin/reset-pin` (Referee/Admin 1-tap PIN Reset & Account Unlock)
+- [x] Add `Referee PIN Reset & Account Unlock` tool in `src/pages/AdminPage.tsx`
+- [x] Remove false `"86% possible duplicate"` perceptual dHash block on Cherry Printers blank form templates in `src/lib/imageDedup.ts` and `cloudflare/worker.js`
+- [x] Add 1-tap `[Log It Anyway — This Is a New Ticket]` override button in `src/pages/SubmitSlipPage.tsx`
+- [x] Bump version to `v1.6.27` across `package.json`, `Navbar.tsx`, `AboutPage.tsx`, and `cloudflare/worker.js`
+- [x] Pass `npm run lint` and `npm run build` with 0 errors and deploy Cloudflare Worker + Netlify production
+
+### v1.6.26 (Universal Infraction Masking Across Leaderboard Podium & Docket)
 - [x] Investigate why "fingering" was appearing on leaderboard when unauthenticated
 - [x] Clarify single database architecture (Cloudflare D1 copper-demerits-db) to user
 - [x] Fix unmasked `item.description` on Leaderboard Top 3 Podium cards in `src/pages/LeaderboardPage.tsx`

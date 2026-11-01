@@ -2,6 +2,75 @@
 
 All notable changes to the **Copper Athletic Club — Ring of Honor** web application are documented in this file.
 
+## [1.6.30] - 2026-11-01
+
+### Fixed & Enhanced — Scan-Time Default for Blank Slip Times, Future-Date OCR Guard & Instant Wall Pinning
+- **Verified & Cleaned Up Burtis & Ziggie Slips + Fixed Future-Dated Bill Slips in Live Cloudflare D1 (`copper-demerits-db`)**:
+  - Confirmed Burtis's scan went into D1, removed the sideways duplicate scan (`19876c85-e9af-4b5f-86f6-591d1194cf7b`), and updated Burtis's upright scan (`4eef8600-e68e-431f-bbad-3a3c33da1260`) to `"Sass-ing the Boss Lady"` (`2026-11-01` at `17:47` scan time).
+  - Updated Ziggie's just-scanned slip (`457ba4ac-9886-4d35-90b4-abf5a101911f`) to `"For NEVER trying the epic chicken wings @ the Copper!!"` (`2026-11-01` at `17:50` scan time).
+  - Fixed two earlier slips for Bill (`e2417cb8-4f42-4a16-8bb6-e5afe9b2bb76` and `519727ba-2001-4a66-8519-fb8b45311049`) where OCR had misread the slash `/` in `11/1/26` as future dates (`2026-11-26` and `2026-11-12`), which had been pinning those slips above newly scanned slips on `/docket`, and normalized all November 1 blank-time slips to their actual scan times.
+- **Scan-Time Default & Authoritative Date Latest-Time Rule (`cloudflare/worker.js`, `src/lib/moderation.ts`, `src/pages/SubmitSlipPage.tsx`, `src/context/DemeritsContext.tsx`)**:
+  - Replaced hardcoded `'21:00'` default times and UTC `toISOString().slice(0, 10)` date defaults with local `America/Detroit` / client scan date and time (`getMichiganDateTime`, `getCurrentLocalDateTime`).
+  - Instructed the AI Vision OCR prompt to return `""` when the physical slip's `Time:` line is blank instead of inventing `20:00` or `21:00`.
+  - When no time is written on a slip, `incident_time` now automatically defaults to the **exact time the scan was done** — or, if there are already slips on that slip's authoritative `incident_date` with a later time, to the **latest time on that date (`+1 min`)** so a newly scanned slip is always the latest entry for its date.
+- **Future-Date OCR Sanity Guard (`cloudflare/worker.js`, `src/context/DemeritsContext.tsx`)**:
+  - Updated `normalizeExtractedDate` and `POST /api/demerits` so any OCR date misread that falls in the future (`> scanDate`) is clamped to `scanDate`.
+- **Wall of Slips (`/docket`) Instant Confirmation Banner & Sort Toggle (`src/pages/DocketPage.tsx`)**:
+  - Added a prominent green confirmation banner (`✅ Slip Verified & Posted to the Wall!`) when redirected from `/submit`, a **`NEW • JUST SCANNED`** badge on recently scanned slips, and a **`Slip Date & Time`** vs. **`Just Scanned`** sort toggle.
+
+## [1.6.29] - 2026-11-01
+
+### Fixed & Enhanced — Multi-Slip Individual Ticket Cropping, Quadrant Fallback & Same-Patron Timestamp Guard
+- **Cropped & Corrected Live 4-Slip Upload (`76bb65b1254226a781b6b3d9.jpg`) in Cloudflare R2 & D1**:
+  - Cropped the 4 individual tickets from `76bb65b1254226a781b6b3d9.jpg` into 4 dedicated R2 images (`76bb65b1254226a781b6b3d9_slip_1.jpg` through `_slip_4.jpg`) while preserving the composite photo as `source_image_url`:
+    1. **Ballz** (`8b2e8575-962d-40a2-9467-e4248342708d`) — `2026-11-01` (`21:00`) — *"lying about shots"* (`+1`, signed *"The Boss Lady"*).
+    2. **Caitlyn** (`0837dda9-13af-4121-8e87-3d06cf926999`) — `2026-10-25` (`20:54`) — *"Not being where you said you were!"* (`+1`, signed *"The Boss"*).
+    3. **Beans** (`c53e4acb-719b-4a19-991f-6176f1089422`) — `2026-11-01` (`21:01`) — *"ordering a margarita"* (`+1`, signed *"The Boss"*).
+    4. **Ballz** (`361529bd-5de8-49ed-9726-45ad68755429`) — `2026-11-01` (`21:02`) — *"Creating a web site w/ a design flaw - Shameful"* (`+1`, signed *"The Boss"*).
+  - Corrected the OCR date misread (`11/1/26` was previously parsed as `2026-11-14`) so all 3 November 1 slips appear immediately under `This Month` and `Today` leaderboard filters.
+- **Guaranteed Per-Slip Cropping with Quadrant Fallback (`cloudflare/worker.js`, `src/pages/SubmitSlipPage.tsx`)**:
+  - Updated `extractSlipsFromImageWithAI` prompt and `sanitizeExtractedSlips` in `cloudflare/worker.js` + `persistSlipDrafts` in `src/pages/SubmitSlipPage.tsx` with `getFallbackMultiSlipCropBox` / `getFallbackClientCropBox` so if a Vision LLM ever returns the full-frame default box (`0.05..0.95`) on a multi-slip photo, each slip is automatically cropped to its 2-slip, 3-slip, or 4-slip (2×2 quadrant) region.
+- **Fixed Same-Patron Multi-Slip Collapse (`src/context/DemeritsContext.tsx`, `cloudflare/worker.js`)**:
+  - Updated `sanitizeAndDeduplicateSlips` in `src/context/DemeritsContext.tsx` to require matching infraction text before collapsing two slips with the same patron/date/time, and staggered blank-time defaults (`21:00`, `21:01`, `21:02`...) in `sanitizeExtractedSlips` so two different slips for the same patron in one photo never collide.
+
+## [1.6.28] - 2026-11-01
+
+### Added & Enhanced — Prominent Multi-Slip & Batch Photo Scanner UI across Drop Slip & Ref Booth
+- **Front-and-Center Scan Mode Toggle & Multi-Slip Upload Card (`src/pages/SubmitSlipPage.tsx`)**:
+  - Replaced the previously hidden slip-count selector (which was buried inside `Manual Override / Edit`) with a prominent **`[📄 Single Slip Photo]`** vs. **`[📚 Multi-Slip / Batch (2–4 Slips)]`** toggle bar at the top of the capture card, plus a dedicated 3rd **`Multi-Slip / Batch Upload`** button.
+  - Added an upfront slip count selector (**`✨ Auto-Detect (1–4)`**, **`2 Slips in Photo`**, **`3 Slips in Photo`**, **`4 Slips in Photo`**) when Multi-Slip mode is active, passing `expectedSlipCount` to `POST /api/extract-slip`.
+  - Enabled URL query param support (`/submit?mode=multi`) so direct links from the Ref Booth open immediately in Multi-Slip / Batch mode.
+- **Multi-File Batch Gallery Upload (`src/pages/SubmitSlipPage.tsx`)**:
+  - Enabled `multiple` on the photo file inputs so Referees and Patrons can select multiple separate slip photos from their phone camera roll at once and batch-process all of them sequentially with live step feedback (`Batch Photo X of Y...`).
+- **Automatic Individual Slip Cropping from Multi-Slip Photos (`src/lib/imageAutoCrop.ts`, `src/pages/SubmitSlipPage.tsx`)**:
+  - Added `cropNormalizedRegionFromDataUrl` in `src/lib/imageAutoCrop.ts` to crop each individual slip using its AI Vision `crop_box` (`x_min`, `y_min`, `x_max`, `y_max`) when `draftsToSave.length > 1`, uploading each slip's cropped ticket image to R2 (`image_url`) while preserving the full multi-slip photo as `source_image_url`.
+  - Added `skipPortraitAutoRotate` in `autoCropAndRotateSlip` and `fingerprintImageFile` so vertically stacked multi-slip photos are not blindly rotated 270° before AI Vision runs.
+- **Ref Booth Multi-Slip Quick-Launch Banner (`src/pages/AdminPage.tsx`)**:
+  - Added a **`Multi-Slip / Batch Scanner`** header button and a **`📸 Scan Multiple Slips at Once for Any Patron`** quick-launch banner at the top of `/admin` linking to `/submit?mode=multi`.
+
+## [1.6.27] - 2026-11-01
+
+### Fixed & Enhanced — First-Time Demerit Quick Claiming, Self-Service & Referee PIN Reset & False Duplicate Slip Fix
+- **First-Time Demerit Quick-Claim UX (`src/pages/LeaderboardPage.tsx`, `src/components/ClaimProfileModal.tsx`, `src/components/SlipModalViewer.tsx`)**:
+  - Added a prominent **"GOT YOUR FIRST DEMERIT? CLAIM YOUR NAME IN 10 SECONDS!"** banner on the Scoreboard (`/`).
+  - Wired `⚡ CLAIM PROFILE` buttons on unclaimed scoreboard cards and slip evidence modals directly to `openProfileModal({ mode: 'claim', memberId })`, pre-selecting the patron's card in a streamlined 3-step Claim flow:
+    1. Tap your unclaimed name on the board (or `+ Create New`).
+    2. Enter your **10-Digit Phone Number** OR **Email Address** (only one required).
+    3. Pick a **4–8 Digit Bar PIN** (with Show/Hide PIN toggle).
+  - Auto-Redirect for Unclaimed Names on Sign In: If a first-time patron enters an unclaimed name on the Sign In tab, the server returns `needsClaim: true` + `unclaimedMember`, and the modal automatically switches to Claim mode with their name pre-selected and PIN pre-filled.
+- **Flexible Sign-In & Thomas Lopez Profile Fix (`cloudflare/worker.js`, `src/components/ClaimProfileModal.tsx`)**:
+  - Investigated **Thomas Lopez** (`Beans`, `c01a25a2-15ba-4621-a0ae-d79aebf7b5ea`) in live Cloudflare D1: his account had 11 brute-force lockout records in `pin_failures` and previously required entering his exact phone number (`9015815743`) because sign-in did not accept Display Name or Bar Nicknames/Aliases.
+  - Cleared all `pin_failures` rows in live D1 and seeded aliases `'thomas lopez'`, `'thomas'`, `'tom lopez'`, and `'beans'` for `Beans`.
+  - Upgraded `POST /api/claim-profile` (`findMemberByFlexibleIdentifier`) so returning patrons can sign in using **Display Name, Bar Nickname/Alias (`staff_aliases`), 10-Digit Phone Number, OR Email Address** + their 4–8 digit PIN, or tap their Quick-Tap Roster Chip in 1 click.
+- **Self-Service & Referee-Assisted PIN Reset (`cloudflare/worker.js`, `src/components/ClaimProfileModal.tsx`, `src/pages/AdminPage.tsx`)**:
+  - Added `POST /api/reset-pin` and a dedicated **`🔓 Reset PIN`** tab in `ClaimProfileModal`: patrons select their profile, verify their 10-digit phone number (or last 4 digits) or email address, and set a new 4–8 digit PIN (automatically clearing any lockouts).
+  - Added `POST /api/admin/reset-pin` and a **`🔑 Referee PIN Reset & Account Unlock`** card at the top of the Ref Booth (`/admin`): any signed-in Referee (`Sarah`, `Burtis`) or Admin (`Rick`) can reset any patron's PIN (with a 1-tap `Use 1234` helper) and unlock their account immediately.
+- **Eliminated False `"86% Possible Duplicate"` Slip Rejections (`src/lib/imageDedup.ts`, `cloudflare/worker.js`, `src/pages/SubmitSlipPage.tsx`)**:
+  - Diagnosed why brand-new physical slips were falsely flagged as an `"86% possible duplicate"`: `autoCropAndRotateSlip` crops every slip tightly to the white paper borders and rotates it upright to landscape. Because every physical Cherry Printers "DEMERIT SLIP" form shares the exact same bold top header, horizontal rule lines, and checkboxes, the 9×8 grayscale perceptual `dHash` produced Hamming distance `<= 10` (`86%` match) across completely different tickets.
+  - Removed the perceptual `dHash` blank-template block in `checkDuplicateSlipImage` (client) and Layer 2 of `POST /api/demerits` (server); image deduplication now strictly checks exact SHA-256 binary file matches.
+  - Refined `checkDuplicateCitationContent` and `infractionSimilarityServer` to strip common stop words and require BOTH the same patron AND `>= 75%` infraction text similarity on the same date (removing the 30-minute time-only block so multiple slips on the same night never collide).
+  - Added a 1-tap **`[Log It Anyway — This Is a New Ticket]`** override button on `/submit` (`bypassDuplicateCheck = true`).
+
 ## [1.6.26] - 2026-10-24
 
 ### Fixed & Enhanced — Universal Infraction Masking Across Leaderboard Podium & Docket

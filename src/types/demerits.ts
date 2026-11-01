@@ -28,6 +28,8 @@ export interface Member {
   claimed_at?: string | null;
   favorite_team?: string | null;
   tagline?: string | null;
+  has_phone?: boolean;
+  has_email?: boolean;
   notification_email?: string;
   notification_phone?: string;
   notification_carrier?: string;

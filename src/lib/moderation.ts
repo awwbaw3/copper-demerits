@@ -44,9 +44,6 @@ const CLIENT_OBJECTIONABLE_PATTERNS: RegExp[] = [
 ];
 
 /**
- * Instant client-side profanity, name-calling, and slur detector + sanitizer.
- */
-/**
  * Dynamically masks sensitive bar banter words on public scoreboards, tickers,
  * and citation cards (e.g. "F***ering the bartender") preserving context
  * while keeping public viewing PG-13.
@@ -257,13 +254,30 @@ export interface ExtractedSlipAI {
   };
 }
 
+export function getCurrentLocalDateTime(now: Date = new Date()): {
+  date: string;
+  time: string;
+} {
+  const yyyy = now.getFullYear();
+  const mm = String(now.getMonth() + 1).padStart(2, '0');
+  const dd = String(now.getDate()).padStart(2, '0');
+  const hh = String(now.getHours()).padStart(2, '0');
+  const min = String(now.getMinutes()).padStart(2, '0');
+  return {
+    date: `${yyyy}-${mm}-${dd}`,
+    time: `${hh}:${min}`,
+  };
+}
+
 /**
  * Calls the Cloudflare Worker Vision AI (`/api/extract-slip`) to automatically read
  * 1 or more physical Demerit Slips from an uploaded photo or camera capture.
  */
 export async function extractSlipsFromPhotoAI(
   imageBase64: string,
-  defaultDate?: string
+  defaultDate?: string,
+  expectedSlipCount?: number,
+  defaultTime?: string
 ): Promise<{
   ok: boolean;
   isDemeritSlip?: boolean;
@@ -273,6 +287,7 @@ export async function extractSlipsFromPhotoAI(
   error?: string;
 }> {
   try {
+    const localNow = getCurrentLocalDateTime();
     const res = await cloudflareFetch<{
       ok: boolean;
       isDemeritSlip?: boolean;
@@ -284,7 +299,9 @@ export async function extractSlipsFromPhotoAI(
       method: 'POST',
       body: JSON.stringify({
         imageBase64,
-        defaultDate: defaultDate || new Date().toISOString().slice(0, 10),
+        defaultDate: defaultDate || localNow.date,
+        defaultTime: defaultTime || localNow.time,
+        expectedSlipCount: expectedSlipCount && expectedSlipCount > 0 ? expectedSlipCount : undefined,
       }),
     });
     return res;
@@ -295,4 +312,3 @@ export async function extractSlipsFromPhotoAI(
     };
   }
 }
-

@@ -20,11 +20,15 @@ import {
   Database,
   Fingerprint,
   Lock,
+  Unlock,
   Beer,
   Send,
   Trophy,
   GitMerge,
   Edit3,
+  RotateCcw,
+  Camera,
+  Layers,
 } from 'lucide-react';
 
 export const AdminPage: React.FC = () => {
@@ -48,11 +52,25 @@ export const AdminPage: React.FC = () => {
     adminOverrideSlip,
     sendFridayDigestTest,
     mergeProfiles,
+    adminResetMemberPin,
   } = useDemerits();
 
   const [selectedSlip, setSelectedSlip] = useState<EnrichedDemeritSlip | null>(null);
   const [editingSlip, setEditingSlip] = useState<EnrichedDemeritSlip | null>(null);
   const [sendingDigestTest, setSendingDigestTest] = useState(false);
+
+  // Referee PIN Reset & Account Unlock State
+  const [resetTargetMemberId, setResetTargetMemberId] = useState<string>(
+    () => members.find((m) => m.display_name.toLowerCase() === 'beans')?.id || members[0]?.id || ''
+  );
+  const [resetNewPinInput, setResetNewPinInput] = useState<string>('1234');
+  const [resetPhoneInput, setResetPhoneInput] = useState<string>('');
+  const [resetEmailInput, setResetEmailInput] = useState<string>('');
+  const [resettingPin, setResettingPin] = useState<boolean>(false);
+  const [resetPinFeedback, setResetPinFeedback] = useState<{
+    type: 'ok' | 'err';
+    msg: string;
+  } | null>(null);
 
   // Profile Merger State
   const [adminMergeSourceId, setAdminMergeSourceId] = useState<string>('');
@@ -98,8 +116,8 @@ export const AdminPage: React.FC = () => {
             </h1>
             <p className="mx-auto max-w-xl text-xs sm:text-sm text-[#D6C7B8]">
               Only the Site Administrator (<strong className="text-white">Rick</strong>) or Official
-              Bar Referee (<strong className="text-white">Sarah</strong>) signed in with their 4–8
-              digit Bar PIN can access the Ref Booth, override auto-blurred slips, or manage
+              Bar Referee (<strong className="text-white">Sarah / Burtis</strong>) signed in with their 4–8
+              digit Bar PIN can access the Ref Booth, reset patron PINs, override auto-blurred slips, or manage
               aliases.
             </p>
           </div>
@@ -125,6 +143,45 @@ export const AdminPage: React.FC = () => {
       </div>
     );
   }
+
+  const handleRefereeResetPin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!resetTargetMemberId) {
+      setResetPinFeedback({ type: 'err', msg: 'Please select a patron or staff member first.' });
+      return;
+    }
+    const cleanPin = resetNewPinInput.trim();
+    if (cleanPin.length < 4 || cleanPin.length > 8) {
+      setResetPinFeedback({ type: 'err', msg: 'New Bar PIN must be between 4 and 8 digits.' });
+      return;
+    }
+
+    setResettingPin(true);
+    setResetPinFeedback(null);
+    try {
+      const res = await adminResetMemberPin({
+        targetMemberId: resetTargetMemberId,
+        newPin: cleanPin,
+        phone: resetPhoneInput.trim() || undefined,
+        email: resetEmailInput.trim() || undefined,
+      });
+
+      if (!res.ok) {
+        setResetPinFeedback({ type: 'err', msg: res.error || 'Could not reset member PIN.' });
+      } else {
+        setResetPinFeedback({
+          type: 'ok',
+          msg:
+            res.message ||
+            `Successfully reset PIN to "${cleanPin}" and unlocked account!`,
+        });
+        setResetPhoneInput('');
+        setResetEmailInput('');
+      }
+    } finally {
+      setResettingPin(false);
+    }
+  };
 
   const handleAddAlias = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -152,7 +209,7 @@ export const AdminPage: React.FC = () => {
       msg:
         removed > 0
           ? `Removed ${removed} duplicate or non-image slip(s).`
-          : 'All uploaded slip photos are unique (SHA-256 + 64-bit Perceptual dHash verified).',
+          : 'All uploaded slip photos are unique (SHA-256 binary verified).',
     });
   };
 
@@ -296,6 +353,14 @@ export const AdminPage: React.FC = () => {
             {isSupabaseConnected ? 'Cloud Database & AI Live' : 'Local Storage'}
           </span>
 
+          <Link
+            to="/submit?mode=multi"
+            className="inline-flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-[#DFC15E] to-[#B87333] px-3.5 py-2.5 min-h-[44px] touch-manipulation active:scale-95 font-mono-docket text-xs font-bold text-[#121212] shadow-md transition hover:brightness-110 cursor-pointer"
+          >
+            <Layers className="h-3.5 w-3.5" />
+            <span>Multi-Slip / Batch Scanner</span>
+          </Link>
+
           <button
             type="button"
             onClick={handleDeduplicate}
@@ -306,6 +371,39 @@ export const AdminPage: React.FC = () => {
           </button>
         </div>
       </div>
+
+      {/* Referee Multi-Slip & Batch Scanner Quick-Launch Card */}
+      <section className="rounded-2xl border-2 border-[#B87333]/60 bg-gradient-to-r from-[#241A12] via-[#1C1612] to-[#14110F] p-4 sm:p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-[0_12px_35px_rgba(0,0,0,0.65)]">
+        <div className="space-y-1">
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-[#DFC15E]/40 bg-[#DFC15E]/15 px-3 py-0.5 font-mono-docket text-[10px] font-bold uppercase tracking-widest text-[#DFC15E]">
+            <Layers className="h-3 w-3" />
+            <span>REFEREE &amp; PATRON MULTI-SLIP SCANNER</span>
+          </span>
+          <h2 className="font-athletic text-2xl sm:text-3xl font-black uppercase tracking-wide text-[#F5F2EB]">
+            SCAN MULTIPLE SLIPS AT ONCE FOR ANY PATRON
+          </h2>
+          <p className="font-mono-docket text-xs text-[#D6C7B8] max-w-2xl">
+            Have a stack of physical demerit slips on the bar? Lay <strong className="text-white">2 to 4 slips side-by-side in 1 photo</strong> OR select <strong className="text-white">multiple photos at once</strong> from your camera roll. AI Vision reads every slip&apos;s Student line, crops each ticket, and credits each patron automatically.
+          </p>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2.5 shrink-0">
+          <Link
+            to="/submit?mode=multi"
+            className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#DFC15E] to-[#B87333] px-4 py-3 min-h-[46px] font-athletic text-base font-black uppercase tracking-wider text-[#121212] shadow-[0_0_20px_rgba(223,193,94,0.35)] hover:brightness-110 active:scale-95 touch-manipulation cursor-pointer"
+          >
+            <Layers className="h-4 w-4" />
+            <span>Scan 2–4 Slips / Batch Upload</span>
+          </Link>
+          <Link
+            to="/submit"
+            className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-white/20 bg-white/5 hover:border-[#DFC15E] px-4 py-3 min-h-[46px] font-athletic text-base font-bold uppercase tracking-wider text-[#F5F2EB] active:scale-95 touch-manipulation cursor-pointer"
+          >
+            <Camera className="h-4 w-4 text-[#DFC15E]" />
+            <span>Snap Single Slip</span>
+          </Link>
+        </div>
+      </section>
 
       {feedback && (
         <div
@@ -318,6 +416,121 @@ export const AdminPage: React.FC = () => {
           {feedback.msg}
         </div>
       )}
+
+      {/* Referee PIN Reset & Account Unlock Tool */}
+      <section className="rounded-2xl border-2 border-[#DFC15E]/50 bg-gradient-to-r from-[#1A1511] via-[#211A14] to-[#1A1511] p-4 sm:p-6 space-y-4 shadow-[0_12px_35px_rgba(0,0,0,0.65)]">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#DFC15E]/25 pb-3">
+          <div>
+            <span className="font-mono-docket text-[10px] font-bold uppercase tracking-widest text-[#DFC15E]">
+              🔑 INSTANT BAR ASSISTANCE · REFEREE &amp; ADMIN TOOL
+            </span>
+            <h2 className="font-athletic text-2xl sm:text-3xl font-bold uppercase tracking-wide text-[#F5F2EB] flex items-center gap-2">
+              <Unlock className="h-6 w-6 text-[#DFC15E]" />
+              <span>REFEREE PIN RESET &amp; ACCOUNT UNLOCK</span>
+            </h2>
+          </div>
+          <span className="rounded-full border border-emerald-400/40 bg-emerald-500/15 px-3 py-1 font-mono-docket text-xs font-bold text-emerald-300">
+            Clears Lockouts &amp; Resets PIN Immediately
+          </span>
+        </div>
+
+        <p className="font-mono-docket text-xs text-[#D6C7B8]">
+          If a patron at the bar (like <strong className="text-white">Thomas Lopez / Beans</strong>) forgets their PIN or gets locked out after failed attempts, select their profile below, set a new 4–8 digit PIN, and click <strong>Reset PIN &amp; Unlock Account</strong>. They can immediately sign in using their Name, Nickname, Phone, or Email + the new PIN!
+        </p>
+
+        {resetPinFeedback && (
+          <div
+            className={`rounded-xl border px-4 py-3 font-mono-docket text-xs font-bold ${
+              resetPinFeedback.type === 'ok'
+                ? 'border-emerald-500/50 bg-emerald-950/50 text-emerald-200'
+                : 'border-rose-500/50 bg-rose-950/50 text-rose-200'
+            }`}
+          >
+            {resetPinFeedback.msg}
+          </div>
+        )}
+
+        <form onSubmit={handleRefereeResetPin} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-3 rounded-xl border border-white/10 bg-[#0E0C0B] p-4">
+          <div className="lg:col-span-4">
+            <label className="block font-mono-docket text-xs font-bold uppercase text-[#E8B888]">
+              1. SELECT PATRON / MEMBER *
+            </label>
+            <select
+              value={resetTargetMemberId}
+              onChange={(e) => {
+                setResetTargetMemberId(e.target.value);
+                setResetPinFeedback(null);
+              }}
+              aria-label="Select member to reset PIN"
+              className="mt-1.5 w-full rounded-xl border border-white/15 bg-[#151210] px-3.5 py-2.5 font-mono-docket text-base sm:text-xs min-h-[44px] text-white focus:border-[#DFC15E]"
+            >
+              {members.map((m) => {
+                const memberAliases = aliases
+                  .filter((a) => a.member_id === m.id)
+                  .map((a) => a.alias)
+                  .slice(0, 2);
+                return (
+                  <option key={m.id} value={m.id}>
+                    {m.display_name}
+                    {memberAliases.length > 0 ? ` (${memberAliases.join(', ')})` : ''} —{' '}
+                    {m.is_claimed ? 'Claimed' : 'Unclaimed'}
+                  </option>
+                );
+              })}
+            </select>
+          </div>
+
+          <div className="lg:col-span-3">
+            <div className="flex items-center justify-between">
+              <label className="block font-mono-docket text-xs font-bold uppercase text-[#DFC15E]">
+                2. NEW 4–8 DIGIT PIN *
+              </label>
+              <button
+                type="button"
+                onClick={() => setResetNewPinInput('1234')}
+                className="font-mono-docket text-[10px] font-bold text-[#DFC15E] underline hover:text-white cursor-pointer"
+              >
+                Use 1234
+              </button>
+            </div>
+            <input
+              type="text"
+              inputMode="numeric"
+              minLength={4}
+              maxLength={8}
+              required
+              value={resetNewPinInput}
+              onChange={(e) => setResetNewPinInput(e.target.value)}
+              placeholder="e.g. 1234 or 123456"
+              className="mt-1.5 w-full rounded-xl border border-[#DFC15E]/50 bg-[#151210] px-3.5 py-2.5 font-mono-docket text-base sm:text-xs min-h-[44px] tracking-widest text-white focus:border-[#DFC15E] focus:outline-none"
+            />
+          </div>
+
+          <div className="lg:col-span-2">
+            <label className="block font-mono-docket text-xs font-bold uppercase text-[#B5A99D]">
+              PHONE (OPTIONAL)
+            </label>
+            <input
+              type="tel"
+              value={resetPhoneInput}
+              onChange={(e) => setResetPhoneInput(e.target.value)}
+              placeholder="Keep existing"
+              className="mt-1.5 w-full rounded-xl border border-white/15 bg-[#151210] px-3 py-2.5 font-mono-docket text-base sm:text-xs min-h-[44px] text-white focus:border-[#B87333] focus:outline-none"
+            />
+          </div>
+
+          <div className="lg:col-span-3 flex flex-col justify-end">
+            <button
+              type="submit"
+              disabled={resettingPin || !resetTargetMemberId}
+              className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#DFC15E] via-[#E8B888] to-[#DFC15E] px-4 py-2.5 min-h-[44px] touch-manipulation active:scale-95 font-athletic text-sm font-black uppercase tracking-wider text-[#121212] hover:brightness-110 disabled:opacity-40 cursor-pointer shadow-[0_0_20px_rgba(223,193,94,0.3)]"
+            >
+              <RotateCcw className="h-4 w-4" />
+              <span>{resettingPin ? 'Resetting...' : 'Reset PIN & Unlock'}</span>
+            </button>
+          </div>
+        </form>
+      </section>
 
       {/* Friday Night Docket & Dispatcher Info */}
       <section className="rounded-2xl border border-white/10 bg-[#141110] p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -598,7 +811,7 @@ export const AdminPage: React.FC = () => {
               <span>PATRON NICKNAME &amp; STAFF ALIAS MAPPER</span>
             </h2>
             <p className="mt-1 font-mono-docket text-[11px] text-[#9E8F82]">
-              Only Admins and signed-in Claimed Profiles can adjust nicknames. Any slip written with a mapped nickname automatically merges its points and stats into that profile.
+              Only Admins and signed-in Claimed Profiles can adjust nicknames. Any slip written with a mapped nickname automatically merges its points and stats into that profile, and patrons can also use any mapped nickname to sign in!
             </p>
           </div>
 
@@ -609,7 +822,7 @@ export const AdminPage: React.FC = () => {
                 required
                 value={newAliasInput}
                 onChange={(e) => setNewAliasInput(e.target.value)}
-                placeholder='Friendly nickname/alias (e.g. "ricky", "big burt", "the boss")'
+                placeholder='Friendly nickname/alias (e.g. "thomas lopez", "ricky", "the boss")'
                 className="w-full rounded-xl border border-white/15 bg-[#121212] px-3.5 py-2.5 font-mono-docket text-base sm:text-xs min-h-[44px] text-[#F5F2EB] focus:border-[#B87333] focus:outline-none"
               />
             </div>
@@ -760,9 +973,16 @@ export const AdminPage: React.FC = () => {
                 key={m.id}
                 className="flex items-center justify-between rounded-xl border border-white/10 bg-[#121212] px-3.5 py-2"
               >
-                <span className="font-athletic text-base font-bold uppercase text-[#F5F2EB]">
-                  {m.display_name}
-                </span>
+                <div className="flex items-center gap-2">
+                  <span className="font-athletic text-base font-bold uppercase text-[#F5F2EB]">
+                    {m.display_name}
+                  </span>
+                  {m.is_claimed && (
+                    <span className="rounded bg-emerald-500/15 border border-emerald-500/30 px-1.5 py-0.5 font-mono-docket text-[9px] font-bold text-emerald-300">
+                      CLAIMED
+                    </span>
+                  )}
+                </div>
                 <div className="flex items-center gap-1.5">
                   {m.is_admin && (
                     <span className="rounded bg-amber-500/20 px-2 py-0.5 font-mono-docket text-[10px] font-bold text-amber-300">
@@ -801,7 +1021,7 @@ export const AdminPage: React.FC = () => {
         </div>
 
         <p className="font-mono-docket text-xs text-[#D6C7B8]">
-          Combine two profiles into one unified record (for example, when a patron like Ziggie &amp; David Lee was cited under different names or a duplicate profile was created). The target profile absorbs all citations, demerit points, and aliases, and the source profile's name becomes an official slip alias.
+          Combine two profiles into one unified record (for example, when a patron like Ziggie &amp; David Lee was cited under different names or a duplicate profile was created). The target profile absorbs all citations, demerit points, and aliases, and the source profile&apos;s name becomes an official slip alias.
         </p>
 
         {adminMergeFeedback && (

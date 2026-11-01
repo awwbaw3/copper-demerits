@@ -1,5 +1,5 @@
 /**
- * Copper Demerits (`copperdemerits.com`) — Cloudflare Worker + D1 + R2 + Workers AI Backend (v1.6.26)
+ * Copper Demerits (`copperdemerits.com`) — Cloudflare Worker + D1 + R2 + Workers AI Backend (v1.6.27)
  * - Database: Cloudflare D1 (`DB` binding -> `copper-demerits-db`)
  * - Object Storage: Cloudflare R2 (`SLIPS_BUCKET` binding -> `copper-demerits-slips`)
  * - AI Moderation: Cloudflare Workers AI (`AI` binding) + Optional `GEMINI_API_KEY` (Gemini 2.5 Flash)
@@ -262,35 +262,84 @@ function inferDemeritCategory(desc, suggestedType) {
   return 'Party Foul / Conduct';
 }
 
+function getMichiganDateTime(now = new Date()) {
+  try {
+    const parts = new Intl.DateTimeFormat('en-US', {
+      timeZone: 'America/Detroit',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      hourCycle: 'h23',
+    }).formatToParts(now);
+    const map = {};
+    for (const p of parts) {
+      map[p.type] = p.value;
+    }
+    const yyyy = map.year || String(now.getUTCFullYear());
+    const mm = map.month || String(now.getUTCMonth() + 1).padStart(2, '0');
+    const dd = map.day || String(now.getUTCDate()).padStart(2, '0');
+    const hh = map.hour === '24' ? '00' : (map.hour || '17').padStart(2, '0');
+    const min = (map.minute || '00').padStart(2, '0');
+    return {
+      date: `${yyyy}-${mm}-${dd}`,
+      time: `${hh}:${min}`,
+    };
+  } catch {
+    const iso = now.toISOString();
+    return {
+      date: iso.slice(0, 10),
+      time: iso.slice(11, 16),
+    };
+  }
+}
+
+function addMinutesToHHMM(hhmm, deltaMinutes = 1) {
+  const m = String(hhmm || '').match(/^(\d{1,2}):(\d{2})$/);
+  if (!m) return hhmm || '17:00';
+  const total = Math.min(23 * 60 + 59, Math.max(0, parseInt(m[1], 10) * 60 + parseInt(m[2], 10) + deltaMinutes));
+  const h = Math.floor(total / 60);
+  const mins = total % 60;
+  return `${String(h).padStart(2, '0')}:${String(mins).padStart(2, '0')}`;
+}
+
 function normalizeExtractedDate(rawDate, fallbackDate) {
-  const fb = fallbackDate || new Date().toISOString().slice(0, 10);
+  const michNow = getMichiganDateTime();
+  const fb = fallbackDate || michNow.date;
   const currentYear = fb.slice(0, 4);
   if (!rawDate) return fb;
   const str = String(rawDate).trim();
+  let parsed = null;
   if (/^\d{4}-\d{2}-\d{2}$/.test(str)) {
     const yr = parseInt(str.slice(0, 4), 10);
-    if (yr < 2025) {
-      return `${currentYear}${str.slice(4)}`;
+    parsed = yr < 2025 ? `${currentYear}${str.slice(4)}` : str;
+  } else {
+    const mdy = str.match(/^(\d{1,2})[\/\-](\d{1,2})(?:[\/\-](\d{2,4}))?$/);
+    if (mdy) {
+      const mm = mdy[1].padStart(2, '0');
+      const dd = mdy[2].padStart(2, '0');
+      let yyyy = mdy[3] ? mdy[3] : currentYear;
+      if (yyyy.length === 2) yyyy = `20${yyyy}`;
+      if (parseInt(yyyy, 10) < 2025) yyyy = currentYear;
+      parsed = `${yyyy}-${mm}-${dd}`;
     }
-    return str;
   }
-  const mdy = str.match(/^(\d{1,2})[\/\-](\d{1,2})(?:[\/\-](\d{2,4}))?$/);
-  if (mdy) {
-    const mm = mdy[1].padStart(2, '0');
-    const dd = mdy[2].padStart(2, '0');
-    let yyyy = mdy[3] ? mdy[3] : currentYear;
-    if (yyyy.length === 2) yyyy = `20${yyyy}`;
-    if (parseInt(yyyy, 10) < 2025) yyyy = currentYear;
-    return `${yyyy}-${mm}-${dd}`;
+  if (!parsed) return fb;
+  // Sanity guard: a physical handwritten demerit slip cannot be dated in the future after the scan date
+  // (protects against OCR misreading the slash "/" in "11/1/26" as "11/12/26", "11/14/26", or "11/26/26")
+  if (parsed > fb) {
+    return fb;
   }
-  return fb;
+  return parsed;
 }
 
-function normalizeExtractedTime(rawTime) {
-  if (!rawTime) return '21:00';
+function parseExplicitExtractedTime(rawTime) {
+  if (!rawTime) return null;
   const str = String(rawTime).trim().toUpperCase();
+  if (!str || str === 'NULL' || str === 'NONE' || str === 'N/A' || str === 'BLANK') return null;
   const match = str.match(/(\d{1,2}):(\d{2})\s*(AM|PM)?/);
-  if (!match) return '21:00';
+  if (!match) return null;
   let hours = parseInt(match[1], 10);
   const mins = match[2];
   const ampm = match[3];
@@ -302,7 +351,14 @@ function normalizeExtractedTime(rawTime) {
     // Bar demerit slips written between 1:00 and 11:59 without AM/PM are evening PM hours
     hours += 12;
   }
+  if (hours < 0 || hours > 23) return null;
   return `${String(hours).padStart(2, '0')}:${mins}`;
+}
+
+function normalizeExtractedTime(rawTime, fallbackTime) {
+  const explicit = parseExplicitExtractedTime(rawTime);
+  if (explicit) return explicit;
+  return fallbackTime || getMichiganDateTime().time;
 }
 
 function base64ToUint8Array(base64DataUrl) {
@@ -317,15 +373,67 @@ function base64ToUint8Array(base64DataUrl) {
   return bytes;
 }
 
-function sanitizeExtractedSlips(rawSlips, fallbackDate) {
+function getFallbackMultiSlipCropBox(index, totalCount) {
+  if (totalCount === 2) {
+    // 2 slips: left/right or top/bottom; default to 2-column grid with generous margin
+    return index === 0
+      ? { x_min: 0.01, y_min: 0.02, x_max: 0.51, y_max: 0.98 }
+      : { x_min: 0.49, y_min: 0.02, x_max: 0.99, y_max: 0.98 };
+  }
+  if (totalCount === 3) {
+    // 3 slips: 2 on top, 1 on bottom (or 2x2 quadrants 0, 1, 2)
+    if (index === 0) return { x_min: 0.01, y_min: 0.01, x_max: 0.51, y_max: 0.52 };
+    if (index === 1) return { x_min: 0.49, y_min: 0.01, x_max: 0.99, y_max: 0.52 };
+    return { x_min: 0.15, y_min: 0.48, x_max: 0.85, y_max: 0.99 };
+  }
+  if (totalCount >= 4) {
+    // 4 slips laid out in 2x2 grid (Top-Left, Top-Right, Bottom-Left, Bottom-Right)
+    const row = Math.floor((index % 4) / 2);
+    const col = (index % 4) % 2;
+    return {
+      x_min: col === 0 ? 0.01 : 0.49,
+      y_min: row === 0 ? 0.01 : 0.49,
+      x_max: col === 0 ? 0.51 : 0.99,
+      y_max: row === 0 ? 0.51 : 0.99,
+    };
+  }
+  return { x_min: 0.02, y_min: 0.02, x_max: 0.98, y_max: 0.98 };
+}
+
+function sanitizeExtractedSlips(rawSlips, fallbackDate, fallbackTime, latestTimesByDate = {}) {
   if (!Array.isArray(rawSlips) || rawSlips.length === 0) return [];
-  return rawSlips.map((s) => {
+  const totalCount = rawSlips.length;
+  const michNow = getMichiganDateTime();
+  const baseScanTime = fallbackTime || michNow.time;
+  const runningLatestByDate = { ...latestTimesByDate };
+
+  return rawSlips.map((s, idx) => {
     const rawStudent = String(s.raw_student || s.student || s.patron || 'Patron').trim();
     const rawSignature = String(
       s.raw_signature || s.signature || s.teacher || s.issuer || 'The Boss - AKA Sarah'
     ).trim();
-    const incidentDate = normalizeExtractedDate(s.incident_date || s.date, fallbackDate);
-    const incidentTime = normalizeExtractedTime(s.incident_time || s.time);
+    const incidentDate = normalizeExtractedDate(s.incident_date || s.date, fallbackDate || michNow.date);
+    const explicitTime = parseExplicitExtractedTime(s.incident_time || s.time);
+
+    let incidentTime;
+    if (explicitTime) {
+      incidentTime = explicitTime;
+    } else {
+      // No time was written on the physical slip:
+      // Default to the scan time, OR the latest time on that slip's date (+1 min) if later than scan time
+      let targetTime = baseScanTime;
+      const latestOnDate = runningLatestByDate[incidentDate];
+      if (latestOnDate && latestOnDate >= targetTime) {
+        targetTime = addMinutesToHHMM(latestOnDate, 1);
+      } else if (totalCount > 1 && idx > 0) {
+        targetTime = addMinutesToHHMM(baseScanTime, idx);
+      }
+      incidentTime = targetTime;
+    }
+
+    if (!runningLatestByDate[incidentDate] || incidentTime > runningLatestByDate[incidentDate]) {
+      runningLatestByDate[incidentDate] = incidentTime;
+    }
     const locationArea = String(s.location_area || s.room || 'Copper A.C.').trim() || 'Copper A.C.';
 
     let rawItems = Array.isArray(s.demerit_items || s.items) ? (s.demerit_items || s.items) : [];
@@ -380,13 +488,38 @@ function sanitizeExtractedSlips(rawSlips, fallbackDate) {
 
     let cropBox = null;
     if (s.crop_box && typeof s.crop_box === 'object') {
-      cropBox = {
-        x_min: Math.max(0, Math.min(1, Number(s.crop_box.x_min ?? s.crop_box.xmin ?? 0))),
-        y_min: Math.max(0, Math.min(1, Number(s.crop_box.y_min ?? s.crop_box.ymin ?? 0))),
-        x_max: Math.max(0, Math.min(1, Number(s.crop_box.x_max ?? s.crop_box.xmax ?? 1))),
-        y_max: Math.max(0, Math.min(1, Number(s.crop_box.y_max ?? s.crop_box.ymax ?? 1))),
-      };
+      let xMin = Number(s.crop_box.x_min ?? s.crop_box.xmin ?? 0);
+      let yMin = Number(s.crop_box.y_min ?? s.crop_box.ymin ?? 0);
+      let xMax = Number(s.crop_box.x_max ?? s.crop_box.xmax ?? 1);
+      let yMax = Number(s.crop_box.y_max ?? s.crop_box.ymax ?? 1);
+      // Normalize 0..1000 or 0..100 scales if returned by an LLM
+      const maxVal = Math.max(xMin, yMin, xMax, yMax);
+      if (maxVal > 10) {
+        const scale = maxVal > 100 ? 1000 : 100;
+        xMin /= scale;
+        yMin /= scale;
+        xMax /= scale;
+        yMax /= scale;
+      }
+      xMin = Math.max(0, Math.min(1, xMin));
+      yMin = Math.max(0, Math.min(1, yMin));
+      xMax = Math.max(0, Math.min(1, xMax));
+      yMax = Math.max(0, Math.min(1, yMax));
+
+      const boxW = xMax - xMin;
+      const boxH = yMax - yMin;
+      // If multi-slip photo but the model lazily returned the full-frame default box (0.05..0.95),
+      // use the quadrant fallback for this slip index so each slip still crops to its own ticket!
+      if (totalCount > 1 && boxW >= 0.85 && boxH >= 0.85) {
+        cropBox = getFallbackMultiSlipCropBox(idx, totalCount);
+      } else if (boxW > 0.08 && boxH > 0.08) {
+        cropBox = { x_min: xMin, y_min: yMin, x_max: xMax, y_max: yMax };
+      }
     }
+    if (!cropBox && totalCount > 1) {
+      cropBox = getFallbackMultiSlipCropBox(idx, totalCount);
+    }
+
     return {
       raw_student: rawStudent,
       raw_signature: rawSignature,
@@ -401,17 +534,56 @@ function sanitizeExtractedSlips(rawSlips, fallbackDate) {
   });
 }
 
-/**
- * Extracts 1 or more physical Demerit Slips from an uploaded photo using Vision AI:
- * - Uses Gemini 2.5 Flash if `env.GEMINI_API_KEY` is configured
- * - Uses Cloudflare Workers AI Vision (`@cf/meta/llama-3.2-11b-vision-instruct` / `@cf/google/gemma-3-12b-it` / `@cf/llava-hf/llava-1.5-7b-hf`)
- */
+const SERVER_INFRACTION_STOP_WORDS = new Set([
+  'the',
+  'and',
+  'for',
+  'with',
+  'from',
+  'that',
+  'this',
+  'was',
+  'were',
+  'are',
+  'not',
+  'you',
+  'your',
+  'his',
+  'her',
+  'him',
+  'she',
+  'they',
+  'them',
+  'their',
+  'all',
+  'out',
+  'over',
+  'into',
+  'after',
+  'before',
+  'too',
+  'many',
+  'bar',
+  'copper',
+  'demerit',
+  'demerits',
+  'slip',
+  'citation',
+  'boss',
+  'lady',
+  'sarah',
+  'aka',
+  'being',
+  'having',
+  'getting',
+]);
+
 function tokenizeWords(text) {
   return String(text || '')
     .toLowerCase()
     .replace(/[^a-z0-9\s]/g, ' ')
     .split(/\s+/)
-    .filter((w) => w.length >= 3);
+    .filter((w) => w.length >= 3 && !SERVER_INFRACTION_STOP_WORDS.has(w));
 }
 
 function infractionSimilarityServer(textA, textB) {
@@ -434,20 +606,15 @@ function infractionSimilarityServer(textA, textB) {
   return (matches * 2) / (wordsA.length + wordsB.length);
 }
 
-function calculateHammingDistanceServer(hashA, hashB) {
-  if (!hashA || !hashB || hashA.length !== 16 || hashB.length !== 16) {
-    return 64;
-  }
-  let distance = 0;
-  for (let i = 0; i < 16; i++) {
-    const xor = parseInt(hashA[i], 16) ^ parseInt(hashB[i], 16);
-    distance += (xor & 1) + ((xor >> 1) & 1) + ((xor >> 2) & 1) + ((xor >> 3) & 1);
-  }
-  return distance;
-}
-
-async function extractSlipsFromImageWithAI(env, { imageBase64, defaultDate, knownMembers = [], knownAliases = [] }) {
-  const fallbackDate = defaultDate || new Date().toISOString().slice(0, 10);
+/**
+ * Extracts 1 or more physical Demerit Slips from an uploaded photo using Vision AI:
+ * - Uses Gemini 2.5 Flash if `env.GEMINI_API_KEY` is configured
+ * - Uses Cloudflare Workers AI Vision (`@cf/mistralai/mistral-small-3.1-24b-instruct` / `@cf/google/gemma-3-12b-it` / `@cf/meta/llama-3.2-11b-vision-instruct`)
+ */
+async function extractSlipsFromImageWithAI(env, { imageBase64, defaultDate, defaultTime, knownMembers = [], knownAliases = [], expectedSlipCount = 0, latestTimesByDate = {} }) {
+  const michNow = getMichiganDateTime();
+  const fallbackDate = defaultDate || michNow.date;
+  const fallbackTime = defaultTime || michNow.time;
   if (!imageBase64) {
     return { ok: false, error: 'Missing imageBase64 for slip extraction.' };
   }
@@ -456,31 +623,37 @@ async function extractSlipsFromImageWithAI(env, { imageBase64, defaultDate, know
     ? `Known Copper Athletic Club patrons & staff names: ${knownMembers.join(', ')}. Known nicknames/signatures: ${knownAliases.join(', ')}.`
     : `Known Copper Athletic Club regulars: Rick, Burtis, Sarah (The Boss / The Boss Lady), David Lee.`;
 
+  const multiSlipInstruction = expectedSlipCount > 1
+    ? `\nIMPORTANT MULTI-SLIP INSTRUCTION: The user indicated there are ${expectedSlipCount} physical Demerit Slips in this photo (or multiple slips laid out together). Carefully scan the entire image (top-to-bottom, left-to-right) and extract a separate object in the "slips" array for EVERY physical slip visible, along with each slip's individual "crop_box"!\n`
+    : `\nIMPORTANT: If there are 2, 3, or 4 physical Demerit Slips laid out side-by-side or stacked in this photo, extract a separate object in the "slips" array for EVERY physical slip visible, along with each slip's individual "crop_box"!\n`;
+
   const extractionPrompt = `You are an expert OCR reader and Referee for Copper Athletic Club's handwritten "DEMERIT SLIP" citations.
 First, verify whether this image actually contains at least one physical paper "DEMERIT SLIP" (or written citation slip with fields like Student, Date, Time, Room, Demerits, Teacher/Signature, or handwritten offenses).
 - If the image is NOT a demerit slip (for example: a random selfie, a person, a drink, food, a pet, a landscape, or an unrelated screenshot), return:
 {"is_demerit_slip": false, "rejection_reason": "This photo does not appear to contain a Copper Demerit Slip. Please snap a clear photo of the physical demerit slip!", "slips": []}
 
-If the image DOES contain 1 or more physical Demerit Slips (up to 4 slips laying next to each other), set "is_demerit_slip": true and read all handwritten fields for EVERY slip visible:
+If the image DOES contain 1 or more physical Demerit Slips (up to 4 slips laying next to each other), set "is_demerit_slip": true and read all handwritten fields for EVERY slip visible:${multiSlipInstruction}
 ${rosterHint}
 
 - "raw_student": Handwritten name on the "Student:" line (e.g. "Rick", "Burtis", "David Lee", "Ziggie", etc.)
-- "incident_date": Handwritten date on the "Date(s):" line formatted as YYYY-MM-DD (if year is 26 or missing, use 2026; if blank use "${fallbackDate}")
-- "incident_time": Handwritten time on the "Time:" line in 24-hour HH:MM format (note: bar slips are evening PM times unless AM is written, so "9:09" or "9:09 PM" -> "21:09", "6:27" -> "18:27", "8:50" -> "20:50")
+- "incident_date": Handwritten date on the "Date(s):" line formatted as YYYY-MM-DD (if year is 26 or missing, use 2026; if blank use "${fallbackDate}"). Note that "11/1/26" is November 1, 2026 ("2026-11-01") — do NOT misread the slash "/" as a digit ("11/12", "11/14", or "11/26").
+- "incident_time": Handwritten time on the "Time:" line in 24-hour HH:MM format ONLY if a time is actually written on the "Time:" line (e.g. "9:09" or "9:09 PM" -> "21:09", "6:27" -> "18:27"). CRITICAL: If the "Time:" line on the physical slip is blank/empty, return "" (empty string) — NEVER guess or invent "21:00" or "20:00"!
 - "location_area": Handwritten room on the "Room:" line (e.g. "Copper A.C.", "Copper Bar", "Copper")
 - "demerit_count": Total integer number of demerits written on the "Demerits:" line (e.g. "1", "2", "3", "1 - so far" -> 1)
 - "raw_signature": Handwritten signature on the "Teacher:" / bottom signature line (e.g. "The Boss - AKA Sarah", "The Boss Lady", "YOUR BOSS!", or if it's Sarah's cursive signature write "Sarah (Cursive Signature)")
 - "demerit_items": Array of each handwritten offense/reason listed on the slip. Each item must have:
-  - "description": Exact handwritten offense text (e.g. "Too many seat moves", "Tried to order Gin and Diet Coke", "The headband", "Back talk, insubordinate", "No call / no show to see the Red Wings", "Pulling a Deb Jarvis", "Giving the finger to the bartender / flipping off the bartender", "Flying chair").
-    * Note on cursive reading: Read cursive accurately (e.g. "Deb Jarvis", NOT "Deb Taco"; "giving the finger to the bartender", "lingering by the bartender", or "bickering with the bartender").
+  - "description": Exact handwritten offense text (e.g. "Too many seat moves", "Tried to order Gin and Diet Coke", "The headband", "Back talk, insubordinate", "No call / no show to see the Red Wings", "Pulling a Deb Jarvis", "Giving the finger to the bartender / flipping off the bartender", "Flying chair", "Sass-ing the Boss Lady").
+    * Note on cursive reading: Read cursive accurately (e.g. "Deb Jarvis", NOT "Deb Taco"; "Sass-ing the Boss Lady", NOT "Sass - Uns two"; "chicken wings", NOT "check-in").
   - "type": One of ["Attendance / No-Show", "Insubordination / Defiance", "Bar Etiquette / Seating", "Drink Crime / Order Foul", "Attire / Headgear Foul", "Sports / Fantasy Foul", "Party Foul / Conduct"]
   - "points": Integer points for this offense so the items sum to "demerit_count"
 
 - "rotation_needed": integer degrees clockwise (0, 90, 180, 270) needed to make the slip upright so handwriting reads from left-to-right, top-to-bottom. If already upright, 0; if sideways to the right, 270; if sideways to the left, 90; if upside-down, 180.
-- "crop_box": normalized bounding box of this paper slip as {"x_min": 0.05, "y_min": 0.05, "x_max": 0.95, "y_max": 0.95} with values 0.0 to 1.0 excluding bar counter background.
+- "crop_box": tight normalized bounding box (0.0 to 1.0) around THIS specific individual paper slip in the photo: {"x_min": ..., "y_min": ..., "x_max": ..., "y_max": ...}.
+  * CRITICAL FOR MULTI-SLIP PHOTOS: When there are 2, 3, or 4 slips in the photo, each slip MUST have its own distinct "crop_box" coordinates corresponding to where that specific slip sits in the image (e.g., Top-Left slip ~ {"x_min": 0.02, "y_min": 0.02, "x_max": 0.48, "y_max": 0.48}; Top-Right slip ~ {"x_min": 0.50, "y_min": 0.02, "x_max": 0.98, "y_max": 0.48}; Bottom-Left slip ~ {"x_min": 0.02, "y_min": 0.50, "x_max": 0.48, "y_max": 0.98}; Bottom-Right slip ~ {"x_min": 0.50, "y_min": 0.50, "x_max": 0.98, "y_max": 0.98}). Order slips top-to-bottom, left-to-right!
+  * Also read each slip's "Date(s):" line carefully (note that "11/1/26" is November 1, 2026 -> "2026-11-01", do NOT confuse the vertical slash "/" with a "4").
 
 Respond ONLY with valid JSON in this exact structure (no markdown fences, no extra commentary):
-{"is_demerit_slip": true, "rotation_needed": 0, "slips": [{"raw_student": "...", "incident_date": "YYYY-MM-DD", "incident_time": "HH:MM", "location_area": "...", "demerit_count": 1, "raw_signature": "...", "crop_box": {"x_min": 0.05, "y_min": 0.05, "x_max": 0.95, "y_max": 0.95}, "demerit_items": [{"type": "...", "description": "...", "points": 1}]}]}`;
+{"is_demerit_slip": true, "rotation_needed": 0, "slips": [{"raw_student": "...", "incident_date": "YYYY-MM-DD", "incident_time": "", "location_area": "...", "demerit_count": 1, "raw_signature": "...", "crop_box": {"x_min": 0.05, "y_min": 0.05, "x_max": 0.95, "y_max": 0.95}, "demerit_items": [{"type": "...", "description": "...", "points": 1}] }]}`;
 
   const dataUrl = imageBase64.startsWith('data:')
     ? imageBase64
@@ -522,7 +695,7 @@ Respond ONLY with valid JSON in this exact structure (no markdown fences, no ext
               'This photo does not appear to contain a physical Demerit Slip.',
           };
         }
-        const slips = sanitizeExtractedSlips(parsed?.slips || (Array.isArray(parsed) ? parsed : []), fallbackDate);
+        const slips = sanitizeExtractedSlips(parsed?.slips || (Array.isArray(parsed) ? parsed : []), fallbackDate, fallbackTime, latestTimesByDate);
         if (slips.length > 0) {
           return { ok: true, isDemeritSlip: true, model: 'gemini-2.5-flash', rotation_needed: Number(parsed?.rotation_needed) || 0, slips };
         }
@@ -612,7 +785,9 @@ Respond ONLY with valid JSON in this exact structure (no markdown fences, no ext
           }
           const slips = sanitizeExtractedSlips(
             parsed?.slips || (Array.isArray(parsed) ? parsed : []),
-            fallbackDate
+            fallbackDate,
+            fallbackTime,
+            latestTimesByDate
           );
           if (slips.length > 0) {
             return { ok: true, isDemeritSlip: true, model: modelName, rotation_needed: Number(parsed?.rotation_needed) || 0, slips };
@@ -647,7 +822,9 @@ Respond ONLY with valid JSON in this exact structure (no markdown fences, no ext
         }
         const slips = sanitizeExtractedSlips(
           parsed?.slips || (Array.isArray(parsed) ? parsed : []),
-          fallbackDate
+          fallbackDate,
+          fallbackTime,
+          latestTimesByDate
         );
         if (slips.length > 0) {
           return { ok: true, isDemeritSlip: true, model: '@cf/llava-hf/llava-1.5-7b-hf', slips };
@@ -678,9 +855,18 @@ function normalizePhone(raw) {
 
 /**
  * Formats a Member row for PUBLIC responses — strictly strips all PII (phone, email, PIN, verification codes)
+ * Only exposes boolean flags `has_phone` and `has_email` so the self-service PIN reset UI knows which verification prompt to show.
  */
 function formatPublicMember(row) {
   if (!row) return null;
+  const rawContact = String(row.claimed_by_contact || '').trim();
+  const hasPhone = Boolean(
+    normalizePhone(row.notification_phone).length === 10 ||
+      (!rawContact.includes('@') && normalizePhone(rawContact).length === 10)
+  );
+  const hasEmail = Boolean(
+    normalizeEmail(row.notification_email).includes('@') || rawContact.includes('@')
+  );
   return {
     id: row.id,
     display_name: row.display_name,
@@ -691,6 +877,8 @@ function formatPublicMember(row) {
     claimed_at: row.claimed_at || null,
     favorite_team: row.favorite_team || 'lions',
     tagline: row.tagline || null,
+    has_phone: hasPhone,
+    has_email: hasEmail,
     notification_opt_in: Boolean(row.notification_opt_in),
     notification_verified: Boolean(row.notification_verified),
     created_at: row.created_at,
@@ -1202,12 +1390,16 @@ async function ensureSchemaAndSeed(db) {
     .prepare(`UPDATE members SET is_admin = 1 WHERE id = '11111111-1111-4111-8111-111111111111'`)
     .run();
 
-  // Ensure baseline friendly nicknames exist for the 4 authentic members
+  // Ensure baseline friendly nicknames exist for authentic members (including Thomas Lopez / Beans / Tommy Tacos)
   const baselineNicknames = [
     { id: 'c0000000-0000-4000-8000-000000000011', alias: 'rick', member_id: '11111111-1111-4111-8111-111111111111' },
     { id: 'c0000000-0000-4000-8000-000000000012', alias: 'burtis', member_id: '22222222-2222-4222-8222-222222222222' },
     { id: 'c0000000-0000-4000-8000-000000000013', alias: 'david lee', member_id: 'bd28ef26-f7c7-4eaf-96c1-f621ba3a7feb' },
     { id: 'c0000000-0000-4000-8000-000000000014', alias: 'ziggie', member_id: 'bd28ef26-f7c7-4eaf-96c1-f621ba3a7feb' },
+    { id: 'alias-thomas-lopez', alias: 'thomas lopez', member_id: 'c01a25a2-15ba-4621-a0ae-d79aebf7b5ea' },
+    { id: 'alias-thomas', alias: 'thomas', member_id: 'c01a25a2-15ba-4621-a0ae-d79aebf7b5ea' },
+    { id: 'alias-tom-lopez', alias: 'tom lopez', member_id: 'c01a25a2-15ba-4621-a0ae-d79aebf7b5ea' },
+    { id: 'alias-beans', alias: 'beans', member_id: 'c01a25a2-15ba-4621-a0ae-d79aebf7b5ea' },
   ];
   for (const nick of baselineNicknames) {
     await db
@@ -1276,6 +1468,57 @@ function matchMemberFromAliases(rawText, members, aliases, roleFilter = null) {
 }
 
 /**
+ * Finds a member row from an identifier (Display Name, Alias/Nickname, Email, or 10-Digit Phone).
+ */
+function findMemberByFlexibleIdentifier(rawIdentifier, allMembers, allAliases, claimedOnly = false) {
+  const raw = String(rawIdentifier || '').trim();
+  if (!raw) return null;
+  const lower = raw.toLowerCase();
+  const targetEmail = raw.includes('@') ? normalizeEmail(raw) : '';
+  const targetPhone = !raw.includes('@') ? normalizePhone(raw) : '';
+
+  const candidates = claimedOnly
+    ? allMembers.filter((m) =>
+        Boolean(m.is_claimed || (m.claimed_pin && String(m.claimed_pin).trim() !== ''))
+      )
+    : allMembers;
+
+  // 1. Check Email or Phone match first
+  if (targetEmail || targetPhone.length >= 7) {
+    const byContact = candidates.find((m) => {
+      const rowEmail = normalizeEmail(m.notification_email);
+      const rowContactEmail = String(m.claimed_by_contact || '').includes('@')
+        ? normalizeEmail(m.claimed_by_contact)
+        : '';
+      const rowPhone = normalizePhone(m.notification_phone);
+      const rowContactPhone = !String(m.claimed_by_contact || '').includes('@')
+        ? normalizePhone(m.claimed_by_contact)
+        : '';
+
+      if (targetEmail) {
+        return rowEmail === targetEmail || rowContactEmail === targetEmail;
+      }
+      if (targetPhone.length >= 7) {
+        return (
+          (rowPhone && (rowPhone === targetPhone || rowPhone.endsWith(targetPhone))) ||
+          (rowContactPhone && (rowContactPhone === targetPhone || rowContactPhone.endsWith(targetPhone)))
+        );
+      }
+      return false;
+    });
+    if (byContact) return byContact;
+  }
+
+  // 2. Check exact Display Name or Alias match
+  const matchedId = matchMemberFromAliases(lower, candidates, allAliases, null);
+  if (matchedId) {
+    return candidates.find((m) => m.id === matchedId) || null;
+  }
+
+  return null;
+}
+
+/**
  * Automatically merges/reassigns slip stats (`patron_id` and `issuer_id`) whenever
  * nicknames or display names are added or updated.
  */
@@ -1328,7 +1571,7 @@ export default {
         return jsonResponse({
           ok: true,
           service: 'copper-demerits-api',
-          version: '1.6.26',
+          version: '1.6.30',
           backend: 'cloudflare-d1-r2-ai',
           database: 'copper-demerits-db',
           bucket: 'copper-demerits-slips',
@@ -1407,18 +1650,34 @@ export default {
       // 3B. Zero-Touch AI Vision Slip OCR & Extraction (`POST /api/extract-slip`)
       if (path === '/api/extract-slip' && request.method === 'POST') {
         const body = await request.json();
-        const [membersRes, aliasesRes] = await Promise.all([
+        const michNow = getMichiganDateTime();
+        const [membersRes, aliasesRes, latestTimesRes] = await Promise.all([
           env.DB.prepare('SELECT display_name FROM members').all(),
           env.DB.prepare('SELECT alias FROM staff_aliases').all(),
+          env.DB.prepare(
+            `SELECT incident_date, MAX(incident_time) as max_time
+             FROM demerits
+             WHERE status != 'rejected' AND incident_time IS NOT NULL AND incident_time != ''
+             GROUP BY incident_date`
+          ).all(),
         ]);
         const knownMembers = (membersRes.results || []).map((m) => m.display_name);
         const knownAliases = (aliasesRes.results || []).map((a) => a.alias);
+        const latestTimesByDate = {};
+        for (const row of latestTimesRes.results || []) {
+          if (row.incident_date && row.max_time) {
+            latestTimesByDate[String(row.incident_date)] = String(row.max_time).slice(0, 5);
+          }
+        }
 
         const extraction = await extractSlipsFromImageWithAI(env, {
           imageBase64: body.imageBase64 || null,
-          defaultDate: body.defaultDate || new Date().toISOString().slice(0, 10),
+          defaultDate: body.defaultDate || michNow.date,
+          defaultTime: body.defaultTime || michNow.time,
           knownMembers,
           knownAliases,
+          expectedSlipCount: Number(body.expectedSlipCount) || 0,
+          latestTimesByDate,
         });
 
         return jsonResponse(extraction, 200);
@@ -1430,7 +1689,7 @@ export default {
           env.DB.prepare('SELECT * FROM members ORDER BY display_name ASC').all(),
           env.DB.prepare('SELECT * FROM staff_aliases ORDER BY alias ASC').all(),
           env.DB.prepare(
-            'SELECT * FROM demerits ORDER BY incident_date DESC, incident_time DESC'
+            'SELECT * FROM demerits ORDER BY incident_date DESC, incident_time DESC, created_at DESC'
           ).all(),
         ]);
 
@@ -1442,7 +1701,7 @@ export default {
         });
       }
 
-      // 5. Claim an Unclaimed Profile, Create New Profile, or Sign In via Email/Phone + PIN (`POST /api/claim-profile` or `POST /api/login`)
+      // 5. Claim an Unclaimed Profile, Create New Profile, or Sign In via Name/Alias/Email/Phone + PIN (`POST /api/claim-profile` or `POST /api/login`)
       if ((path === '/api/claim-profile' || path === '/api/login') && request.method === 'POST') {
         const body = await request.json();
         const {
@@ -1470,68 +1729,59 @@ export default {
         const isLoginRequest =
           path === '/api/login' || action === 'login' || Boolean(loginIdentifier);
 
-        // --- A. RETURNING USER SIGN-IN (Email or 10-Digit Phone + 4-8 Digit PIN) ---
+        // --- A. RETURNING USER SIGN-IN (Name, Nickname/Alias, Email, or 10-Digit Phone + 4-8 Digit PIN) ---
         if (isLoginRequest) {
-          const rawId = String(loginIdentifier || email || phone || '').trim();
-          if (!rawId) {
+          const rawId = String(loginIdentifier || email || phone || displayName || '').trim();
+          if (!rawId && !memberId) {
             return jsonResponse(
               {
                 ok: false,
-                error: 'Enter your Email Address or 10-Digit Phone Number to sign in.',
+                error: 'Enter your Name, Bar Nickname, Phone Number, or Email Address to sign in.',
               },
               400
             );
           }
 
-          const targetEmail = rawId.includes('@') ? normalizeEmail(rawId) : '';
-          const targetPhone = !rawId.includes('@') ? normalizePhone(rawId) : '';
-
-          if (!targetEmail && targetPhone.length < 7) {
-            return jsonResponse(
-              {
-                ok: false,
-                error: 'Enter a valid Email Address or 10-Digit Phone Number to sign in.',
-              },
-              400
-            );
-          }
-
-          const allMembersRes = await env.DB.prepare('SELECT * FROM members').all();
+          const [allMembersRes, allAliasesRes] = await Promise.all([
+            env.DB.prepare('SELECT * FROM members').all(),
+            env.DB.prepare('SELECT * FROM staff_aliases').all(),
+          ]);
           const allMembers = allMembersRes.results || [];
+          const allAliases = allAliasesRes.results || [];
 
-          const matchedMember = allMembers.find((m) => {
-            const isClaimedRow = Boolean(
-              m.is_claimed || (m.claimed_pin && String(m.claimed_pin).trim() !== '')
-            );
-            if (!isClaimedRow) return false;
+          let matchedMember = null;
+          if (memberId) {
+            matchedMember = allMembers.find((m) => m.id === memberId) || null;
+          } else {
+            matchedMember = findMemberByFlexibleIdentifier(rawId, allMembers, allAliases, true);
+          }
 
-            const rowEmail = normalizeEmail(m.notification_email);
-            const rowContactEmail = String(m.claimed_by_contact || '').includes('@')
-              ? normalizeEmail(m.claimed_by_contact)
-              : '';
-            const rowPhone = normalizePhone(m.notification_phone);
-            const rowContactPhone = !String(m.claimed_by_contact || '').includes('@')
-              ? normalizePhone(m.claimed_by_contact)
-              : '';
-
-            if (targetEmail) {
-              return rowEmail === targetEmail || rowContactEmail === targetEmail;
-            }
-            if (targetPhone) {
-              return (
-                (rowPhone && rowPhone === targetPhone) ||
-                (rowContactPhone && rowContactPhone === targetPhone)
-              );
-            }
-            return false;
-          });
-
+          // Check if the user typed an UNCLAIMED member's name on the Sign In screen!
           if (!matchedMember) {
+            const unclaimedMatch = findMemberByFlexibleIdentifier(rawId, allMembers, allAliases, false);
+            if (unclaimedMatch) {
+              const isClaimedRow = Boolean(
+                unclaimedMatch.is_claimed ||
+                  (unclaimedMatch.claimed_pin && String(unclaimedMatch.claimed_pin).trim() !== '')
+              );
+              if (!isClaimedRow) {
+                return jsonResponse(
+                  {
+                    ok: false,
+                    needsClaim: true,
+                    unclaimedMember: formatPublicMember(unclaimedMatch),
+                    error: `"${unclaimedMatch.display_name}" hasn't been claimed yet! We switched you to "First Time? Claim Name" — just add your phone or email and pick your PIN to claim it now.`,
+                  },
+                  404
+                );
+              }
+            }
+
             return jsonResponse(
               {
                 ok: false,
                 error:
-                  'No claimed profile found for that email address or phone number. If you have not claimed your card yet, switch to the "Claim Unclaimed Name" tab!',
+                  'No claimed profile found for that Name, Nickname, Phone, or Email. If this is your first demerit, tap "First Time? Claim Name" above!',
               },
               404
             );
@@ -1543,7 +1793,7 @@ export default {
               {
                 ok: false,
                 error:
-                  'Too many incorrect PIN attempts. Security lockout active for 15 minutes.',
+                  'Too many incorrect PIN attempts. Tap "Forgot / Reset PIN?" below to reset your PIN with your phone/email, or ask a Referee in the Ref Booth.',
               },
               429
             );
@@ -1554,7 +1804,9 @@ export default {
             return jsonResponse(
               {
                 ok: false,
-                error: 'Incorrect 4–8 digit Bar PIN for that email address or phone number.',
+                matchedMemberName: matchedMember.display_name,
+                matchedMemberId: matchedMember.id,
+                error: `Incorrect 4–8 digit Bar PIN for ${matchedMember.display_name}. Forgot your PIN? Tap "Forgot / Reset PIN?" below!`,
               },
               403
             );
@@ -1578,7 +1830,7 @@ export default {
             {
               ok: false,
               error:
-                'Please enter either your Email Address or your 10-Digit Phone Number to claim your profile (you will use this with your PIN to sign in next time).',
+                'Please enter either your 10-Digit Phone Number or Email Address to claim your profile (so you can sign in or reset your PIN anytime).',
             },
             400
           );
@@ -1655,7 +1907,7 @@ export default {
           return jsonResponse(
             {
               ok: false,
-              error: `That email or phone number is already linked to a claimed profile (${duplicateContactOwner.display_name}). Switch to the "Sign In" tab to log in with your PIN!`,
+              error: `That phone number or email is already linked to "${duplicateContactOwner.display_name}". Switch to the "Sign In" tab (or "Reset PIN") to access your profile!`,
             },
             409
           );
@@ -1671,7 +1923,7 @@ export default {
               {
                 ok: false,
                 error:
-                  'This profile has already been claimed! Please use the "Sign In" tab with your email or phone number and 4–8 digit Bar PIN.',
+                  'This profile has already been claimed! Please use the "Sign In" tab (or "Reset PIN" if you forgot your PIN).',
               },
               409
             );
@@ -1761,6 +2013,238 @@ export default {
           ok: true,
           mode: 'created-and-claimed',
           member: formatPrivateMember(created),
+        });
+      }
+
+      // 5B. Self-Service PIN Reset (`POST /api/reset-pin`)
+      // Verifies a patron's registered 10-digit Phone Number or Email Address, unlocks their account, and updates their 4-8 digit PIN.
+      if (path === '/api/reset-pin' && request.method === 'POST') {
+        const body = await request.json();
+        const { memberId, identifier, contactVerify, newPin } = body;
+        const cleanPin = String(newPin || '').trim();
+        const rawVerify = String(contactVerify || '').trim();
+
+        if (cleanPin.length < 4 || cleanPin.length > 8) {
+          return jsonResponse(
+            { ok: false, error: 'Please choose a new 4 to 8 digit Bar PIN.' },
+            400
+          );
+        }
+
+        if (!rawVerify) {
+          return jsonResponse(
+            {
+              ok: false,
+              error: 'Please enter the 10-digit Phone Number or Email Address linked to your profile to verify ownership.',
+            },
+            400
+          );
+        }
+
+        const [allMembersRes, allAliasesRes] = await Promise.all([
+          env.DB.prepare('SELECT * FROM members').all(),
+          env.DB.prepare('SELECT * FROM staff_aliases').all(),
+        ]);
+        const allMembers = allMembersRes.results || [];
+        const allAliases = allAliasesRes.results || [];
+
+        let targetMember = null;
+        if (memberId) {
+          targetMember = allMembers.find((m) => m.id === memberId) || null;
+        }
+        if (!targetMember && identifier) {
+          targetMember = findMemberByFlexibleIdentifier(identifier, allMembers, allAliases, false);
+        }
+        if (!targetMember && rawVerify) {
+          targetMember = findMemberByFlexibleIdentifier(rawVerify, allMembers, allAliases, false);
+        }
+
+        if (!targetMember) {
+          return jsonResponse(
+            {
+              ok: false,
+              error: 'Could not find a matching profile. Select your name from the list or ask a Referee in the Ref Booth to reset your PIN!',
+            },
+            404
+          );
+        }
+
+        const verifyEmail = rawVerify.includes('@') ? normalizeEmail(rawVerify) : '';
+        const verifyPhone = !rawVerify.includes('@') ? normalizePhone(rawVerify) : '';
+
+        const rowEmail = normalizeEmail(targetMember.notification_email);
+        const rowContactEmail = String(targetMember.claimed_by_contact || '').includes('@')
+          ? normalizeEmail(targetMember.claimed_by_contact)
+          : '';
+        const rowPhone = normalizePhone(targetMember.notification_phone);
+        const rowContactPhone = !String(targetMember.claimed_by_contact || '').includes('@')
+          ? normalizePhone(targetMember.claimed_by_contact)
+          : '';
+
+        const hasStoredContact = Boolean(rowEmail || rowContactEmail || rowPhone || rowContactPhone);
+        let contactMatches = false;
+
+        if (verifyEmail && (verifyEmail === rowEmail || verifyEmail === rowContactEmail)) {
+          contactMatches = true;
+        }
+        if (
+          verifyPhone.length === 10 &&
+          (verifyPhone === rowPhone || verifyPhone === rowContactPhone)
+        ) {
+          contactMatches = true;
+        }
+        // Also allow matching last 4 digits of phone if they selected their exact memberId and entered 4 or 10 digits
+        if (
+          !contactMatches &&
+          memberId &&
+          verifyPhone.length >= 4 &&
+          ((rowPhone && rowPhone.endsWith(verifyPhone)) ||
+            (rowContactPhone && rowContactPhone.endsWith(verifyPhone)))
+        ) {
+          contactMatches = true;
+        }
+
+        // If the profile was never claimed or had no contact stored yet, allow claiming/setting contact + PIN
+        if (!hasStoredContact && (verifyEmail || verifyPhone.length === 10)) {
+          contactMatches = true;
+        }
+
+        if (!contactMatches) {
+          return jsonResponse(
+            {
+              ok: false,
+              error: `The phone number or email entered does not match the contact on file for ${targetMember.display_name}. You can also ask any Referee (Sarah, Burtis, or Rick) in the Ref Booth to reset your PIN in 1 tap!`,
+            },
+            403
+          );
+        }
+
+        const now = new Date().toISOString();
+        await env.DB.prepare(
+          `UPDATE members
+           SET claimed_pin = ?,
+               is_claimed = 1,
+               claimed_at = COALESCE(claimed_at, ?),
+               claimed_by_contact = COALESCE(claimed_by_contact, ?),
+               notification_email = COALESCE(notification_email, ?),
+               notification_phone = COALESCE(notification_phone, ?)
+           WHERE id = ?`
+        )
+          .bind(
+            cleanPin,
+            now,
+            verifyEmail || (verifyPhone.length === 10 ? verifyPhone : null),
+            verifyEmail || null,
+            verifyPhone.length === 10 ? verifyPhone : null,
+            targetMember.id
+          )
+          .run();
+
+        const ip = request.headers.get('cf-connecting-ip') || '0.0.0.0';
+        await clearPinFailures(env, ip, targetMember.id);
+        await env.DB.prepare('DELETE FROM pin_failures WHERE member_id = ?')
+          .bind(targetMember.id)
+          .run();
+
+        const updated = await env.DB.prepare('SELECT * FROM members WHERE id = ?')
+          .bind(targetMember.id)
+          .first();
+
+        return jsonResponse({
+          ok: true,
+          mode: 'pin-reset',
+          member: formatPrivateMember(updated),
+        });
+      }
+
+      // 5C. Referee / Admin PIN Reset & Account Unlock (`POST /api/admin/reset-pin`)
+      if (path === '/api/admin/reset-pin' && request.method === 'POST') {
+        const body = await request.json();
+        const {
+          actor_member_id,
+          actor_pin,
+          target_member_id,
+          new_pin,
+          phone,
+          email,
+        } = body;
+
+        const actorId = actor_member_id || request.headers.get('X-Member-Id');
+        const actorPin = String(actor_pin || request.headers.get('X-Member-Pin') || '').trim();
+
+        if (!actorId) {
+          return jsonResponse(
+            { ok: false, error: 'Referee or Admin authentication required.' },
+            401
+          );
+        }
+
+        const actor = await env.DB.prepare('SELECT * FROM members WHERE id = ?')
+          .bind(actorId)
+          .first();
+        if (!actor || (!actor.is_admin && !actor.is_staff)) {
+          return jsonResponse(
+            { ok: false, error: 'Only Referees or Site Admins can reset another member\'s Bar PIN.' },
+            403
+          );
+        }
+
+        if (actor.claimed_pin && actorPin && String(actor.claimed_pin).trim() !== actorPin) {
+          return jsonResponse({ ok: false, error: 'Incorrect Referee/Admin Bar PIN.' }, 403);
+        }
+
+        const cleanNewPin = String(new_pin || '').trim();
+        if (cleanNewPin.length < 4 || cleanNewPin.length > 8) {
+          return jsonResponse(
+            { ok: false, error: 'New PIN must be 4 to 8 characters.' },
+            400
+          );
+        }
+
+        const target = await env.DB.prepare('SELECT * FROM members WHERE id = ?')
+          .bind(target_member_id)
+          .first();
+        if (!target) {
+          return jsonResponse({ ok: false, error: 'Target member not found.' }, 404);
+        }
+
+        const cleanPhone = phone ? normalizePhone(phone) : null;
+        const cleanEmail = email ? normalizeEmail(email) : null;
+        const now = new Date().toISOString();
+
+        await env.DB.prepare(
+          `UPDATE members
+           SET claimed_pin = ?,
+               is_claimed = 1,
+               claimed_at = COALESCE(claimed_at, ?),
+               claimed_by_contact = COALESCE(?, claimed_by_contact),
+               notification_phone = COALESCE(?, notification_phone),
+               notification_email = COALESCE(?, notification_email)
+           WHERE id = ?`
+        )
+          .bind(
+            cleanNewPin,
+            now,
+            cleanPhone || cleanEmail || null,
+            cleanPhone || null,
+            cleanEmail || null,
+            target.id
+          )
+          .run();
+
+        // Clear all brute-force lockout records for this member and across pin_failures
+        await env.DB.prepare('DELETE FROM pin_failures WHERE member_id = ? OR member_id IS NULL')
+          .bind(target.id)
+          .run();
+
+        const updated = await env.DB.prepare('SELECT * FROM members WHERE id = ?')
+          .bind(target.id)
+          .first();
+
+        return jsonResponse({
+          ok: true,
+          member: formatPublicMember(updated),
+          message: `Bar PIN for ${updated.display_name} has been reset to "${cleanNewPin}" and any login lockout has been cleared!`,
         });
       }
 
@@ -2350,121 +2834,89 @@ export default {
           : null;
 
         // -------------------------------------------------------------
-        // Server-Side 3-Layer Duplicate Prevention Check
+        // Server-Side Duplicate Prevention Check (Exact File SHA-256 + Same Patron/Infraction Match)
+        // NOTE: Never block on 9x8 perceptual dHash because every Cherry Printers "DEMERIT SLIP" form
+        // has the same printed template layout (~86% visual dHash similarity).
         // -------------------------------------------------------------
+        const bypassDupCheck = Boolean(body.bypass_duplicate_check);
         const normSha = (body.image_sha256 || '').toLowerCase().trim();
-        const normDhash = (body.image_dhash || '').trim();
-        const incidentDate = body.incident_date ? String(body.incident_date).trim() : '';
-        const incidentTime = body.incident_time ? String(body.incident_time).slice(0, 5) : '';
-
-        // Layer 1: Exact image SHA-256 match
-        if (normSha) {
-          const shaMatch = await env.DB.prepare(
-            'SELECT id, raw_student, incident_date, incident_time FROM demerits WHERE LOWER(image_sha256) = ? AND status != ?'
+        const michNow = getMichiganDateTime();
+        const incidentDate = normalizeExtractedDate(body.incident_date, michNow.date);
+        let incidentTime = body.incident_time ? parseExplicitExtractedTime(body.incident_time) : null;
+        if (!incidentTime) {
+          const maxTimeRow = await env.DB.prepare(
+            `SELECT MAX(incident_time) as max_time FROM demerits WHERE status != 'rejected' AND incident_date = ? AND incident_time IS NOT NULL AND incident_time != ''`
           )
-            .bind(normSha, 'rejected')
+            .bind(incidentDate)
             .first();
-
-          if (shaMatch) {
-            return jsonResponse(
-              {
-                ok: false,
-                isDuplicate: true,
-                error: `Duplicate slip image rejected: This exact image is already logged for ${shaMatch.raw_student} on ${shaMatch.incident_date}.`,
-                matchedSlipId: shaMatch.id,
-              },
-              409
-            );
+          const maxOnDate = maxTimeRow?.max_time ? String(maxTimeRow.max_time).slice(0, 5) : null;
+          if (maxOnDate && maxOnDate >= michNow.time) {
+            incidentTime = addMinutesToHHMM(maxOnDate, 1);
+          } else {
+            incidentTime = michNow.time;
           }
         }
 
-        // Layer 2: Perceptual dHash visual similarity match (Hamming distance <= 10, >= 84.4%)
-        if (normDhash && normDhash.length === 16) {
-          const recentDhashes = await env.DB.prepare(
-            'SELECT id, raw_student, incident_date, incident_time, image_dhash FROM demerits WHERE image_dhash IS NOT NULL AND status != ?'
-          )
-            .bind('rejected')
-            .all();
-          for (const row of recentDhashes.results || []) {
-            if (row.image_dhash && row.image_dhash.length === 16) {
-              const dist = calculateHammingDistanceServer(normDhash, row.image_dhash);
-              if (dist <= 10) {
-                const sim = Math.round(((64 - dist) / 64) * 100);
-                return jsonResponse(
-                  {
-                    ok: false,
-                    isDuplicate: true,
-                    error: `Duplicate slip visual match (${sim}% visual similarity with existing ${row.raw_student} citation on ${row.incident_date}).`,
-                    matchedSlipId: row.id,
-                  },
-                  409
-                );
-              }
-            }
-          }
-        }
-
-        // Layer 3: Citation Content Match (Same patron on same date with matching time or matching infraction)
-        if (incidentDate && (resolvedPatronId || sanitizedStudent)) {
-          const candidateSlipsRes = await env.DB.prepare(
-            `SELECT id, patron_id, raw_student, incident_date, incident_time, infractions, demerit_count
-             FROM demerits
-             WHERE status != 'rejected'
-               AND (incident_date = ? OR incident_date = date(?, '+1 day') OR incident_date = date(?, '-1 day'))
-               AND (patron_id = ? OR LOWER(raw_student) = LOWER(?))`
-          )
-            .bind(
-              incidentDate,
-              incidentDate,
-              incidentDate,
-              resolvedPatronId || '',
-              sanitizedStudent.trim()
+        if (!bypassDupCheck) {
+          // Layer 1: Exact image SHA-256 binary file match
+          if (normSha) {
+            const shaMatch = await env.DB.prepare(
+              'SELECT id, raw_student, incident_date, incident_time FROM demerits WHERE LOWER(image_sha256) = ? AND status != ?'
             )
-            .all();
+              .bind(normSha, 'rejected')
+              .first();
 
-          const candidateSlips = candidateSlipsRes.results || [];
-          for (const cand of candidateSlips) {
-            const candTime = cand.incident_time ? String(cand.incident_time).slice(0, 5) : '';
-            // Time match on same date (within 30 mins)
-            if (cand.incident_date === incidentDate && incidentTime && candTime) {
-              const [h1, m1] = incidentTime.split(':').map(Number);
-              const [h2, m2] = candTime.split(':').map(Number);
-              if (!Number.isNaN(h1) && !Number.isNaN(m1) && !Number.isNaN(h2) && !Number.isNaN(m2)) {
-                const diffMin = Math.abs(h1 * 60 + m1 - (h2 * 60 + m2));
-                if (diffMin <= 30) {
-                  return jsonResponse(
-                    {
-                      ok: false,
-                      isDuplicate: true,
-                      error: `Duplicate citation rejected: A slip for ${cand.raw_student} on ${cand.incident_date} at ${candTime} is already logged.`,
-                      matchedSlipId: cand.id,
-                    },
-                    409
-                  );
-                }
+            if (shaMatch) {
+              return jsonResponse(
+                {
+                  ok: false,
+                  isDuplicate: true,
+                  error: `Duplicate slip image rejected: This exact photo file is already logged for ${shaMatch.raw_student} on ${shaMatch.incident_date}.`,
+                  matchedSlipId: shaMatch.id,
+                },
+                409
+              );
+            }
+          }
+
+          // Layer 2: Citation Content Match (Same patron on same date with high infraction similarity >= 75%)
+          if (incidentDate && (resolvedPatronId || sanitizedStudent)) {
+            const candidateSlipsRes = await env.DB.prepare(
+              `SELECT id, patron_id, raw_student, incident_date, incident_time, infractions, demerit_count
+               FROM demerits
+               WHERE status != 'rejected'
+                 AND incident_date = ?
+                 AND (patron_id = ? OR LOWER(raw_student) = LOWER(?))`
+            )
+              .bind(
+                incidentDate,
+                resolvedPatronId || '',
+                sanitizedStudent.trim()
+              )
+              .all();
+
+            const candidateSlips = candidateSlipsRes.results || [];
+            for (const cand of candidateSlips) {
+              let candInfractions = [];
+              try {
+                candInfractions = JSON.parse(cand.infractions || '[]');
+              } catch {
+                candInfractions = [];
               }
-            }
-
-            // Infraction similarity match (>= 60%)
-            let candInfractions = [];
-            try {
-              candInfractions = JSON.parse(cand.infractions || '[]');
-            } catch {
-              candInfractions = [];
-            }
-            if (Array.isArray(candInfractions) && candInfractions.length > 0 && sanitizedInfractions.length > 0) {
-              for (const cInf of candInfractions) {
-                for (const sInf of sanitizedInfractions) {
-                  if (infractionSimilarityServer(String(cInf), String(sInf)) >= 0.60) {
-                    return jsonResponse(
-                      {
-                        ok: false,
-                        isDuplicate: true,
-                        error: `Duplicate citation rejected: Patron ${cand.raw_student} already has a citation for "${cInf}" on ${cand.incident_date}.`,
-                        matchedSlipId: cand.id,
-                      },
-                      409
-                    );
+              if (Array.isArray(candInfractions) && candInfractions.length > 0 && sanitizedInfractions.length > 0) {
+                for (const cInf of candInfractions) {
+                  for (const sInf of sanitizedInfractions) {
+                    if (infractionSimilarityServer(String(cInf), String(sInf)) >= 0.75) {
+                      return jsonResponse(
+                        {
+                          ok: false,
+                          isDuplicate: true,
+                          error: `Duplicate citation rejected: Patron ${cand.raw_student} already has a citation for "${cInf}" on ${cand.incident_date}.`,
+                          matchedSlipId: cand.id,
+                        },
+                        409
+                      );
+                    }
                   }
                 }
               }
@@ -2491,8 +2943,8 @@ export default {
             resolvedIssuerId,
             sanitizedSignature,
             Number(body.demerit_count) || 1,
-            body.incident_date,
-            body.incident_time ? String(body.incident_time).slice(0, 5) : null,
+            incidentDate,
+            incidentTime,
             body.location_area || 'Copper Athletic Club',
             JSON.stringify(sanitizedInfractions),
             JSON.stringify(sanitizedItems),
@@ -3046,9 +3498,6 @@ export default {
       }
 
       // 14. Merge Profiles Under Different Names (`POST /api/profiles/merge`)
-      // Allows:
-      // A) Site Admin/Staff to merge ANY two profiles in Ref Booth
-      // B) A claimed member to merge another profile (or unclaimed profile) into their own account with PIN validation
       if (path === '/api/profiles/merge' && request.method === 'POST') {
         const body = await request.json();
         const sourceMemberId = body.source_member_id;
@@ -3220,8 +3669,7 @@ export default {
         });
       }
 
-      // 14. Add or Delete Member Nickname / Staff Alias (`/api/aliases`)
-      // Restricted to: Site Admins/Staff OR the signed-in Claimed Profile owner adjusting their OWN nicknames!
+      // 15. Add or Delete Member Nickname / Staff Alias (`/api/aliases`)
       if (path === '/api/aliases' && request.method === 'POST') {
         const body = await request.json();
         const alias = (body.alias || '').trim().toLowerCase();
@@ -3362,4 +3810,3 @@ export default {
     ctx.waitUntil(dispatchFridayDocket(env));
   },
 };
-
