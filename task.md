@@ -1,6 +1,14 @@
 # Task Tracker — Copper Demerits (`copperdemerits.com`)
 
-## Active Sprint — v1.6.32 (Relaxed, Readable Top Scoreboard Ticker Speed & Larger Typography)
+## Active Sprint — v1.6.33 (Dynamic Sports Rank Calculation & True Co-Leader Tie Detection)
+- [x] Audit `src/pages/LeaderboardPage.tsx` and identify hardcoded `rankIcon: '🚨 CO-#1 LEADER'` on Burtis
+- [x] Implement dynamic `getPatronRankInfo` with sports tie detection (`firstIndex + 1` with `tieCount > 1`)
+- [x] Update `getPlayerCardTheme` to award `👑 #1 LEADER` (or `👑 CO-#1 LEADER` if tied), podium tiers (`🥈 T-#2`, `🥉 T-#3`), and `#N / T-#N IN THE BOX`
+- [x] Remove hardcoded `Site Administrator & Ring of Honor Co-Leader` in `src/components/ClaimProfileModal.tsx`
+- [x] Bind Sarah's Referee stats box dynamically to `periodSlips.length` and `totalPeriodPoints`
+- [x] Pass `npm run lint` and `npm run build`, and deploy to Netlify production
+
+### v1.6.32 (Relaxed, Readable Top Scoreboard Ticker Speed & Larger Typography)
 - [x] Replace fixed `34s` `.animate-ticker` duration in `src/index.css` with dynamic `var(--ticker-duration, 120s)` and `:active` touch-pause support
 - [x] Cap ticker slip highlights to the 12 most recent slips (`approvedSlips.slice(0, 12)`) and compute `tickerDurationSeconds = Math.max(115, tickerItems.length * 9)` in `src/components/Navbar.tsx`
 - [x] Enlarge ticker banner height (`py-2 sm:py-2.5`) and typography (`text-sm sm:text-[15px] font-extrabold text-[#F5F2EB]`) in `src/components/Navbar.tsx`

@@ -33,9 +33,21 @@ interface ChangelogEntry {
 
 const USER_CHANGELOG: ChangelogEntry[] = [
   {
+    version: 'v1.6.33',
+    date: 'November 2, 2026',
+    badge: 'LATEST RELEASE',
+    title: 'Dynamic Sports Rank Calculation & True Co-Leader Tie Detection',
+    summary:
+      'Replaced historical hardcoded leaderboard theme badges with dynamic, live-calculated standings, sports podium tiers, and mathematically accurate tie detection across all patron cards.',
+    highlights: [
+      'Accurate Dynamic Ranks: Standings now dynamically evaluate true sports ranking (1-indexed with tie grouping). Ballz rightfully wears the solo 👑 #1 LEADER crown with championship gold, while Burtis correctly displays his true standing (#4 IN THE BOX) rather than a stale historical Co-Leader badge.',
+      'Sports Tie & Podium Tiers: Authentic sports podium badges (👑 CO-#1 LEADER if tied, 🥈 T-#2 / #2 PODIUM, 🥉 T-#3 / #3 PODIUM, and #N / T-#N IN THE BOX for subsequent ranks).',
+      'Dynamic Referee House Stats: Sarah’s Head Referee spotlight now dynamically reflects total verified slips and points handed out.',
+    ],
+  },
+  {
     version: 'v1.6.32',
     date: 'November 1, 2026',
-    badge: 'LATEST RELEASE',
     title: 'Relaxed, Readable Top Scoreboard Ticker Speed & Larger Typography',
     summary:
       'Slowed down the top scrolling ESPN-style scoreboard ticker so it never speeds up as more slips are scanned, and enlarged the banner height and font size for effortless reading across the bar.',

@@ -776,7 +776,7 @@ export const ClaimProfileModal: React.FC = () => {
                 </div>
                 <p className="font-mono-docket text-[11px] text-emerald-200/80">
                   {currentMember.is_admin
-                    ? 'Site Administrator & Ring of Honor Co-Leader'
+                    ? 'Site Administrator & Ref Official'
                     : currentMember.is_staff && currentMember.is_patron
                     ? 'Staff & Patron Hybrid'
                     : currentMember.is_staff

@@ -2,6 +2,19 @@
 
 Chronological log of architectural decisions, database migrations, and infrastructure deployments.
 
+## 2026-11-02 — v1.6.33 Dynamic Sports Rank Calculation & True Co-Leader Tie Detection
+- **Leaderboard Rank & Badge Decoupling (`src/pages/LeaderboardPage.tsx`)**:
+  - Investigated user report: *"Burtis still shows as Co #1 Leader badge on the page, but he is not longer co-leader"*.
+  - Identified that `getPlayerTheme` had static string matching for `'rick'` and `'burtis'` returning `👑 CO-#1 LEADER` and `🚨 CO-#1 LEADER` from the project's initial October seed data.
+  - Replaced static theme helper with `getPatronRankInfo` and `getPlayerCardTheme`, calculating dynamic rank numbers and tie conditions across `activeRankings`.
+  - Tied 1st place ranks correctly show `👑 CO-#1 LEADER`, while sole leaders show `👑 #1 LEADER`. Burtis correctly reflects rank `#4 IN THE BOX` based on his 4 points in Cloudflare D1 (`copper-demerits-db`).
+- **Profile & Admin Role Text Sanitization (`src/components/ClaimProfileModal.tsx`)**:
+  - Replaced hardcoded `Site Administrator & Ring of Honor Co-Leader` with `Site Administrator & Ref Official`.
+- **Ref Spotlight Dynamic Aggregations (`src/pages/LeaderboardPage.tsx`)**:
+  - Bound Sarah's spotlight stats box to live `periodSlips.length` and `totalPeriodPoints`.
+
+---
+
 ## 2026-11-01 — v1.6.32 Relaxed, Readable Top Scoreboard Ticker Speed & Larger Typography
 - **Top Scrolling Banner Speed & Readability Fix (`src/index.css`, `src/components/Navbar.tsx`)**:
   - Root cause: `.animate-ticker` had a hardcoded `34s` animation duration while `tickerItems` iterated over all `approvedSlips` (`27+` items), forcing ~6,000px of text across the viewport in 34 seconds.

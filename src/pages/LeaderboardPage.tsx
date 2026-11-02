@@ -71,45 +71,133 @@ export const LeaderboardPage: React.FC = () => {
     { key: 'custom', label: 'Custom Dates' },
   ];
 
-  const getPlayerTheme = (name: string, index: number) => {
-    const lower = name.toLowerCase();
-    if (lower.includes('rick')) {
+  // Dynamic sports rank calculation with tie detection
+  const getPatronRankInfo = (patron: (typeof patronStandings)[0], allStandings: typeof patronStandings) => {
+    // If no points, they are on a clean sheet
+    if (patron.totalDemerits <= 0) {
       return {
-        teamTag: 'LIONS / WOLVERINES / TIGERS TRIFECTA',
-        nickname: '"THE SEAT-HOPPING HEADBAND"',
-        cardBg: 'from-[#00274C]/65 via-[#1B1613] to-[#121212]',
-        border: 'border-[#FFCB05]/60 shadow-[0_0_30px_rgba(255,203,5,0.2)]',
-        badgeBg: 'bg-[#FFCB05] text-[#00274C]',
-        rankIcon: '👑 CO-#1 LEADER',
+        rankNumber: allStandings.length,
+        isTied: false,
+        rankIcon: '🟢 CLEAN SHEET',
+        badgeBg: 'bg-emerald-600 text-white',
+        border: 'border-emerald-500/40',
+        cardBg: 'from-emerald-950/30 via-[#1B1613] to-[#121212]',
       };
     }
-    if (lower.includes('burtis')) {
+
+    // Find the first index with identical points to establish the true sports rank (1-indexed)
+    const firstIndex = allStandings.findIndex((p) => p.totalDemerits === patron.totalDemerits);
+    const rankNumber = firstIndex !== -1 ? firstIndex + 1 : 1;
+    const tieCount = allStandings.filter((p) => p.totalDemerits === patron.totalDemerits).length;
+    const isTied = tieCount > 1;
+
+    // Leader (#1)
+    if (rankNumber === 1) {
       return {
-        teamTag: 'RED WINGS BOX + BAD BOYS DOUBLE TECH',
-        nickname: '"NO-SHOW & UNBOTHERED"',
-        cardBg: 'from-[#CE1126]/55 via-[#1B1613] to-[#121212]',
-        border: 'border-[#CE1126]/65 shadow-[0_0_30px_rgba(206,17,38,0.25)]',
-        badgeBg: 'bg-[#CE1126] text-white',
-        rankIcon: '🚨 CO-#1 LEADER',
+        rankNumber: 1,
+        isTied,
+        rankIcon: isTied ? '👑 CO-#1 LEADER' : '👑 #1 LEADER',
+        badgeBg: 'bg-gradient-to-r from-[#FFCB05] to-[#DFC15E] text-[#121212] font-black shadow-[0_0_15px_rgba(255,203,5,0.4)]',
+        border: 'border-[#DFC15E] shadow-[0_0_35px_rgba(223,193,94,0.35)]',
+        cardBg: 'from-[#DFC15E]/30 via-[#261D12] to-[#121212]',
       };
     }
-    if (lower.includes('david')) {
+
+    // 2nd Place (Silver Podium)
+    if (rankNumber === 2) {
       return {
-        teamTag: 'DETROIT BAD BOYS TECHNICAL FOUL',
-        nickname: '"1 DEMERIT — SO FAR"',
-        cardBg: 'from-[#1D42BA]/55 via-[#1B1613] to-[#121212]',
-        border: 'border-[#3B82F6]/60 shadow-[0_0_25px_rgba(29,66,186,0.25)]',
-        badgeBg: 'bg-[#1D42BA] text-white',
-        rankIcon: `#${index + 1} IN THE BOX`,
+        rankNumber: 2,
+        isTied,
+        rankIcon: isTied ? '🥈 T-#2 PODIUM' : '🥈 #2 PODIUM',
+        badgeBg: 'bg-slate-200 text-slate-900 font-black shadow-[0_0_12px_rgba(226,232,240,0.3)]',
+        border: 'border-slate-300/70 shadow-[0_0_25px_rgba(203,213,225,0.25)]',
+        cardBg: 'from-slate-700/35 via-[#1E1B19] to-[#121212]',
       };
     }
+
+    // 3rd Place (Bronze / Copper Podium)
+    if (rankNumber === 3) {
+      return {
+        rankNumber: 3,
+        isTied,
+        rankIcon: isTied ? '🥉 T-#3 PODIUM' : '🥉 #3 PODIUM',
+        badgeBg: 'bg-[#B87333] text-[#121212] font-black shadow-[0_0_12px_rgba(184,115,51,0.3)]',
+        border: 'border-[#B87333]/80 shadow-[0_0_25px_rgba(184,115,51,0.25)]',
+        cardBg: 'from-[#B87333]/30 via-[#241A13] to-[#121212]',
+      };
+    }
+
+    // 4th and beyond: In the penalty box
     return {
-      teamTag: 'MARSHALL SPORTS LOUNGE ROSTER',
-      nickname: '"CLEAN SHEET"',
-      cardBg: 'from-[#18453B]/45 via-[#1B1613] to-[#121212]',
-      border: 'border-[#B87333]/35',
-      badgeBg: 'bg-[#B87333] text-[#121212]',
-      rankIcon: `#${index + 1}`,
+      rankNumber,
+      isTied,
+      rankIcon: isTied ? `T-#${rankNumber} IN THE BOX` : `#${rankNumber} IN THE BOX`,
+      badgeBg: 'bg-white/10 text-[#D6C7B8] border border-white/20',
+      border: 'border-white/15 hover:border-[#B87333]/50',
+      cardBg: 'from-white/5 via-[#1A1715] to-[#121212]',
+    };
+  };
+
+  const getPlayerCardTheme = (
+    patron: (typeof patronStandings)[0],
+    allStandings: typeof patronStandings,
+    memberRecord?: Member
+  ) => {
+    const rankInfo = getPatronRankInfo(patron, allStandings);
+
+    // Determine Michigan team tag based on member profile favorite_team or roster nickname
+    const team = memberRecord?.favorite_team;
+    let teamTag = 'MARSHALL SPORTS LOUNGE ROSTER';
+    if (team === 'red-wings') teamTag = 'RED WINGS HOCKEYTOWN PENALTY BOX';
+    else if (team === 'pistons-bad-boys') teamTag = 'DETROIT BAD BOYS TECHNICAL FOUL';
+    else if (team === 'lions') teamTag = 'HONOLULU BLUE LIONS COUNTRY';
+    else if (team === 'michigan') teamTag = 'WOLVERINES MAIZE & BLUE';
+    else if (team === 'msu') teamTag = 'SPARTAN GREEN & WHITE';
+    else {
+      const lower = patron.displayName.toLowerCase();
+      if (lower.includes('burtis')) teamTag = 'RED WINGS HOCKEYTOWN PENALTY BOX';
+      else if (lower.includes('rick') || lower.includes('ballz')) teamTag = 'HONOLULU BLUE LIONS COUNTRY';
+      else if (lower.includes('david') || lower.includes('beans') || lower.includes('jai')) teamTag = 'DETROIT BAD BOYS TECHNICAL FOUL';
+      else if (lower.includes('natalie') || lower.includes('hannah')) teamTag = 'SPARTAN GREEN & WHITE';
+      else if (lower.includes('victoria')) teamTag = 'WOLVERINES MAIZE & BLUE';
+    }
+
+    // Fallback nickname if member has no custom tagline
+    const lower = patron.displayName.toLowerCase();
+    let fallbackNickname = '"COPPER AC REGULAR"';
+    if (lower.includes('ballz')) fallbackNickname = '"GIN & DIET COKE PROHIBITION"';
+    else if (lower.includes('burtis')) fallbackNickname = '"NO-SHOW & UNBOTHERED"';
+    else if (lower.includes('rick')) fallbackNickname = '"THE SEAT-HOPPING HEADBAND"';
+    else if (lower.includes('david')) fallbackNickname = '"1 DEMERIT — SO FAR"';
+    else if (lower.includes('ziggie')) fallbackNickname = '"CHICKEN WING ETTE"';
+    else if (lower.includes('blow dry')) fallbackNickname = '"THE STYLIST FOUL"';
+    else if (lower.includes('beans')) fallbackNickname = '"I AM BEANS"';
+
+    // Outside top 3 podium, allow subtle team color tinting on card background
+    let cardBg = rankInfo.cardBg;
+    if (rankInfo.rankNumber > 3) {
+      if (team === 'red-wings' || lower.includes('burtis')) {
+        cardBg = 'from-[#CE1126]/20 via-[#1B1613] to-[#121212]';
+      } else if (team === 'pistons-bad-boys' || lower.includes('david')) {
+        cardBg = 'from-[#1D42BA]/20 via-[#1B1613] to-[#121212]';
+      } else if (team === 'lions') {
+        cardBg = 'from-[#0076B6]/20 via-[#1B1613] to-[#121212]';
+      } else if (team === 'michigan') {
+        cardBg = 'from-[#00274C]/25 via-[#1B1613] to-[#121212]';
+      } else if (team === 'msu') {
+        cardBg = 'from-[#18453B]/20 via-[#1B1613] to-[#121212]';
+      }
+    }
+
+    return {
+      teamTag,
+      nickname: fallbackNickname,
+      cardBg,
+      border: rankInfo.border,
+      badgeBg: rankInfo.badgeBg,
+      rankIcon: rankInfo.rankIcon,
+      rankNumber: rankInfo.rankNumber,
+      isTied: rankInfo.isTied,
     };
   };
 
@@ -325,8 +413,9 @@ export const LeaderboardPage: React.FC = () => {
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-            {activeRankings.map((patron, idx) => {
-              const theme = getPlayerTheme(patron.displayName, idx);
+            {activeRankings.map((patron) => {
+              const memberRecord = members.find((m) => m.id === patron.memberId);
+              const theme = getPlayerCardTheme(patron, activeRankings, memberRecord);
               const allItems = patron.slips.flatMap((s) =>
                 normalizeSlipDemeritItems(s).map((item) => ({
                   ...item,
@@ -350,7 +439,6 @@ export const LeaderboardPage: React.FC = () => {
                             {theme.rankIcon}
                           </span>
                           {(() => {
-                            const memberRecord = members.find((m) => m.id === patron.memberId);
                             const isMe = currentMember?.id === patron.memberId;
                             return (
                               <button
@@ -533,16 +621,16 @@ export const LeaderboardPage: React.FC = () => {
               <div className="flex items-center gap-3 rounded-2xl border border-[#DFC15E]/40 bg-black/50 px-4 py-2">
                 <div className="text-center">
                   <span className="block font-display-tall text-3xl font-black text-[#DFC15E] leading-none">
-                    4 / 4
+                    {periodSlips.length}
                   </span>
                   <span className="text-[9px] font-mono-docket uppercase text-[#A3968A]">
-                    SLIPS ISSUED
+                    SLIPS SUSTAINED
                   </span>
                 </div>
                 <div className="h-8 w-px bg-white/15" />
                 <div className="text-center">
                   <span className="block font-display-tall text-3xl font-black text-[#E8B888] leading-none">
-                    7 PTS
+                    {totalPeriodPoints} PTS
                   </span>
                   <span className="text-[9px] font-mono-docket uppercase text-[#A3968A]">
                     HANDED OUT

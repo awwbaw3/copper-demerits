@@ -2,6 +2,19 @@
 
 All notable changes to the **Copper Athletic Club — Ring of Honor** web application are documented in this file.
 
+## [1.6.33] - 2026-11-02
+
+### Fixed & Enhanced — Dynamic Sports Rank Calculation & True Co-Leader Tie Detection
+- **Dynamic Leaderboard Rank & Badge Calculation (`src/pages/LeaderboardPage.tsx`)**:
+  - Root Cause: Historical mock theme generator `getPlayerTheme` had hardcoded `rankIcon: '🚨 CO-#1 LEADER'` whenever a name matched `'burtis'` and `rankIcon: '👑 CO-#1 LEADER'` for `'rick'`, dating back to the initial seed data when both patrons were tied at 4 points.
+  - Implemented `getPatronRankInfo` and `getPlayerCardTheme` that dynamically evaluate each patron's true rank against `activeRankings` with true sports tie handling (`firstIndex + 1` with `tieCount > 1`).
+  - Patrons with 1st place points are crowned `👑 #1 LEADER` (or `👑 CO-#1 LEADER` if tied), 2nd place receives `🥈 #2 / T-#2 PODIUM`, 3rd place receives `🥉 #3 / T-#3 PODIUM`, and subsequent ranks receive `#N / T-#N IN THE BOX`.
+  - Burtis (currently #4 with 4 pts) accurately displays `#4 IN THE BOX`, while Ballz (currently #1 with 10 pts) wears the championship gold `👑 #1 LEADER` crown.
+- **Admin Role Label Sanitization (`src/components/ClaimProfileModal.tsx`)**:
+  - Replaced hardcoded `'Site Administrator & Ring of Honor Co-Leader'` text with `'Site Administrator & Ref Official'` so admin locker passes never display an unearned or outdated co-leader title.
+- **Dynamic Referee Spotlight Stats (`src/pages/LeaderboardPage.tsx`)**:
+  - Updated Sarah's Head Referee stats box to dynamically reflect active `periodSlips.length` and `totalPeriodPoints` instead of static seed numbers.
+
 ## [1.6.32] - 2026-11-01
 
 ### Fixed & Enhanced — Relaxed, Readable Top Scoreboard Ticker Speed & Larger Typography
