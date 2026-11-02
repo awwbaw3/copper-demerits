@@ -269,7 +269,7 @@ export const Navbar: React.FC = () => {
 
   return (
     <>
-      <header className="sticky top-0 z-40 border-b border-[#B87333]/35 bg-[#0F0D0C]/95 backdrop-blur-md pt-[env(safe-area-inset-top,0px)] pr-[env(safe-area-inset-right,0px)] pl-[env(safe-area-inset-left,0px)] w-full max-w-full overflow-x-clip">
+      <header className="sticky top-0 z-40 border-b border-[#B87333]/35 bg-[#0F0D0C]/95 backdrop-blur-md pt-[env(safe-area-inset-top,0px)] pr-[env(safe-area-inset-right,0px)] pl-[env(safe-area-inset-left,0px)] w-full max-w-full overflow-x-clip print:hidden">
         {/* Animated ESPN / Fox Sports Detroit Style Ticker — Relaxed speed & larger, high-contrast typography */}
         <div className="w-full max-w-full overflow-hidden border-b border-[#B87333]/35 bg-gradient-to-r from-[#1A120E] via-[#2A1B12] to-[#1A120E] py-2 sm:py-2.5 contain-paint">
           <div
@@ -451,7 +451,7 @@ export const Navbar: React.FC = () => {
         aria-label="Mobile Navigation"
         className={`fixed bottom-0 inset-x-0 z-40 grid ${
           mobileNavItems.length === 5 ? 'grid-cols-5' : 'grid-cols-4'
-        } border-t border-[#B87333]/40 bg-[#120F0D]/95 backdrop-blur-xl pt-1 pb-[max(env(safe-area-inset-bottom,0px),8px)] pr-[env(safe-area-inset-right,0px)] pl-[env(safe-area-inset-left,0px)] md:hidden shadow-[0_-10px_30px_rgba(0,0,0,0.85)] w-full max-w-full overflow-x-hidden`}
+        } border-t border-[#B87333]/40 bg-[#120F0D]/95 backdrop-blur-xl pt-1 pb-[max(env(safe-area-inset-bottom,0px),8px)] pr-[env(safe-area-inset-right,0px)] pl-[env(safe-area-inset-left,0px)] md:hidden shadow-[0_-10px_30px_rgba(0,0,0,0.85)] w-full max-w-full overflow-x-hidden print:hidden`}
       >
         {mobileNavItems.map(({ to, label, icon: Icon, badge }) => (
           <NavLink

@@ -13,9 +13,9 @@ export const App: React.FC = () => {
   return (
     <DemeritsProvider>
       <BrowserRouter>
-        <div className="min-h-screen flex flex-col bg-[#121212] text-[#F5F2EB] pb-20 md:pb-0 w-full max-w-full overflow-x-hidden">
+        <div className="min-h-screen flex flex-col bg-[#121212] text-[#F5F2EB] pb-20 md:pb-0 w-full max-w-full overflow-x-hidden print:min-h-0 print:bg-white print:text-black print:pb-0 print:overflow-visible">
           <Navbar />
-          <main className="flex-1">
+          <main className="flex-1 print:flex-none print:w-full print:m-0 print:p-0">
             <Routes>
               <Route path="/" element={<LeaderboardPage />} />
               <Route path="/docket" element={<DocketPage />} />
@@ -25,7 +25,7 @@ export const App: React.FC = () => {
               <Route path="/admin" element={<AdminPage />} />
             </Routes>
           </main>
-          <footer className="mt-12 border-t border-[#B87333]/25 bg-[#0E0C0B] py-7 px-4">
+          <footer className="mt-12 border-t border-[#B87333]/25 bg-[#0E0C0B] py-7 px-4 print:hidden">
             <div className="mx-auto max-w-6xl space-y-4">
               <div className="rounded-2xl border border-[#B87333]/30 bg-[#151210] px-4 py-3 text-center space-y-1.5">
                 <p className="font-mono-docket text-[11px] sm:text-xs text-[#D6C7B8]">
@@ -93,7 +93,7 @@ export const App: React.FC = () => {
                     className="inline-flex items-center gap-1 rounded border border-[#DFC15E]/30 bg-[#DFC15E]/10 px-2 py-0.5 font-mono-docket text-[10px] font-bold text-[#DFC15E] hover:bg-[#DFC15E]/20 transition"
                     title="Current App Version"
                   >
-                    <span>v1.6.26</span>
+                    <span>v1.6.34</span>
                   </Link>
                 </div>
               </div>

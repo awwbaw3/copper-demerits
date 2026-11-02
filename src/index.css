@@ -156,3 +156,52 @@ dialog::backdrop {
 ::-webkit-scrollbar-thumb:hover {
   background: #B87333;
 }
+
+/* =========================================================================
+   Print Styles — 1-Page Physical Tabletop Placard & Clean Print Output
+   ========================================================================= */
+@media print {
+  @page {
+    size: portrait;
+    margin: 0.4in;
+  }
+
+  html,
+  body,
+  #root {
+    background: #ffffff !important;
+    background-color: #ffffff !important;
+    color: #000000 !important;
+    height: auto !important;
+    min-height: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: visible !important;
+  }
+
+  /* Universally hide all global chrome & web UI elements in print */
+  header,
+  nav,
+  footer,
+  aside,
+  .print\:hidden {
+    display: none !important;
+  }
+
+  /* Suppress browser link URLs and underlines */
+  a,
+  a:visited {
+    text-decoration: none !important;
+    color: inherit !important;
+  }
+
+  /* Printable Placard Container & Page Containment */
+  #printable-qr-sign {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+    page-break-after: avoid !important;
+    box-shadow: none !important;
+    background-color: #ffffff !important;
+    color: #000000 !important;
+  }
+}

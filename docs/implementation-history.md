@@ -2,6 +2,16 @@
 
 Chronological log of architectural decisions, database migrations, and infrastructure deployments.
 
+## 2026-11-02 — v1.6.34 Isolated 1-Page Physical Tabletop Placard & Backbar Tent Card Print Layout
+- **Placard Print Isolation & 1-Page Formatting (`src/pages/SharePage.tsx`, `src/index.css`, `src/App.tsx`, `src/components/Navbar.tsx`)**:
+  - Investigated issue: *"When we click Print Tablettop Placard / Backbar Card, it should only show a one-page printable version of this placard. Instead it appears to print the whole website."*
+  - Diagnosed that `Navbar` (`header` & `nav`) and `footer` had no print hiding rules, and body background was dark, causing the entire website layout to print across multiple pages.
+  - Implemented `@media print` rules in `src/index.css` hiding `header`, `nav`, `footer`, `aside`, and `.print:hidden`.
+  - Added `@page { size: portrait; margin: 0.4in; }` and encapsulated `#printable-qr-sign` with `break-inside: avoid; page-break-inside: avoid; page-break-after: avoid; max-width: 6.2in; margin: 0 auto;`.
+  - Enhanced tabletop tent placard graphics: stag logo, clean black frame, crisp QR code, direct URL, live stats, and table tent fold guides fitting cleanly on one page.
+
+---
+
 ## 2026-11-02 — v1.6.33 Dynamic Sports Rank Calculation & True Co-Leader Tie Detection
 - **Leaderboard Rank & Badge Decoupling (`src/pages/LeaderboardPage.tsx`)**:
   - Investigated user report: *"Burtis still shows as Co #1 Leader badge on the page, but he is not longer co-leader"*.

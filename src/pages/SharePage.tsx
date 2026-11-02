@@ -117,7 +117,7 @@ export const SharePage: React.FC = () => {
   };
 
   return (
-    <div className="mx-auto max-w-4xl px-3 sm:px-4 pt-4 sm:pt-6 pb-16 space-y-6">
+    <div className="mx-auto max-w-4xl px-3 sm:px-4 pt-4 sm:pt-6 pb-16 space-y-6 print:m-0 print:p-0 print:max-w-none print:w-full print:space-y-0">
       {/* Top Breadcrumb Header - Hidden in Print */}
       <div className="flex items-center justify-between print:hidden">
         <Link
@@ -133,37 +133,40 @@ export const SharePage: React.FC = () => {
       </div>
 
       {/* Main Container */}
-      <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-start">
+      <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-start print:block print:w-full print:m-0 print:p-0">
         {/* Left Column: QR Code Display Card (Printable Section) */}
-        <div className="md:col-span-7 space-y-4">
+        <div className="md:col-span-7 space-y-4 print:w-full print:m-0 print:p-0 print:block">
           <div
             id="printable-qr-sign"
-            className="relative overflow-hidden rounded-3xl border-2 border-[#DFC15E] bg-[#171310] p-6 sm:p-8 text-center shadow-[0_0_50px_rgba(223,193,94,0.2)] print:border-4 print:border-black print:bg-white print:text-black print:p-8 print:shadow-none"
+            className="relative overflow-hidden rounded-3xl border-2 border-[#DFC15E] bg-[#171310] p-6 sm:p-8 text-center shadow-[0_0_50px_rgba(223,193,94,0.2)] print:border-4 print:border-black print:rounded-3xl print:bg-white print:text-black print:p-6 print:shadow-none print:max-w-[6.2in] print:mx-auto print:break-inside-avoid print:page-break-inside-avoid print:page-break-after-avoid"
           >
             {/* Header Brand Badge */}
-            <div className="flex items-center justify-center gap-3 mb-4">
+            <div className="flex items-center justify-center gap-3 mb-4 print:mb-3">
               <img
                 src="/brand/CopperLogo_Web.png"
                 alt="Copper Athletic Club"
-                className="h-12 sm:h-14 w-auto object-contain drop-shadow-[0_0_15px_rgba(184,115,51,0.5)] print:filter print:grayscale"
+                className="h-12 sm:h-14 print:h-16 w-auto object-contain drop-shadow-[0_0_15px_rgba(184,115,51,0.5)] print:drop-shadow-none"
               />
-              <div className="text-left border-l-2 border-[#B87333]/50 pl-3 print:border-black">
-                <h1 className="font-athletic text-lg sm:text-2xl font-black uppercase tracking-wider text-[#F5F2EB] leading-none print:text-black">
+              <div className="text-left border-l-2 border-[#B87333]/50 pl-3 print:border-black print:pl-3">
+                <span className="hidden print:block font-mono text-[9px] uppercase tracking-widest text-neutral-600 font-bold">
+                  Copper Athletic Club • Marshall, MI
+                </span>
+                <h1 className="font-athletic text-lg sm:text-2xl print:text-2xl font-black uppercase tracking-wider text-[#F5F2EB] leading-none print:text-black">
                   RING OF <span className="text-[#DFC15E] print:text-black">DEMERITS</span>
                 </h1>
-                <p className="font-mono-docket text-[11px] text-[#DFC15E] tracking-widest uppercase mt-0.5 print:text-black">
+                <p className="font-mono-docket text-[11px] print:text-xs text-[#DFC15E] tracking-widest uppercase mt-0.5 print:text-black print:font-bold">
                   Official Backbar Docket &amp; Scoreboard
                 </p>
               </div>
             </div>
 
             {/* QR Code Container */}
-            <div className="relative mx-auto my-4 inline-block rounded-2xl bg-white p-4 shadow-[0_0_35px_rgba(223,193,94,0.35)] print:p-2 print:shadow-none">
+            <div className="relative mx-auto my-4 print:my-3 inline-block rounded-2xl bg-white p-4 print:p-3 print:border-2 print:border-black shadow-[0_0_35px_rgba(223,193,94,0.35)] print:shadow-none">
               {qrDataUrl ? (
                 <img
                   src={qrDataUrl}
                   alt="Copper Demerits QR Code"
-                  className="h-56 w-56 sm:h-64 sm:w-64 object-contain rounded-lg"
+                  className="h-56 w-56 sm:h-64 sm:w-64 print:h-60 print:w-60 object-contain rounded-lg"
                 />
               ) : (
                 <div className="flex h-56 w-56 sm:h-64 sm:w-64 items-center justify-center text-xs text-neutral-500 font-mono-docket">
@@ -173,30 +176,37 @@ export const SharePage: React.FC = () => {
             </div>
 
             {/* Callout Prompt */}
-            <div className="space-y-1.5 mt-2">
-              <span className="inline-block rounded-full bg-[#DFC15E] px-3 py-1 font-athletic text-xs font-black uppercase tracking-wider text-[#121212] print:border print:border-black print:bg-white print:text-black">
-                Scan With Phone Camera
+            <div className="space-y-1.5 mt-2 print:mt-1">
+              <span className="inline-block rounded-full bg-[#DFC15E] px-3.5 py-1 font-athletic text-xs print:text-sm font-black uppercase tracking-wider text-[#121212] print:border-2 print:border-black print:bg-black print:text-white">
+                Scan With Any Phone Camera
               </span>
-              <p className="font-mono-docket text-xs text-[#E8B888] print:text-black font-semibold">
-                Instant Access · No App Store Needed · 1-Tap Home Screen Install
+              <p className="font-mono-docket text-xs print:text-xs text-[#E8B888] print:text-neutral-800 font-semibold print:max-w-md print:mx-auto">
+                Instant Access · Live Standings · Wall of Demerit Slips · 1-Tap Home Screen App
               </p>
-              <div className="pt-2">
-                <code className="rounded-lg bg-black/60 px-3 py-1 font-mono-docket text-xs text-[#DFC15E] border border-[#B87333]/30 print:bg-transparent print:border-none print:text-black print:text-sm print:font-bold">
+              <div className="pt-2 print:pt-1">
+                <code className="rounded-lg bg-black/60 px-3 py-1 font-mono-docket text-xs text-[#DFC15E] border border-[#B87333]/30 print:bg-neutral-100 print:border print:border-black print:text-black print:text-base print:font-black print:px-4 print:py-1.5">
                   {fullShareUrl}
                 </code>
               </div>
             </div>
 
             {/* Current Backbar Stats Footer inside card */}
-            <div className="mt-5 pt-4 border-t border-[#B87333]/30 flex items-center justify-center gap-4 text-[11px] font-mono-docket text-[#B5A99D] print:border-black print:text-black">
+            <div className="mt-5 print:mt-4 pt-4 print:pt-3 border-t border-[#B87333]/30 print:border-black flex items-center justify-center gap-4 text-[11px] print:text-xs font-mono-docket text-[#B5A99D] print:text-black print:font-bold">
               <span className="flex items-center gap-1">
-                <Flame className="h-3.5 w-3.5 text-[#DFC15E]" />
+                <Flame className="h-3.5 w-3.5 text-[#DFC15E] print:text-black" />
                 <strong className="text-white print:text-black">{totalDemeritPoints}</strong> Total Demerit Pts
               </span>
               <span>•</span>
               <span>
                 <strong className="text-white print:text-black">{approvedSlips.length}</strong> Official Slips Logged
               </span>
+            </div>
+
+            {/* Tabletop Placard Cut / Fold helper (Visible in Print Only) */}
+            <div className="hidden print:block mt-4 pt-3 border-t border-dashed border-neutral-400 text-center">
+              <p className="text-[10px] font-mono uppercase tracking-widest text-neutral-500 font-medium">
+                ✂ Tabletop Tent Card / Backbar Display Placard · copperdemerits.com
+              </p>
             </div>
           </div>
         </div>

@@ -33,9 +33,21 @@ interface ChangelogEntry {
 
 const USER_CHANGELOG: ChangelogEntry[] = [
   {
-    version: 'v1.6.33',
+    version: 'v1.6.34',
     date: 'November 2, 2026',
     badge: 'LATEST RELEASE',
+    title: 'Isolated 1-Page Physical Tabletop Placard & Backbar Tent Card Print Layout',
+    summary:
+      'Fixed print functionality so printing the Tabletop Placard (/share) strictly outputs a high-contrast 1-page table tent card rather than printing the website headers, tickers, navigation, and footers.',
+    highlights: [
+      'Isolated 1-Page Print Placard: Encapsulated the QR code card with @page { size: portrait; margin: 0.4in; } and page-break-inside: avoid, guaranteeing that printing the tabletop placard fits on exactly one 8.5x11 sheet with zero 2nd page spillover.',
+      'Universal Print Chrome Suppression: Added global print rules hiding the top sticky header, animated sports ticker, mobile bottom navigation bar, and desktop footer.',
+      'Clean Table Tent Design: Added high-contrast white card styling with crisp Copper Athletic Club branding, large QR code, and table tent fold guides.',
+    ],
+  },
+  {
+    version: 'v1.6.33',
+    date: 'November 2, 2026',
     title: 'Dynamic Sports Rank Calculation & True Co-Leader Tie Detection',
     summary:
       'Replaced historical hardcoded leaderboard theme badges with dynamic, live-calculated standings, sports podium tiers, and mathematically accurate tie detection across all patron cards.',

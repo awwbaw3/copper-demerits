@@ -2,6 +2,17 @@
 
 All notable changes to the **Copper Athletic Club — Ring of Honor** web application are documented in this file.
 
+## [1.6.34] - 2026-11-02
+
+### Fixed & Enhanced — Isolated 1-Page Physical Tabletop Placard & Backbar Tent Card Print Layout
+- **Isolated 1-Page Placard Printing (`src/pages/SharePage.tsx`, `src/index.css`)**:
+  - Root Cause: Triggering "Print Tabletop Placard / Backbar Card" called `window.print()` without global print styling, causing the browser to print the entire web page (sticky header, animated sports ticker, mobile fixed bottom bar, and full footer with disclaimers across 2–3 pages).
+  - Added dedicated `@media print` rules in `src/index.css` that hide all web chrome (`header`, `nav`, `footer`, `aside`, `.print:hidden`), reset root backgrounds to pure white, and isolate `#printable-qr-sign` with `@page { size: portrait; margin: 0.4in; }` and `page-break-inside: avoid`.
+  - Upgraded `#printable-qr-sign` with high-contrast, professional tabletop tent card formatting including Copper Athletic Club stag branding, large high-res QR code, direct URL, live citation stats, and folding guides, strictly fitting on a single 8.5" x 11" sheet.
+- **Universal Print Chrome Suppression (`src/App.tsx`, `src/components/Navbar.tsx`)**:
+  - Explicitly added `print:hidden` to the sticky header, mobile bottom navigation bar, and footer.
+  - Updated footer version badge in `src/App.tsx` to `v1.6.34`.
+
 ## [1.6.33] - 2026-11-02
 
 ### Fixed & Enhanced — Dynamic Sports Rank Calculation & True Co-Leader Tie Detection

@@ -1,6 +1,14 @@
 # Task Tracker — Copper Demerits (`copperdemerits.com`)
 
-## Active Sprint — v1.6.33 (Dynamic Sports Rank Calculation & True Co-Leader Tie Detection)
+## Active Sprint — v1.6.34 (Isolated 1-Page Physical Tabletop Placard & Backbar Tent Card Print Layout)
+- [x] Add global `@media print` rules in `src/index.css` hiding `header`, `nav`, `footer`, `aside`, and `.print:hidden`
+- [x] Add `@page { size: portrait; margin: 0.4in; }` and page-break isolation for `#printable-qr-sign`
+- [x] Add explicit `print:hidden` on `src/components/Navbar.tsx` (`<header>` and mobile bottom `<nav>`) and `src/App.tsx` (`<footer>`)
+- [x] Refactor `src/pages/SharePage.tsx` container and card so `#printable-qr-sign` prints as a centered, clean 1-page table tent card
+- [x] Update footer version badge in `src/App.tsx` to `v1.6.34`
+- [x] Pass `npm run lint` and `npm run build`, and deploy to Netlify production
+
+### v1.6.33 (Dynamic Sports Rank Calculation & True Co-Leader Tie Detection)
 - [x] Audit `src/pages/LeaderboardPage.tsx` and identify hardcoded `rankIcon: '🚨 CO-#1 LEADER'` on Burtis
 - [x] Implement dynamic `getPatronRankInfo` with sports tie detection (`firstIndex + 1` with `tieCount > 1`)
 - [x] Update `getPlayerCardTheme` to award `👑 #1 LEADER` (or `👑 CO-#1 LEADER` if tied), podium tiers (`🥈 T-#2`, `🥉 T-#3`), and `#N / T-#N IN THE BOX`
